@@ -1,0 +1,43 @@
+apply plugin: 'java'
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+
+    compileOnly files('compileLibs/android-4.1.1.4.jar')
+    compileOnly project(':e3db:e3db-crypto-stubs')
+
+    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+    implementation 'com.squareup.okio:okio:1.13.0'
+    implementation project(':e3db-crypto-interface')
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"
+
+//assert hasProperty('java7Home') : "Set the property 'java7Home' in your your gradle.properties pointing to a Java 7 installation"
+if(hasProperty('java7home')) {
+    def javaExecutablesPath = new File(java7Home, 'bin')
+    def javaExecutables = [:].withDefault { execName ->
+        def executable = new File(javaExecutablesPath, execName + ".exe")
+        assert executable.exists() : "There is no ${execName} executable in ${javaExecutablesPath}"
+        executable
+    }
+    tasks.withType(AbstractCompile) {
+        options.with {
+            fork = true
+            forkOptions.javaHome = file(java7Home)
+        }
+    }
+    tasks.withType(Javadoc) {
+        executable = javaExecutables.javadoc
+    }
+    tasks.withType(Test) {
+        executable = javaExecutables.java
+    }
+    tasks.withType(JavaExec) {
+        executable = javaExecutables.java
+    }
+}

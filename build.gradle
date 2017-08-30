@@ -26,3 +26,20 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+/*
+ * Set the gradle property "java7Home" to the root of a Java 7 JDK to ensure compilation
+ * using only JDK 7 classes.
+ */
+void setJava7(Project project) {
+    if (hasProperty('java7Home') && project.sourceCompatibility.toString() == "1.7") {
+        def javaBootstrapPath = new File(java7Home, 'jre').toPath().resolve("lib").resolve("rt.jar").toString()
+        project.tasks.withType(AbstractCompile) {
+            options.with {
+                fork = true
+                forkOptions.javaHome = file(java7Home)
+                forkOptions.jvmArgs = ["-bootclasspath", javaBootstrapPath, "-Xlint:unchecked"]
+            }
+        }
+    }
+}

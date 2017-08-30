@@ -13,3 +13,5 @@ dependencies {
     runtime project(':e3db-crypto-plain')
     implementation project(':e3db')
 }
+
+setJava7(this.project)

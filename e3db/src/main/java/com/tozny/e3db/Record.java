@@ -5,9 +5,5 @@ import java.util.Map;
 
 public interface Record {
   RecordMeta meta();
-  List<String> keys();
-  List<Object> values();
-  Map<String, String> entries();
-  String get(String key);
-  boolean containsKey(String key);
+  Map<String, String> data();
 }

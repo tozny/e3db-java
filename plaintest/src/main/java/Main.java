@@ -1,6 +1,6 @@
-import com.tozny.e3db.ClientInfo;
-import com.tozny.e3db.E3DBClient;
-import com.tozny.e3db.E3DBClientBuilder;
+import com.tozny.e3db.Config;
+import com.tozny.e3db.Client;
+import com.tozny.e3db.ClientBuilder;
 import com.tozny.e3db.QueryParams;
 import com.tozny.e3db.QueryResponse;
 import com.tozny.e3db.Record;
@@ -19,14 +19,14 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
   public static void main(String [] args) throws IOException, InterruptedException {
-    // This class does not run in Android Studio correctly. Instead, use gradlew to build
+    // This program does not run in Android Studio correctly. Instead, use gradlew to build
     // an uber jar and run that:
     //
     // > gradlew :plaintest:shadowJar
     // > java -cp plaintest\build\libs\plaintest-all.jar Main
     final CountDownLatch queryLatch = new CountDownLatch(1);
-    final E3DBClient client = new E3DBClientBuilder()
-      .fromClientInfo(ClientInfo.fromJson(new String(Files.readAllBytes(Paths.get("C:\\Users\\Justin\\.tozny\\dev1\\e3db.json")), "UTF-8")))
+    final Client client = new ClientBuilder()
+      .fromClientInfo(Config.fromJson(new String(Files.readAllBytes(Paths.get("C:\\Users\\Justin\\.tozny\\dev1\\e3db.json")), "UTF-8")))
       .build();
 
     client.query(QueryParams.ALL, new ResultHandler<QueryResponse>() {
@@ -38,7 +38,7 @@ public class Main {
         else {
           for(Record record : r.asValue().records())
             try {
-              System.out.println("Got pasted item: " + record.get("data"));
+              System.out.println("Got pasted item: " + record.data().get("data"));
             } catch (NoSuchElementException e) {
               System.out.println("Record " + record.meta().recordId() + " does not have a 'data' field.");
             }
@@ -63,7 +63,7 @@ public class Main {
     plain.put("isMetallica", "false");
     plain.put("year", "1990");
 
-    client.write(new RecordData(record), plain, "lyric", new ResultHandler<Record>() {
+    client.write("lyric", new RecordData(record), plain, new ResultHandler<Record>() {
       @Override
       public void handle(Result<Record> r) {
         if(r.isError())

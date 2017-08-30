@@ -1,7 +1,7 @@
 package com.tozny.e3db.crypto;
 
 import com.tozny.e3db.CipherWithNonce;
-import com.tozny.e3db.E3DBCrypto;
+import com.tozny.e3db.Crypto;
 
 import org.libsodium.jni.NaCl;
 import org.libsodium.jni.crypto.Box;
@@ -13,10 +13,10 @@ import static org.libsodium.jni.Sodium.crypto_secretbox_keybytes;
 import static org.libsodium.jni.Sodium.crypto_secretbox_noncebytes;
 import static org.libsodium.jni.SodiumJNI.crypto_box_keypair;
 
-public class AndroidE3DBCrypto implements E3DBCrypto {
+public class AndroidCrypto implements Crypto {
   private Random random = new Random();
 
-  public AndroidE3DBCrypto() {
+  public AndroidCrypto() {
   }
 
   @Override

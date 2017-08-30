@@ -1,6 +1,6 @@
 package com.tozny.e3db;
 
-public interface E3DBCrypto {
+public interface Crypto {
   /**
    * Encrypts the bytes given using the key given. key must be a 32-byte array. Returns a
    * a Base64-URL encoded string with the format EF.EFN (encrypted field/encrypted field nonce).

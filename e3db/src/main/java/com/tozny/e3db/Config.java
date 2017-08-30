@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class ClientInfo {
+public class Config {
   private static final ObjectMapper mapper =  new ObjectMapper();
   public final String apiKey;
   public final String apiSecret;
@@ -19,7 +19,7 @@ public class ClientInfo {
   public final String host;
   private final String publicKey;
 
-  public ClientInfo(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateKey, String publicKey) {
+  public Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateKey, String publicKey) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.privateKey = privateKey;
@@ -29,13 +29,13 @@ public class ClientInfo {
     this.publicKey = publicKey;
   }
 
-  public static ClientInfo fromCredentials(ClientCredentials creds, String clientName, String host, String privateKey, String publicKey) {
-    return new ClientInfo(creds.apiKey(), creds.apiSecret(), creds.clientId(), clientName, host, privateKey, publicKey);
+  public static Config fromCredentials(ClientCredentials creds, String clientName, String host, String privateKey, String publicKey) {
+    return new Config(creds.apiKey(), creds.apiSecret(), creds.clientId(), clientName, host, privateKey, publicKey);
   }
 
-  public static ClientInfo fromJson(String doc) throws IOException {
+  public static Config fromJson(String doc) throws IOException {
     JsonNode info = mapper.readTree(doc);
-    return new ClientInfo(info.get("api_key_id").asText(),
+    return new Config(info.get("api_key_id").asText(),
       info.get("api_secret").asText(),
       UUID.fromString(info.get("client_id").asText()),
       info.get("client_email").asText(),

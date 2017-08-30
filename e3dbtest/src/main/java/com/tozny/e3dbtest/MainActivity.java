@@ -6,15 +6,15 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.tozny.e3db.ClientInfo;
-import com.tozny.e3db.E3DBClient;
-import com.tozny.e3db.E3DBClientBuilder;
+import com.tozny.e3db.Config;
+import com.tozny.e3db.Client;
+import com.tozny.e3db.ClientBuilder;
 import com.tozny.e3db.E3DBNotFoundException;
 import com.tozny.e3db.Record;
 import com.tozny.e3db.RecordData;
 import com.tozny.e3db.Result;
 import com.tozny.e3db.ResultHandler;
-import com.tozny.e3db.crypto.AndroidE3DBCrypto;
+import com.tozny.e3db.crypto.AndroidCrypto;
 
 import org.apache.commons.io.IOUtils;
 
@@ -41,39 +41,39 @@ public class MainActivity extends AppCompatActivity {
 
   public static final String COMPLETED = "completed";
   public static final String MESSAGE = "It's a simple message and I'm leaving out the whistles and bells";
-  private final AndroidE3DBCrypto crypto = new AndroidE3DBCrypto();
+  private final AndroidCrypto crypto = new AndroidCrypto();
 
-  private ClientInfo loadClientInfo(Bundle savedInstanceState) throws IOException {
-    return ClientInfo.fromJson(savedInstanceState.getString("regInfo"));
+  private Config loadClientInfo(Bundle savedInstanceState) throws IOException {
+    return Config.fromJson(savedInstanceState.getString("regInfo"));
   }
 
-  private E3DBClient getClient() throws IOException {
+  private Client getClient() throws IOException {
     String doc = new String(IOUtils.toByteArray(openFileInput("e3db.json")), "UTF-8");
-    return new E3DBClientBuilder()
-      .fromClientInfo(ClientInfo.fromJson(doc))
+    return new ClientBuilder()
+      .fromClientInfo(Config.fromJson(doc))
       .build();
   }
 
   private void write1(ResultHandler<Record> handler) throws IOException {
     final Context ctx = this;
-    E3DBClient client = getClient();
+    Client client = getClient();
 
     Map<String, String> record = new HashMap<>();
     record.put("line", MESSAGE);
-    client.write(new RecordData(record), null, "stuff", handler);
+    client.write("stuff", new RecordData(record), null, handler);
   }
 
   private void registration(final String host, String token) {
     final String clientName = UUID.randomUUID().toString();
     final Context ctx = this;
 
-    E3DBClient.register(
-      token, clientName, host, new ResultHandler<ClientInfo>() {
+    Client.register(
+      token, clientName, host, new ResultHandler<Config>() {
         @Override
-        public void handle(Result<ClientInfo> r) {
+        public void handle(Result<Config> r) {
           try {
             if (! r.isError()) {
-              ClientInfo info = r.asValue();
+              Config info = r.asValue();
               Log.i(INFO, info.clientId.toString());
               FileOutputStream fileOutputStream = openFileOutput("e3db.json", Context.MODE_PRIVATE);
               try {
@@ -99,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void read1(UUID recordId) throws IOException {
-    final E3DBClient client = getClient();
+    final Client client = getClient();
     final Context ctx = this;
     client.read(recordId, new ResultHandler<Record>() {
       @Override
@@ -107,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
         if(! r.isError()) {
           Intent intent = new Intent(ctx, MainActivity.class);
           intent.putExtra(COMPLETED, Step.READ1.toString());
-          if(MESSAGE.compareTo(r.asValue().get("line")) != 0) throw new RuntimeException(MESSAGE + " != " + r.asValue().get("line"));
+          if(MESSAGE.compareTo(r.asValue().data().get("line")) != 0) throw new RuntimeException(MESSAGE + " != " + r.asValue().data().get("line"));
           intent.putExtra("recordId", r.asValue().meta().recordId().toString());
           startActivity(intent);
         }
@@ -120,8 +120,8 @@ public class MainActivity extends AppCompatActivity {
 
   private void share1(UUID type) throws IOException {
     final Context ctx = this;
-    E3DBClient client = getClient();
-    client.share((String) null, null, new ResultHandler<Void>() {
+    Client client = getClient();
+    client.share((String) null, (UUID) null, new ResultHandler<Void>() {
       @Override
       public void handle(Result<Void> r) {
         if(! r.isError()) {
@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void delete1() throws IOException {
     final Context ctx = this;
-    final E3DBClient client = getClient();
+    final Client client = getClient();
 
     write1(new ResultHandler<Record>() {
       @Override
@@ -166,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
 
   private void update1() throws IOException {
     final Context ctx = this;
-    final E3DBClient client = getClient();
+    final Client client = getClient();
 
     write1(new ResultHandler<Record>() {
       @Override
@@ -180,7 +180,7 @@ public class MainActivity extends AppCompatActivity {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError()) throw new RuntimeException("Error", r.asError().other());
-            if(r.asValue().get("line").compareTo(updatedMessage) != 0) throw new RuntimeException(r.asValue().get("line") + " != " + updatedMessage);
+            if(r.asValue().data().get("line").compareTo(updatedMessage) != 0) throw new RuntimeException(r.asValue().data().get("line") + " != " + updatedMessage);
 
             Intent updateComplete = new Intent(ctx, MainActivity.class);
             updateComplete.putExtra(COMPLETED, Step.UPDATE1.toString());

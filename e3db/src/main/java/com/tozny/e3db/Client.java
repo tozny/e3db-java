@@ -6,7 +6,8 @@ import android.os.Looper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tozny.e3db.crypto.AndroidE3DBCrypto;
+import com.tozny.e3db.crypto.AndroidCrypto;
+import com.tozny.e3db.crypto.KaliumCrypto;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -20,7 +21,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -45,17 +45,14 @@ import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
-/**
- * Created by Justin on 8/28/2017.
- */
-public class E3DBClient {
+public class Client {
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
   private static final Executor uiExecutor;
-  private static final E3DBCrypto crypto;
+  private static final Crypto crypto;
   private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
 
@@ -85,7 +82,7 @@ public class E3DBClient {
     }
 
     if (isAndroid) {
-      crypto = new AndroidE3DBCrypto();
+      crypto = new AndroidCrypto();
       // Post results to UI thread
       uiExecutor = new Executor() {
         private final Handler handler = new Handler(Looper.getMainLooper());
@@ -96,7 +93,7 @@ public class E3DBClient {
         }
       };
     } else {
-      crypto = new com.tozny.e3db.crypto.KaliumE3DBCrypto();
+      crypto = new KaliumCrypto();
       // Post results to current thread (whatever that is)
       uiExecutor = new Executor() {
         @Override
@@ -114,7 +111,7 @@ public class E3DBClient {
   private final StorageAPI storageClient;
   private final ShareAPI shareClient;
 
-  E3DBClient(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey) {
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.clientId = clientId;
@@ -218,7 +215,7 @@ public class E3DBClient {
 
   }
 
-  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, E3DBCrypto crypto) throws ParseException, UnsupportedEncodingException {
+  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
     UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
     UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
     Date created = iso8601.parse(rawMeta.get("created").asText());
@@ -282,13 +279,14 @@ public class E3DBClient {
     }
 
   }
+
   private static class R implements Record {
-    private final Map<String, String> fields;
+    private final Map<String, String> data;
 
     private final RecordMeta meta;
 
-    public R(Map<String, String> fields, RecordMeta meta) {
-      this.fields = fields;
+    public R(Map<String, String> data, RecordMeta meta) {
+      this.data = data;
       this.meta = meta;
     }
 
@@ -298,32 +296,9 @@ public class E3DBClient {
     }
 
     @Override
-    public Map<String, String> entries() {
-      return new HashMap<>(this.fields);
+    public Map<String, String> data() {
+      return data;
     }
-
-    @Override
-    public List<String> keys() {
-      return new ArrayList(fields.keySet());
-    }
-
-    @Override
-    public List<Object> values() {
-      return new ArrayList(fields.values());
-    }
-
-    @Override
-    public String get(String key) {
-      if (fields.containsKey(key))
-        return fields.get(key);
-      else
-        throw new NoSuchElementException(key);
-    }
-    @Override
-    public boolean containsKey(String key) {
-      return fields.containsKey(key);
-    }
-
   }
   private static class QR implements QueryResponse {
     private final ArrayList<Record> records;
@@ -382,7 +357,7 @@ public class E3DBClient {
     return new QR(records, nextIdx);
   }
 
-  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, E3DBCrypto crypto) throws UnsupportedEncodingException {
+  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, Crypto crypto) throws UnsupportedEncodingException {
     Map<String, String> encFields = new HashMap<>();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
       byte[] dk = crypto.newSecretKey();
@@ -394,7 +369,7 @@ public class E3DBClient {
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, JsonNode record, E3DBCrypto crypto) throws UnsupportedEncodingException {
+  private static Map<String, String> decryptObject(byte[] accessKey, JsonNode record, Crypto crypto) throws UnsupportedEncodingException {
     Map<String, String> decryptedFields = new HashMap<>();
     Iterator<String> keys = record.fieldNames();
     while (keys.hasNext()) {
@@ -551,7 +526,7 @@ public class E3DBClient {
   }
 
   /**
-   * Generates a private key that can be used for Ec25591
+   * Generates a private key that can be used for Curve25519
    * public-key encryption.
    *
    * The associated public key be retrieve using {@link getPublicKey}.
@@ -581,7 +556,7 @@ public class E3DBClient {
     return ByteString.of(crypto.getPublicKey(arr.toByteArray())).base64Url();
   }
 
-  public static void register(final String token, final String clientName, final String host, final ResultHandler<ClientInfo> handleResult) {
+  public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
     final byte[] privateKey = crypto.newPrivateKey();
     final String publicKey = ByteString.of(crypto.getPublicKey(privateKey)).base64Url();
     register(token, clientName, publicKey, host, new ResultHandler<ClientCredentials>() {
@@ -591,7 +566,7 @@ public class E3DBClient {
           executeError(uiExecutor, handleResult, r.asError().other());
         }
         final ClientCredentials credentials = r.asValue();
-        ClientInfo info = new ClientInfo(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, ByteString.of(privateKey).base64Url(),
+        Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, ByteString.of(privateKey).base64Url(),
           publicKey);
         executeValue(uiExecutor, handleResult, info);
       }
@@ -643,26 +618,26 @@ public class E3DBClient {
   /**
    * Write a new record.
    *
+   * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
    * @param fields Values to encrypt and store.
    * @param plain A JSON document that will be stored as plaintext (not encrypted) alongside
    *              the record. If null, an empty JSON document is assumed.
-   * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
    * @param handleResult
    * @return
    */
-  public void write(final RecordData fields, final Map<String, String> plain, final String type, final ResultHandler<Record> handleResult) {
+  public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     onBackground(new Runnable() {
       @Override
       public void run() {
         try {
           if (fields == null) {
-            uiError(handleResult, new IllegalArgumentException("fields null"));
+            uiError(handleResult, new IllegalArgumentException("data null"));
           }
           if (type == null || type.trim().length() == 0) {
             uiError(handleResult, new IllegalArgumentException("type null"));
           }
           final byte[] ownAK = getOwnAccessKey(type);
-          Map<String, String> encFields = encryptObject(ownAK, fields.getData(), crypto);
+          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
@@ -694,7 +669,7 @@ public class E3DBClient {
   }
 
   /**
-   * Replace the given record with new fields and plaintext. All existing fields and plaintext
+   * Replace the given record with new data and plaintext. All existing data and plaintext
    * will be overwritten.
    *
    * @param recordId
@@ -711,7 +686,7 @@ public class E3DBClient {
       public void run() {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
-          Map<String, String> encFields = encryptObject(ownAK, fields.getData(), crypto);
+          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
@@ -822,7 +797,7 @@ public class E3DBClient {
     Call<Response> putPolicy(@Path("writer_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId, @Body RequestBody policy);
   }
 
-  public void share(final String readerEmail, final String type, final ResultHandler<Void> handleResult) {
+  public void share(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -836,7 +811,7 @@ public class E3DBClient {
     });
   }
 
-  public void share(final UUID readerId, final String type, final ResultHandler<Void> handleResult) {
+  public void share(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       public void run() {
         doShare(readerId, type, handleResult);
@@ -844,7 +819,7 @@ public class E3DBClient {
     });
   }
 
-  public void revoke(final String readerEmail, final String type, final ResultHandler<Void> handleResult) {
+  public void revoke(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -858,7 +833,7 @@ public class E3DBClient {
     });
   }
 
-  public void revoke(final UUID readerId, final String type, final ResultHandler<Void> handleResult) {
+  public void revoke(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       public void run() {
         doRevoke(readerId, type, handleResult);

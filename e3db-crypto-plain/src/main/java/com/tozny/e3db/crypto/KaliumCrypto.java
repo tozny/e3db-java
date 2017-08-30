@@ -1,7 +1,7 @@
 package com.tozny.e3db.crypto;
 
 import com.tozny.e3db.CipherWithNonce;
-import com.tozny.e3db.E3DBCrypto;
+import com.tozny.e3db.Crypto;
 
 import org.abstractj.kalium.crypto.Box;
 import org.abstractj.kalium.crypto.Random;
@@ -12,10 +12,7 @@ import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_BOX_CURVE25519XSALSA20POLY
 import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_KEYBYTES;
 import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_NONCEBYTES;
 
-/**
- * Created by Justin on 8/18/2017.
- */
-public class KaliumE3DBCrypto implements E3DBCrypto {
+public class KaliumCrypto implements Crypto {
   private static Random random = new Random();
 
   public static class Bar {}

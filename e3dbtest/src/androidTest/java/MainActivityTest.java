@@ -134,7 +134,7 @@ public class MainActivityTest {
       wait.await(30, TimeUnit.SECONDS);
     }
 
-    Client from = getClient().client;
+    CI from = getClient();
     CI to = getClient(shareProfile);
     Map<String, String> cleartext = new HashMap<>();
     cleartext.put("song", "triangle man");
@@ -144,7 +144,7 @@ public class MainActivityTest {
     // Use default client to write a record
     {
       final CountDownLatch wait = new CountDownLatch(2);
-      from.write("lyric", new RecordData(cleartext), null, new ResultHandler<Record>() {
+      from.client.write("lyric", new RecordData(cleartext), null, new ResultHandler<Record>() {
         @Override
         public void handle(Result<Record> r) {
           assertFalse("Error writing record", r.isError());
@@ -154,7 +154,7 @@ public class MainActivityTest {
       });
       wait.await(30, TimeUnit.SECONDS);
 
-      from.share("lyric", to.clientId, new ResultHandler<Void>() {
+      from.client.share("lyric", to.clientId, new ResultHandler<Void>() {
         @Override
         public void handle(Result<Void> r) {
           assertFalse("Error sharing lyric record.", r.isError());
@@ -163,6 +163,8 @@ public class MainActivityTest {
       });
       wait.await(30, TimeUnit.SECONDS);
     }
+
+    Log.i("info", "Shared record: " + recordIdRef.get() + " from client " + from.clientId + " to " + to.clientId);
 
     // query the record using share client to see if it exists
     {
@@ -185,7 +187,7 @@ public class MainActivityTest {
     {
       final CountDownLatch wait = new CountDownLatch(2);
 
-      from.revoke("lyric", to.clientId, new ResultHandler<Void>() {
+      from.client.revoke("lyric", to.clientId, new ResultHandler<Void>() {
         @Override
         public void handle(Result<Void> r) {
           assertFalse("Error revoking shared record.", r.isError());

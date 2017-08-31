@@ -19,5 +19,5 @@ interface ShareAPI {
   Call<ResponseBody> lookupClient(@Path("client_id") UUID clientId);
 
   @PUT("/v1/storage/policy/{user_id}/{writer_id}/{reader_id}/{type}")
-  Call<ResponseBody> putPolicy(@Path("writer_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId, @Body RequestBody policy);
+  Call<ResponseBody> putPolicy(@Path("user_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId, @Path("type") String type, @Body RequestBody policy);
 }

@@ -37,7 +37,6 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okio.ByteString;
-import retrofit2.Call;
 import retrofit2.Retrofit;
 
 public class Client {
@@ -506,6 +505,7 @@ public class Client {
       clientId.toString(),
       clientId.toString(),
       readerId.toString(),
+      type,
       RequestBody.create(APPLICATION_JSON, allow)).execute();
 
     if(shareResponse.code() != 201) {
@@ -521,6 +521,7 @@ public class Client {
       clientId.toString(),
       clientId.toString(),
       readerId.toString(),
+      type,
       RequestBody.create(APPLICATION_JSON, deny)).execute();
 
     if(shareResponse.code() != 201) {

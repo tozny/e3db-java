@@ -39,6 +39,10 @@ import okhttp3.ResponseBody;
 import okio.ByteString;
 import retrofit2.Retrofit;
 
+import static com.tozny.e3db.Base64.decodeURL;
+import static com.tozny.e3db.Base64.encodeURL;
+import static com.tozny.e3db.Checks.*;
+
 public class Client {
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
@@ -51,7 +55,6 @@ public class Client {
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
 
   static {
-
     backgroundExecutor = new ThreadPoolExecutor(1,
       Runtime.getRuntime().availableProcessors(),
       30,
@@ -128,11 +131,18 @@ public class Client {
     private final String apiKey;
     private final String apiSecret;
     private final UUID clientId;
+    private final String name;
+    private final String publicKey;
 
-    public CC(String apiKey, String apiSecret, UUID clientId) {
+    private final boolean enabled;
+
+    public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, boolean enabled) {
       this.apiKey = apiKey;
       this.apiSecret = apiSecret;
       this.clientId = clientId;
+      this.name = name;
+      this.publicKey = publicKey;
+      this.enabled = enabled;
     }
 
     @Override
@@ -148,6 +158,20 @@ public class Client {
     @Override
     public UUID clientId() {
       return clientId;
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    @Override
+    public String publicKey() {
+      return publicKey;
+    }
+    @Override
+    public boolean enabled() {
+      return enabled;
     }
   }
 
@@ -188,7 +212,6 @@ public class Client {
         }
       });
   }
-
   private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
     if (handleResult != null)
       uiExecutor.execute(new Runnable() {
@@ -198,10 +221,11 @@ public class Client {
         }
       });
   }
+
   private static class ER {
     public final CipherWithNonce edk; // encrypted data key
-
     public final CipherWithNonce ef; // encrypted field
+
     public ER(String quad) {
       int split = quad.indexOf(".", quad.indexOf(".") + 1);
       edk = CipherWithNonce.decode(quad.substring(0, split));
@@ -209,32 +233,36 @@ public class Client {
     }
 
   }
-
   private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
     UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
     UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
+    UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
     Date created = iso8601.parse(rawMeta.get("created").asText());
     Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
     String version = rawMeta.get("version").asText();
     String type = rawMeta.get("type").asText();
     JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
     Map<String, String> results = decryptObject(accessKey, fields, crypto);
-    RecordMeta meta = new M(recordId, writerId, version, created, lastModified, type, plain);
+    RecordMeta meta = new M(recordId, writerId, userId, version, created, lastModified, type, plain);
     return new R(results, meta);
   }
   private static class M implements RecordMeta {
     private final UUID recordId;
+
     private final UUID writerId;
+    private final UUID userId;
     private final String version;
     private final Date created;
     private final Date lastModified;
+
     private final String type;
 
     private final JsonNode plain;
 
-    private M(UUID recordId, UUID writerId, String version, Date created, Date lastModified, String type, JsonNode plain) {
+    private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
       this.recordId = recordId;
       this.writerId = writerId;
+      this.userId = userId;
       this.version = version;
       this.created = created;
       this.lastModified = lastModified;
@@ -248,6 +276,10 @@ public class Client {
 
     public UUID writerId() {
       return writerId;
+    }
+
+    public UUID userId() {
+      return userId;
     }
 
     public String version() {
@@ -265,6 +297,7 @@ public class Client {
     public String type() {
       return type;
     }
+
     public String plain() {
       try {
         return mapper.writeValueAsString(plain);
@@ -274,8 +307,8 @@ public class Client {
     }
 
   }
-
   private static class R implements Record {
+
     private final Map<String, String> data;
 
     private final RecordMeta meta;
@@ -294,9 +327,10 @@ public class Client {
     public Map<String, String> data() {
       return data;
     }
-    }
+  }
 
   private static class QR implements QueryResponse {
+
     private final ArrayList<Record> records;
 
     private final long lastIdx;
@@ -305,7 +339,6 @@ public class Client {
       this.records = records;
       this.lastIdx = lastIdx;
     }
-
     @Override
     public List<Record> records() {
       return records;
@@ -316,19 +349,38 @@ public class Client {
     }
   }
 
-  private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBUnauthorizedException, ParseException {
+  private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBException, ParseException {
     Map<String, Object> searchRequest = new HashMap<>();
-    searchRequest.put("after_index", params.after);
-    searchRequest.put("count", params.count);
-    searchRequest.put("include_data", true);
-    searchRequest.put("include_all_writers", true);
+
+    if(params.after != null)
+      searchRequest.put("after_index", params.after);
+
+    if(params.count != null)
+      searchRequest.put("count", params.count);
+
+    if(params.includeData != null)
+      searchRequest.put("include_data", params.includeData.booleanValue());
+
+    if(params.writerIds != null)
+      searchRequest.put("writer_ids", makeArray(params.writerIds));
+
+    if(params.includeAllWriters != null)
+      searchRequest.put("include_all_writers", params.includeData.booleanValue());
+
+    if(params.userIds != null)
+      searchRequest.put("user_ids", makeArray(params.userIds));
+
+    if(params.recordIds != null)
+      searchRequest.put("record_ids", makeArray(params.recordIds));
+
     if (params.types != null)
       searchRequest.put("content_types", params.types.toArray());
+
     String content = mapper.writeValueAsString(searchRequest);
     RequestBody queryRequest = RequestBody.create(APPLICATION_JSON, content);
     retrofit2.Response<ResponseBody> execute = storageClient.query(queryRequest).execute();
     if (execute.code() != 200)
-      throw new E3DBUnauthorizedException(execute.code(), execute.message());
+      throw E3DBException.find(execute.code(), execute.message());
 
     JsonNode results = mapper.readTree(execute.body().string());
 
@@ -340,7 +392,7 @@ public class Client {
       JsonNode queryRecord = currPage.get(currRow);
       records.add(makeR(crypto.decryptBox(
         CipherWithNonce.decode(queryRecord.get("access_key").get("eak").asText()),
-        ByteString.decodeBase64(queryRecord.get("access_key").get("authorizer_public_key").get("curve25519").asText()).toByteArray(),
+        decodeURL(queryRecord.get("access_key").get("authorizer_public_key").get("curve25519").asText()),
         privateKey
         ),
         queryRecord.get("meta"),
@@ -350,6 +402,15 @@ public class Client {
     }
 
     return new QR(records, nextIdx);
+  }
+
+  private String[] makeArray(List writerIds) {
+    String[] objects = new String[writerIds.size()];
+    int idx = 0;
+    for(Object id : writerIds) {
+      objects[idx++] = id.toString();
+    }
+    return objects;
   }
 
   private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, Crypto crypto) throws UnsupportedEncodingException {
@@ -376,16 +437,15 @@ public class Client {
     }
     return decryptedFields;
   }
-
   private static class TokenInterceptor implements Interceptor {
     private final URI host;
-    private final AuthAPI authClient;
 
+    private final AuthAPI authClient;
     private final String basic;
+
     private String token = null;
 
     private Date replaceAfter = new Date(0L);
-
     private TokenInterceptor(String apiKey, String apiSecret, URI host) {
       this.host = host;
       try {
@@ -398,6 +458,7 @@ public class Client {
         .build()
         .create(AuthAPI.class);
     }
+
     @Override
     public Response intercept(Chain chain) throws IOException {
       Request req = chain.request();
@@ -435,28 +496,25 @@ public class Client {
 
   private void removeAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException {
     retrofit2.Response<ResponseBody> response = storageClient.deleteAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
-    if(response.code() == 403) {
-      throw new E3DBUnauthorizedException(response.code(), response.message());
-    }
-    else if(response.code() != 204) {
-      throw new E3DBException("HTTP " + response.code() + " " + response.message());
+    if(response.code() != 204) {
+      throw E3DBException.find(response.code(), response.message());
     }
   }
 
-  private byte[] getAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws E3DBUnauthorizedException, IOException {
+  private byte[] getAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws E3DBException, IOException {
     // TODO: cache AKs.
     retrofit2.Response<ResponseBody> response = storageClient.getAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
-    if (response.code() == 403)
-      throw new E3DBUnauthorizedException(response.code(), response.message());
-    else if (response.code() == 404) {
+    if (response.code() == 404) {
       return null;
-    } else {
+    } else if (response.code() == 200) {
       JsonNode eakResponse = mapper.readTree(response.body().string());
       byte[] ak = crypto.decryptBox(eakResponse.get("eak").asText(),
-        crypto.getPublicKey(this.privateKey),
+        decodeURL(eakResponse.get("authorizer_public_key").get("curve25519").asText()),
         this.privateKey);
       return ak;
     }
+    else
+      throw E3DBException.find(response.code(), response.message());
   }
 
   private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak) throws E3DBException, IOException {
@@ -465,10 +523,8 @@ public class Client {
 
     RequestBody body = RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(eak));
     retrofit2.Response<ResponseBody> response = storageClient.putAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type, body).execute();
-    if (response.code() == 403) {
-      throw new E3DBUnauthorizedException(response.code(), response.message());
-    } else if (response.code() != 201) {
-      throw new E3DBException("HTTP " + response.code() + " " + response.message());
+    if (response.code() != 201) {
+      throw E3DBException.find(response.code(), response.message());
     }
   }
 
@@ -478,7 +534,7 @@ public class Client {
       throw new E3DBClientNotFoundException(readerEmail);
     }
     else if(infoResponse.code() != 200) {
-      throw new E3DBException("HTTP " + infoResponse.code() + " " + infoResponse.message());
+      throw E3DBException.find(infoResponse.code(), infoResponse.message());
     }
 
     return mapper.readTree(infoResponse.body().string());
@@ -491,13 +547,13 @@ public class Client {
         uiError(handleResult, new E3DBClientNotFoundException(readerId.toString()));
         return;
       } else if (clientInfo.code() != 200) {
-        uiError(handleResult, new E3DBException("HTTP " + clientInfo.code() + " " + clientInfo.message()));
+        uiError(handleResult, E3DBException.find(clientInfo.code(), clientInfo.message()));
         return;
       }
 
       byte[] ak = getOwnAccessKey(type);
       JsonNode info = mapper.readTree(clientInfo.body().string());
-      byte[] readerKey = ByteString.decodeBase64(info.get("public_key").get("curve25519").asText()).toByteArray();
+      byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
       setAccessKey(this.clientId, this.clientId, readerId, type, readerKey, ak);
     }
 
@@ -508,9 +564,8 @@ public class Client {
       type,
       RequestBody.create(APPLICATION_JSON, allow)).execute();
 
-    if(shareResponse.code() != 201) {
-      uiError(handleResult, new E3DBException("HTTP " + shareResponse.code() + " " + shareResponse.message()));
-    }
+    if(shareResponse.code() != 201)
+      uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
     else
       uiValue(handleResult, null);
   }
@@ -524,9 +579,8 @@ public class Client {
       type,
       RequestBody.create(APPLICATION_JSON, deny)).execute();
 
-    if(shareResponse.code() != 201) {
-      uiError(handleResult, new E3DBException("HTTP " + shareResponse.code() + " " + shareResponse.message()));
-    }
+    if(shareResponse.code() != 201)
+      uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
     else
       uiValue(handleResult, null);
   }
@@ -542,7 +596,7 @@ public class Client {
    */
   public static String newPrivateKey() {
     byte [] key = crypto.newPrivateKey();
-    return ByteString.of(key).base64Url();
+    return encodeURL(key);
   }
 
   /**
@@ -555,11 +609,10 @@ public class Client {
    * @return
    */
   public static String getPublicKey(String privateKey) {
-    ByteString arr = ByteString.decodeBase64(privateKey);
-    if(arr == null)
-      throw new IllegalArgumentException("privateKey could not be decoded.");
-
-    return ByteString.of(crypto.getPublicKey(arr.toByteArray())).base64Url();
+    checkNotEmpty(privateKey, "privateKey");
+    byte[] arr = decodeURL(privateKey);
+    checkNotEmpty(arr, "privateKey");
+    return encodeURL(crypto.getPublicKey(arr));
   }
 
   public UUID clientId() {
@@ -567,8 +620,13 @@ public class Client {
   }
 
   public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
+    checkNotEmpty(token, "token");
+    checkNotEmpty(clientName, "clientName");
+    checkNotEmpty(host, "host");
+
     final byte[] privateKey = crypto.newPrivateKey();
-    final String publicKey = ByteString.of(crypto.getPublicKey(privateKey)).base64Url();
+    final String publicKey = encodeURL(crypto.getPublicKey(privateKey));
+
     register(token, clientName, publicKey, host, new ResultHandler<ClientCredentials>() {
       @Override
       public void handle(Result<ClientCredentials> r) {
@@ -576,7 +634,7 @@ public class Client {
           executeError(uiExecutor, handleResult, r.asError().other());
         }
         final ClientCredentials credentials = r.asValue();
-        Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, ByteString.of(privateKey).base64Url(),
+        Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, encodeURL(privateKey),
           publicKey);
         executeValue(uiExecutor, handleResult, info);
       }
@@ -584,6 +642,11 @@ public class Client {
   }
 
   public static void register(final String token, final String clientName, final String publicKey, String host, final ResultHandler<ClientCredentials> handleResult) {
+    checkNotEmpty(token, "token");
+    checkNotEmpty(clientName, "clientName");
+    checkNotEmpty(publicKey, "publicKey");
+    checkNotEmpty(host, "host");
+
     final RegisterAPI registerClient = new Retrofit.Builder()
       .callbackExecutor(uiExecutor)
       .client(new OkHttpClient.Builder()
@@ -608,14 +671,17 @@ public class Client {
 
           final retrofit2.Response<ResponseBody> response = registerClient.register(RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(registerInfo))).execute();
           if (response.code() != 201) {
-            executeError(uiExecutor, handleResult, new E3DBException("HTTP " + response.code() + " " + response.message()));
+            executeError(uiExecutor, handleResult, E3DBException.find(response.code(), response.message()));
           } else {
             final String doc = response.body().string();
             JsonNode creds = mapper.readTree(doc);
             final String apiKey = creds.get("api_key_id").asText();
             final String apiSecret = creds.get("api_secret").asText();
             final UUID clientId = UUID.fromString(creds.get("client_id").asText());
-            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId);
+            final String name = creds.get("name").asText();
+            final String publicKey = creds.get("public_key").get("curve25519").asText();
+            final boolean enabled = creds.get("enabled").asBoolean();
+            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, enabled);
             executeValue(uiExecutor, handleResult, clientCredentials);
           }
         } catch (final Throwable e) {
@@ -636,6 +702,11 @@ public class Client {
    * @return
    */
   public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(fields, "fields");
+    if(plain != null)
+      checkMap(plain, "plain");
+
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -663,13 +734,11 @@ public class Client {
 
           String content = mapper.writeValueAsString(record);
           final retrofit2.Response<ResponseBody> response = storageClient.writeRecord(RequestBody.create(APPLICATION_JSON, content)).execute();
-          if (response.code() == 403) {
-            uiError(handleResult, new E3DBUnauthorizedException(response.code(), response.message()));
-          } else if (response.code() != 201) {
-            uiError(handleResult, new E3DBException("HTTP " + response.code() + " " + response.message()));
-          } else {
+          if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult, makeR(ownAK, result.get("meta"), result.get("data"), crypto));
+          } else {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
         } catch (final Throwable e) {
           uiError(handleResult, e);
@@ -681,27 +750,29 @@ public class Client {
   /**
    * Replace the given record with new data and plaintext. All existing data and plaintext
    * will be overwritten.
-   *
-   * @param recordId
-   * @param version
+   * @param recordMeta
    * @param fields
    * @param plain
-   * @param handleResult
    * @param type
-   * @return
-   */
-  public void update(final UUID recordId, final String version, final RecordData fields, final Map<String, String> plain, final String type, final ResultHandler<Record> handleResult) {
+   * @param handleResult
+   * @return    */
+  public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
+    checkNotNull(recordMeta, "recordMeta");
+    checkNotNull(fields, "fields");
+    if(plain != null)
+      checkMap(plain, "plain");
+
     onBackground(new Runnable() {
       @Override
       public void run() {
         try {
-          final byte[] ownAK = getOwnAccessKey(type);
+          final byte[] ownAK = getOwnAccessKey(recordMeta.type());
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
           meta.put("user_id", clientId.toString());
-          meta.put("type", type.trim());
+          meta.put("type", recordMeta.type().trim());
 
           if (plain != null)
             meta.put("plain", plain);
@@ -710,16 +781,15 @@ public class Client {
           fields.put("meta", meta);
           fields.put("data", encFields);
 
-          retrofit2.Response<ResponseBody> response = storageClient.updateRecord(recordId.toString(), version, RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(fields))).execute();
+          retrofit2.Response<ResponseBody> response = storageClient.updateRecord(recordMeta.recordId().toString(), recordMeta.version(), RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(fields))).execute();
           if (response.code() == 409) {
-            uiError(handleResult, new E3DBVersionException(recordId, version));
-          } else if (response.code() == 403) {
-            uiError(handleResult, new E3DBUnauthorizedException(response.code(), response.message()));
-          } else if (response.code() != 200) {
-            uiError(handleResult, new E3DBException("HTTP " + response.code() + " " + response.message()));
-          } else {
+            uiError(handleResult, new E3DBVersionException(recordMeta.recordId(), recordMeta.version()));
+          } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult, makeR(ownAK, result.get("meta"), result.get("data"), crypto));
+          }
+          else {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
         } catch (Throwable e) {
           uiError(handleResult, e);
@@ -729,6 +799,9 @@ public class Client {
   }
 
   public void delete(final UUID recordId, final String version, final ResultHandler<Void> handleResult) {
+    checkNotNull(recordId, "recordId");
+    checkNotEmpty(version, "version");
+
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -736,12 +809,11 @@ public class Client {
           retrofit2.Response<ResponseBody> response = storageClient.deleteRecord(recordId.toString(), version.toString()).execute();
           if (response.code() == 409) {
             uiError(handleResult, new E3DBVersionException(recordId, version));
-          } else if (response.code() == 403) {
-            uiError(handleResult, new E3DBUnauthorizedException(response.code(), response.message()));
-          } else if (response.code() != 204) {
-            uiError(handleResult, new E3DBException("HTTP " + response.code() + " " + response.message()));
-          } else {
+          } else if(response.code() == 204) {
             uiValue(handleResult, null);
+          }
+          else {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
         } catch (Throwable e) {
           uiError(handleResult, e);
@@ -751,6 +823,7 @@ public class Client {
   }
 
   public void read(final UUID recordId, final ResultHandler<Record> handleResult) {
+    checkNotNull(recordId, "recordId");
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -760,7 +833,7 @@ public class Client {
             if (response.code() == 404)
               uiError(handleResult, new E3DBNotFoundException(recordId));
             else
-              uiError(handleResult, new E3DBUnauthorizedException(response.code(), response.message()));
+              uiError(handleResult, E3DBException.find(response.code(), response.message()));
             return;
           }
 
@@ -784,6 +857,8 @@ public class Client {
   }
 
   public void query(final QueryParams params, final ResultHandler<QueryResponse> handleResult) {
+    checkNotNull(params, "params");
+
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -800,6 +875,9 @@ public class Client {
   }
 
   public void share(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotEmpty(readerEmail, "readerEmail");;
+
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -814,6 +892,9 @@ public class Client {
   }
 
   public void share(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(readerId, "readerId");
+
     onBackground(new Runnable() {
       public void run() {
         try {
@@ -827,6 +908,9 @@ public class Client {
   }
 
   public void revoke(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotEmpty(readerEmail, "readerEmail");
+
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -841,6 +925,9 @@ public class Client {
   }
 
   public void revoke(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(readerId, "readerId");
+
     onBackground(new Runnable() {
       public void run() {
         try {

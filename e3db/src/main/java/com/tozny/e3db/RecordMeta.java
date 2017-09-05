@@ -6,6 +6,7 @@ import java.util.UUID;
 public interface RecordMeta {
   UUID recordId();
   UUID writerId();
+  UUID userId();
   Date created();
   Date lastModified();
   String version();

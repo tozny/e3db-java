@@ -26,7 +26,7 @@ public class Main {
     // > java -cp plaintest\build\libs\plaintest-all.jar Main
     final CountDownLatch queryLatch = new CountDownLatch(1);
     final Client client = new ClientBuilder()
-      .fromClientInfo(Config.fromJson(new String(Files.readAllBytes(Paths.get("C:\\Users\\Justin\\.tozny\\dev1\\e3db.json")), "UTF-8")))
+      .fromConfig(Config.fromJson(new String(Files.readAllBytes(Paths.get("C:\\Users\\Justin\\.tozny\\dev1\\e3db.json")), "UTF-8")))
       .build();
 
     client.query(QueryParams.ALL, new ResultHandler<QueryResponse>() {

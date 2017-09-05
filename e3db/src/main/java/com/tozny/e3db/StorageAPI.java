@@ -33,5 +33,5 @@ interface StorageAPI {
   Call<ResponseBody> deleteRecord(@Path("record_id") String recordId, @Path("version_id") String version);
 
   @DELETE("/v1/storage/access_keys/{writer_id}/{user_id}/{reader_id}/{record_type}")
-  Call<ResponseBody> deleteAccessKey(String writerId, String userId, String readerId, String type);
+  Call<ResponseBody> deleteAccessKey(@Path("writer_id") String writerId, @Path("user_id") String userId, @Path("reader_id") String readerId, @Path("record_type") String recordType);
 }

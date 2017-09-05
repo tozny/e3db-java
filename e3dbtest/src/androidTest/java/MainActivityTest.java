@@ -13,8 +13,6 @@ import com.tozny.e3db.Result;
 import com.tozny.e3db.ResultHandler;
 import com.tozny.e3db.crypto.AndroidCrypto;
 
-import junit.framework.Assert;
-
 import org.junit.Test;
 
 import java.io.IOException;
@@ -68,7 +66,7 @@ public class MainActivityTest {
   private CI getClient(String profile) throws IOException {
     final Config info = Config.fromJson(profiles.get(profile));
     final Client client = new ClientBuilder()
-      .fromClientInfo(info)
+      .fromConfig(info)
       .build();
     return new CI(client, info.clientId);
   }
@@ -136,6 +134,12 @@ public class MainActivityTest {
 
     CI from = getClient();
     CI to = getClient(shareProfile);
+    Config toConfig = Config.fromJson(profiles.get(shareProfile));
+    Config fromConfig = Config.fromJson(profiles.get("default"));
+
+    // Log.i("info", "to: " + toConfig.json());
+    // Log.i("info", "from: " + fromConfig.json());
+
     Map<String, String> cleartext = new HashMap<>();
     cleartext.put("song", "triangle man");
     cleartext.put("line", "Is he a dot, or is he a speck?");
@@ -164,7 +168,7 @@ public class MainActivityTest {
       wait.await(30, TimeUnit.SECONDS);
     }
 
-    Log.i("info", "Shared record: " + recordIdRef.get() + " from client " + from.clientId + " to " + to.clientId);
+    // Log.i("info", "Shared record: " + recordIdRef.get() + " from client " + from.clientId + " to " + to.clientId);
 
     // query the record using share client to see if it exists
     {
@@ -250,7 +254,7 @@ public class MainActivityTest {
         Log.i(INFO, "Wrote record " + record.meta().recordId() + " with version " + record.meta().version());
         Map<String, String> fields = new HashMap<>();
         fields.put("line", updatedMessage);
-        client.update(record.meta().recordId(), record.meta().version(), new RecordData(fields), null, record.meta().type(), new ResultHandler<Record>() {
+        client.update(record.meta(), new RecordData(fields), null, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             assertFalse("Error updating record: " + record.meta().recordId(), r.isError());

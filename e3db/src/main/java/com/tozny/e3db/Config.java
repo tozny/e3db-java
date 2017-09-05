@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.tozny.e3db.Checks.*;
+
 public class Config {
   private static final ObjectMapper mapper =  new ObjectMapper();
   public final String apiKey;
@@ -20,6 +22,14 @@ public class Config {
   private final String publicKey;
 
   public Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateKey, String publicKey) {
+    checkNotEmpty(apiKey, "apiKey");
+    checkNotEmpty(apiSecret, "apiSecret");
+    checkNotNull(clientId, "clientId");
+    checkNotEmpty(name, "name");
+    checkNotEmpty(host, "host");
+    checkNotEmpty(privateKey, "privateKey");
+    checkNotEmpty(publicKey, "publicKey");
+
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.privateKey = privateKey;
@@ -29,11 +39,16 @@ public class Config {
     this.publicKey = publicKey;
   }
 
-  public static Config fromCredentials(ClientCredentials creds, String clientName, String host, String privateKey, String publicKey) {
-    return new Config(creds.apiKey(), creds.apiSecret(), creds.clientId(), clientName, host, privateKey, publicKey);
+  public static Config fromCredentials(ClientCredentials creds, String host, String privateKey) {
+    checkNotNull(creds, "creds");
+    checkNotEmpty(host, "host");
+    checkNotEmpty(privateKey, "privateKey");
+
+    return new Config(creds.apiKey(), creds.apiSecret(), creds.clientId(), creds.name(), host, privateKey, creds.publicKey());
   }
 
   public static Config fromJson(String doc) throws IOException {
+    checkNotEmpty(doc, "doc");
     JsonNode info = mapper.readTree(doc);
     return new Config(info.get("api_key_id").asText(),
       info.get("api_secret").asText(),

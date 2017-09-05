@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import okio.ByteString;
 
+import static com.tozny.e3db.Checks.*;
+
 public class ClientBuilder {
   private static final ObjectMapper mapper = new ObjectMapper();
   private String apiKey;
@@ -33,7 +35,8 @@ public class ClientBuilder {
       throw new IllegalStateException("privateKey null");
   }
 
-  public ClientBuilder fromClientInfo(Config info) {
+  public ClientBuilder fromConfig(Config info) {
+    checkNotNull(info, "info");
     return this.setHost(info.host)
       .setClientId(info.clientId)
       .setApiKey(info.apiKey)
@@ -42,6 +45,9 @@ public class ClientBuilder {
   }
 
   public ClientBuilder fromJson(String credsJson, byte[] privateKey) {
+    checkNotEmpty(credsJson, "credsJson");
+    checkNotEmpty(privateKey, "privateKey");
+
     try {
       JsonNode creds = mapper.readTree(credsJson);
       apiKey = creds.get("api_key_id").asText();

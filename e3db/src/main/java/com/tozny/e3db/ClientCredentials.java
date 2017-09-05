@@ -6,4 +6,7 @@ public interface ClientCredentials {
   String apiKey();
   String apiSecret();
   UUID clientId();
+  String name();
+  String publicKey();
+  boolean enabled();
 }

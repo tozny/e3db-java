@@ -1,9 +1,12 @@
 package com.tozny.e3db;
 
+import static com.tozny.e3db.Checks.*;
+
 public class ErrorResult<R> implements Result<R> {
   private final Throwable error;
 
   public ErrorResult(Throwable error) {
+    checkNotNull(error, "error");
     this.error = error;
   }
 

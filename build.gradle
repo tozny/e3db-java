@@ -5,13 +5,10 @@ buildscript {
         jcenter()
         google()
         mavenCentral()
+        maven { url "" }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.0.0-beta4'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
-
-        // NOTE: Do not place your application dependencies here; they belong
-        // in the individual module build.gradle files
     }
 }
 
@@ -20,6 +17,7 @@ allprojects {
         jcenter()
         google()
         mavenCentral()
+        mavenLocal()
     }
 }
 

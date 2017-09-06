@@ -1,10 +1,10 @@
 apply plugin: 'java'
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-
     compileOnly files('compileLibs/android-4.1.1.4.jar')
-    compileOnly project(':e3db:e3db-crypto-stubs')
+
+    compileOnly project(':e3db:e3db-crypto-stub-plain')
+    compileOnly project(':e3db:e3db-crypto-stub-android')
 
     implementation 'com.squareup.retrofit2:retrofit:2.3.0'
     implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'

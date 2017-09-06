@@ -1,0 +1,76 @@
+apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+
+android {
+    compileSdkVersion 26
+    buildToolsVersion '26.0.1'
+    sourceSets {
+      main {
+        manifest.srcFile ("${project(":e3db-crypto-android").projectDir}/src/main/AndroidManifest.xml")
+        java {
+          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java", "${project(":e3db").projectDir}/src/main/java", "${project(":e3db-crypto-interface").projectDir}/src/main/java", "${project(":e3db:e3db-crypto-stub-plain").projectDir}/src/main/java"
+        }
+      }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt')
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
+}
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      groupId project(":publish").ext.groupId
+      artifactId 'e3db-client-android'
+      version project(":publish").ext.version
+
+      artifact bundleRelease
+
+      pom.withXml {
+        def dependenciesNode = asNode().appendNode('dependencies')
+
+        // List all compile dependencies and write to POM
+        configurations.compile.getAllDependencies().each { Dependency dep ->
+          if (dep.group == null || dep.version == null || dep.name == null || dep.name == "unspecified")
+            return // ignore invalid dependencies
+
+            def dependencyNode = dependenciesNode.appendNode('dependency')
+            dependencyNode.appendNode('groupId', dep.group)
+            dependencyNode.appendNode('artifactId', dep.name)
+            dependencyNode.appendNode('version', dep.version)
+
+            if (!dep.transitive) {
+              // If this dependency is transitive, we should force exclude all its dependencies them from the POM
+              def exclusionNode = dependencyNode.appendNode('exclusions').appendNode('exclusion')
+              exclusionNode.appendNode('groupId', '*')
+              exclusionNode.appendNode('artifactId', '*')
+            } else if (!dep.properties.excludeRules.empty) {
+              // Otherwise add specified exclude rules
+              def exclusionsNode = dependencyNode.appendNode('exclusions')
+              dep.properties.excludeRules.each { ExcludeRule rule ->
+                def exclusionNode = exclusionsNode.appendNode('exclusion')
+                exclusionNode.appendNode('groupId', rule.group ?: '*')
+                exclusionNode.appendNode('artifactId', rule.module ?: '*')
+              }
+            }
+        }
+      }
+    }
+  }
+}
+
+dependencies {
+  compile 'com.squareup.retrofit2:retrofit:2.3.0'
+  compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+  compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+  compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+  compile 'com.squareup.okio:okio:1.13.0'
+  compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.6'
+}

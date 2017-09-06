@@ -1,1 +1,1 @@
-include ':e3db', ':e3db-crypto-android', ':e3db-crypto-plain', ':e3dbtest', ':e3db:e3db-crypto-stubs', ':e3db-crypto-interface', ':plaintest'
+include ':e3db', ':e3db-crypto-android', ':e3db-crypto-plain', ':e3dbtest', ':e3db:e3db-crypto-stub-android', ':e3db:e3db-crypto-stub-plain', ':e3db-crypto-interface', ':plaintest', ':publish:android', ':publish:plain'

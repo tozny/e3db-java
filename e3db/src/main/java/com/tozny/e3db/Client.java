@@ -633,10 +633,12 @@ public class Client {
         if (r.isError()) {
           executeError(uiExecutor, handleResult, r.asError().other());
         }
-        final ClientCredentials credentials = r.asValue();
-        Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, encodeURL(privateKey),
-          publicKey);
-        executeValue(uiExecutor, handleResult, info);
+        else {
+          final ClientCredentials credentials = r.asValue();
+          Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, encodeURL(privateKey),
+            publicKey);
+          executeValue(uiExecutor, handleResult, info);
+        }
       }
     });
   }

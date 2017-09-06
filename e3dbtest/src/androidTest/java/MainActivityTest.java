@@ -88,7 +88,7 @@ public class MainActivityTest {
   private void registerProfile(final String profile, final ResultHandler<Config> handler) {
     final String clientName = UUID.randomUUID().toString();
     final String host = System.getProperty("e3db.host", "https://dev.e3db.com");
-    final String token = System.getProperty("e3db.token", "6eb84defa08cff9c72e63de78933d9094c5ae5259972dd2153bf37fcb6cca733");
+    final String token = System.getProperty("e3db.token", "1f991d79091ba4aaa1f333bef1929a10ed8c3f426fb6d3b1340a1157950d5bce");
 
     Client.register(
       token, clientName, host, new ResultHandler<Config>() {

@@ -1,7 +1,5 @@
 package com.tozny.e3db;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;

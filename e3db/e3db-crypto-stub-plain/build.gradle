@@ -1,0 +1,9 @@
+apply plugin: 'java'
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    compileOnly project(':e3db-crypto-interface')
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"

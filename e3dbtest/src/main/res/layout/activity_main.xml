@@ -8,6 +8,7 @@
     tools:context="com.tozny.e3dbtest.MainActivity">
 
     <TextView
+        android:id="@+id/hello_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Hello World!"

@@ -44,21 +44,18 @@ public class ClientBuilder {
       .setPrivateKey(info.privateKey);
   }
 
-  public ClientBuilder fromJson(String credsJson, byte[] privateKey) {
-    checkNotEmpty(credsJson, "credsJson");
+  public ClientBuilder fromCredentials(ClientCredentials creds, String host, byte[] privateKey) {
+    checkNotNull(creds, "credsJson");
     checkNotEmpty(privateKey, "privateKey");
+    if(host != null)
+      checkNotEmpty(host, "host");
 
-    try {
-      JsonNode creds = mapper.readTree(credsJson);
-      apiKey = creds.get("api_key_id").asText();
-      apiSecret = creds.get("api_secret").asText();
-      clientId = UUID.fromString(creds.get("client_id").asText());
-      host = URI.create(creds.get("api_url").asText());
-      this.privateKey = privateKey;
-      return this;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    apiKey = creds.apiKey();
+    apiSecret = creds.apiSecret();
+    clientId = creds.clientId();
+    this.host = URI.create(host);
+    this.privateKey = privateKey;
+    return this;
   }
 
   public ClientBuilder setApiKey(String apiKey) {

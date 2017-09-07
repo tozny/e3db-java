@@ -133,15 +133,16 @@ public class Client {
     private final UUID clientId;
     private final String name;
     private final String publicKey;
-
+    private final URI host;
     private final boolean enabled;
 
-    public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, boolean enabled) {
+    public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, String host, boolean enabled) {
       this.apiKey = apiKey;
       this.apiSecret = apiSecret;
       this.clientId = clientId;
       this.name = name;
       this.publicKey = publicKey;
+      this.host = URI.create(host);
       this.enabled = enabled;
     }
 
@@ -169,6 +170,12 @@ public class Client {
     public String publicKey() {
       return publicKey;
     }
+
+    @Override
+    public String host() {
+      return host.toASCIIString();
+    }
+
     @Override
     public boolean enabled() {
       return enabled;
@@ -231,9 +238,9 @@ public class Client {
       edk = CipherWithNonce.decode(quad.substring(0, split));
       ef = CipherWithNonce.decode(quad.substring(split + 1));
     }
-
   }
-  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
+
+  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
     UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
     UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
     UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
@@ -242,10 +249,19 @@ public class Client {
     String version = rawMeta.get("version").asText();
     String type = rawMeta.get("type").asText();
     JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
+    return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
+  }
+
+  private static R makeR(JsonNode rawMeta) throws ParseException {
+    return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
+  }
+
+  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
+    RecordMeta meta = getRecordMeta(rawMeta);
     Map<String, String> results = decryptObject(accessKey, fields, crypto);
-    RecordMeta meta = new M(recordId, writerId, userId, version, created, lastModified, type, plain);
     return new R(results, meta);
   }
+
   private static class M implements RecordMeta {
     private final UUID recordId;
 
@@ -389,16 +405,23 @@ public class Client {
 
     ArrayList<Record> records = new ArrayList<>(currPage.size());
     for (int currRow = 0; currRow < currPage.size(); currRow++) {
+      R record;
       JsonNode queryRecord = currPage.get(currRow);
-      records.add(makeR(crypto.decryptBox(
-        CipherWithNonce.decode(queryRecord.get("access_key").get("eak").asText()),
-        decodeURL(queryRecord.get("access_key").get("authorizer_public_key").get("curve25519").asText()),
-        privateKey
-        ),
-        queryRecord.get("meta"),
-        queryRecord.get("record_data"),
-        crypto)
-      );
+      JsonNode access_key = queryRecord.get("access_key");
+      if(access_key != null && access_key.isObject()) {
+        record = makeR(crypto.decryptBox(
+            CipherWithNonce.decode(access_key.get("eak").asText()),
+            decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
+            privateKey
+          ),
+          queryRecord.get("meta"),
+          queryRecord.get("record_data"),
+          crypto);
+      }
+      else {
+        record = makeR(queryRecord.get("meta"));
+      }
+      records.add(record);
     }
 
     return new QR(records, nextIdx);
@@ -635,7 +658,7 @@ public class Client {
         }
         else {
           final ClientCredentials credentials = r.asValue();
-          Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, host, encodeURL(privateKey),
+          Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
             publicKey);
           executeValue(uiExecutor, handleResult, info);
         }
@@ -643,7 +666,7 @@ public class Client {
     });
   }
 
-  public static void register(final String token, final String clientName, final String publicKey, String host, final ResultHandler<ClientCredentials> handleResult) {
+  public static void register(final String token, final String clientName, final String publicKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(publicKey, "publicKey");
@@ -683,7 +706,7 @@ public class Client {
             final String name = creds.get("name").asText();
             final String publicKey = creds.get("public_key").get("curve25519").asText();
             final boolean enabled = creds.get("enabled").asBoolean();
-            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, enabled);
+            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, host, enabled);
             executeValue(uiExecutor, handleResult, clientCredentials);
           }
         } catch (final Throwable e) {

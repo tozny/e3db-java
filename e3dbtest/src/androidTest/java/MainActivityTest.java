@@ -7,6 +7,9 @@ import com.tozny.e3db.Config;
 import com.tozny.e3db.Client;
 import com.tozny.e3db.ClientBuilder;
 import com.tozny.e3db.E3DBNotFoundException;
+import com.tozny.e3db.QueryParams;
+import com.tozny.e3db.QueryParamsBuilder;
+import com.tozny.e3db.QueryResponse;
 import com.tozny.e3db.Record;
 import com.tozny.e3db.RecordData;
 import com.tozny.e3db.Result;
@@ -17,6 +20,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -28,7 +32,8 @@ import static junit.framework.Assert.*;
 public class MainActivityTest {
 
   public static final String INFO = "info";
-
+  private static final String FIELD = "line";
+  private static final String TYPE = "stuff";
   private Map<String, String> profiles = new HashMap<>();
 
   private enum Step {
@@ -75,8 +80,8 @@ public class MainActivityTest {
     Client client = getClient().client;
 
     Map<String, String> record = new HashMap<>();
-    record.put("line", MESSAGE);
-    client.write("stuff", new RecordData(record), null, new ResultHandler<Record>() {
+    record.put(FIELD, MESSAGE);
+    client.write(TYPE, new RecordData(record), null, new ResultHandler<Record>() {
       @Override
       public void handle(Result<Record> r) {
         assertFalse("Error writing record", r.isError());
@@ -142,7 +147,7 @@ public class MainActivityTest {
 
     Map<String, String> cleartext = new HashMap<>();
     cleartext.put("song", "triangle man");
-    cleartext.put("line", "Is he a dot, or is he a speck?");
+    cleartext.put(FIELD, "Is he a dot, or is he a speck?");
     final AtomicReference<UUID> recordIdRef = new AtomicReference<>();
 
     // Use default client to write a record
@@ -179,7 +184,7 @@ public class MainActivityTest {
           assertFalse("Error reading shared record.", r.isError());
           Record record = r.asValue();
           assertEquals("Song field did not match", "triangle man", record.data().get("song"));
-          assertEquals("line field did not match", "Is he a dot, or is he a speck?", record.data().get("line"));
+          assertEquals("line field did not match", "Is he a dot, or is he a speck?", record.data().get(FIELD));
           wait.countDown();
         }
       });
@@ -224,7 +229,7 @@ public class MainActivityTest {
         Log.i(INFO, "Wrote record " + record.meta().recordId() + " with version " + record.meta().version());
         Map<String, String> fields = new HashMap<>();
         final String updatedMessage = "Not to put too fine a point on it";
-        fields.put("line", updatedMessage);
+        fields.put(FIELD, updatedMessage);
         client.delete(record.meta().recordId(), record.meta().version(), new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
@@ -253,12 +258,12 @@ public class MainActivityTest {
         final Record record = r.asValue();
         Log.i(INFO, "Wrote record " + record.meta().recordId() + " with version " + record.meta().version());
         Map<String, String> fields = new HashMap<>();
-        fields.put("line", updatedMessage);
+        fields.put(FIELD, updatedMessage);
         client.update(record.meta(), new RecordData(fields), null, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             assertFalse("Error updating record: " + record.meta().recordId(), r.isError());
-            assertEquals("Record not updated", r.asValue().data().get("line"), updatedMessage);
+            assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
             handleResult.handle(r);
           }
         });
@@ -277,13 +282,12 @@ public class MainActivityTest {
             wait.countDown();
           }
         });
-
         wait.await(30, TimeUnit.SECONDS);
       }
 
-      final AtomicReference<UUID> recordId = new AtomicReference<>();
       {
-        final CountDownLatch wait = new CountDownLatch(1);
+        final AtomicReference<UUID> recordId = new AtomicReference<>();
+        final CountDownLatch wait = new CountDownLatch(2);
         write1(new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
@@ -292,14 +296,11 @@ public class MainActivityTest {
           }
         });
         wait.await(30, TimeUnit.SECONDS);
-      }
 
-      {
-        final CountDownLatch wait = new CountDownLatch(1);
         read1(recordId.get(), new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            assertEquals("line field did not match", MESSAGE,  r.asValue().data().get("line"));
+            assertEquals("line field did not match", MESSAGE,  r.asValue().data().get(FIELD));
             wait.countDown();
           }
         });
@@ -337,6 +338,70 @@ public class MainActivityTest {
           }
         });
         wait.await(30, TimeUnit.SECONDS);
+      }
+
+      {
+        final AtomicReference<UUID> recordId = new AtomicReference<>();
+        final CountDownLatch wait = new CountDownLatch(3);
+        write1(new ResultHandler<Record>() {
+          @Override
+          public void handle(Result<Record> r) {
+            recordId.set(r.asValue().meta().recordId());
+            wait.countDown();
+          }
+        });
+        wait.await(30, TimeUnit.SECONDS);
+
+        final Client client = getClient().client;
+        client.query(new QueryParamsBuilder().setRecords(recordId.get()).setIncludeData(true).build(), new ResultHandler<QueryResponse>() {
+          @Override
+          public void handle(Result<QueryResponse> r) {
+            assertFalse("An error occurred during query", r.isError());
+            assertEquals("Expected only 1 record", 1, r.asValue().records().size());
+            assertEquals("Type did not match", TYPE, r.asValue().records().get(0).meta().type());
+            assertEquals("Field did not match", MESSAGE, r.asValue().records().get(0).data().get(FIELD));
+            wait.countDown();
+          }
+        });
+
+        client.query(new QueryParamsBuilder().setTypes(TYPE).setIncludeData(true).build(), new ResultHandler<QueryResponse>() {
+          @Override
+          public void handle(Result<QueryResponse> r) {
+            assertFalse("An error occurred during query", r.isError());
+            assertTrue("Expected some records", r.asValue().records().size() > 0);
+            assertEquals("Type did not match", TYPE, r.asValue().records().get(0).meta().type());
+            wait.countDown();
+          }
+        });
+        wait.await(30, TimeUnit.SECONDS);
+
+        {
+          final AtomicReference<Boolean> done = new AtomicReference<>(false);
+          final AtomicReference<Long> last = new AtomicReference<>(-1L);
+          while (!done.get()) {
+            final QueryParamsBuilder paramsBuilder = new QueryParamsBuilder().setTypes(FIELD).setIncludeData(true).setCount(1);
+            final CountDownLatch wait2 = new CountDownLatch(1);
+            client.query(paramsBuilder.build(), new ResultHandler<QueryResponse>() {
+              @Override
+              public void handle(Result<QueryResponse> r) {
+                assertFalse("An error occurred during query", r.isError());
+                List<Record> records = r.asValue().records();
+                if(records.size() == 0) {
+                  done.set(true);
+                }
+                else {
+                  paramsBuilder.setAfter(r.asValue().last());
+                }
+                wait2.countDown();
+              }
+            });
+
+            wait2.await(30, TimeUnit.SECONDS);
+          }
+
+          assertTrue("Query never finished looping", done.get());
+        }
+
       }
     } catch (Exception e) {
       fail("Exception during test: " + e);

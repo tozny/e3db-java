@@ -4,6 +4,10 @@ apply plugin: 'maven-publish'
 android {
     compileSdkVersion 26
     buildToolsVersion '26.0.1'
+    defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 19
+    }
     sourceSets {
       main {
         manifest.srcFile ("${project(":e3db-crypto-android").projectDir}/src/main/AndroidManifest.xml")

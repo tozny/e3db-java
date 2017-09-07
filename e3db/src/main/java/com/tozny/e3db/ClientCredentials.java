@@ -9,4 +9,5 @@ public interface ClientCredentials {
   String name();
   String publicKey();
   boolean enabled();
+  String host();
 }

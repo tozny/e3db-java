@@ -14,7 +14,6 @@ import com.tozny.e3db.Record;
 import com.tozny.e3db.RecordData;
 import com.tozny.e3db.Result;
 import com.tozny.e3db.ResultHandler;
-import com.tozny.e3db.crypto.AndroidCrypto;
 
 import org.junit.Test;
 
@@ -25,6 +24,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static junit.framework.Assert.*;
@@ -36,19 +37,7 @@ public class MainActivityTest {
   private static final String TYPE = "stuff";
   private Map<String, String> profiles = new HashMap<>();
 
-  private enum Step {
-    REGISTRATION,
-    BEGIN,
-    WRITE1,
-    READ1,
-    UPDATE1,
-    SHARE1,
-    DELETE1
-  }
-
-  public static final String COMPLETED = "completed";
   public static final String MESSAGE = "It's a simple message and I'm leaving out the whistles and bells";
-  private final AndroidCrypto crypto = new AndroidCrypto();
 
   private static class CI {
     public final Client client;
@@ -376,10 +365,11 @@ public class MainActivityTest {
         wait.await(30, TimeUnit.SECONDS);
 
         {
+          final AtomicInteger pages = new AtomicInteger(0);
           final AtomicReference<Boolean> done = new AtomicReference<>(false);
-          final AtomicReference<Long> last = new AtomicReference<>(-1L);
+          final AtomicLong last = new AtomicLong(-1L);
+          final QueryParamsBuilder paramsBuilder = new QueryParamsBuilder().setTypes(TYPE).setIncludeData(true).setCount(1);
           while (!done.get()) {
-            final QueryParamsBuilder paramsBuilder = new QueryParamsBuilder().setTypes(FIELD).setIncludeData(true).setCount(1);
             final CountDownLatch wait2 = new CountDownLatch(1);
             client.query(paramsBuilder.build(), new ResultHandler<QueryResponse>() {
               @Override
@@ -390,6 +380,7 @@ public class MainActivityTest {
                   done.set(true);
                 }
                 else {
+                  pages.set(pages.get() + 1);
                   paramsBuilder.setAfter(r.asValue().last());
                 }
                 wait2.countDown();
@@ -399,6 +390,7 @@ public class MainActivityTest {
             wait2.await(30, TimeUnit.SECONDS);
           }
 
+          assertTrue("At least 2 pages of data expected", pages.get() > 1);
           assertTrue("Query never finished looping", done.get());
         }
 

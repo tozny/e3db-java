@@ -563,51 +563,6 @@ public class Client {
     return mapper.readTree(infoResponse.body().string());
   }
 
-  private void doShare(UUID readerId, String type, ResultHandler<Void> handleResult) throws IOException, E3DBException {
-    if(getAccessKey(clientId, clientId, readerId, type) == null) {
-      final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(readerId).execute();
-      if (clientInfo.code() == 404) {
-        uiError(handleResult, new E3DBClientNotFoundException(readerId.toString()));
-        return;
-      } else if (clientInfo.code() != 200) {
-        uiError(handleResult, E3DBException.find(clientInfo.code(), clientInfo.message()));
-        return;
-      }
-
-      byte[] ak = getOwnAccessKey(type);
-      JsonNode info = mapper.readTree(clientInfo.body().string());
-      byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
-      setAccessKey(this.clientId, this.clientId, readerId, type, readerKey, ak);
-    }
-
-    retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-      clientId.toString(),
-      clientId.toString(),
-      readerId.toString(),
-      type,
-      RequestBody.create(APPLICATION_JSON, allow)).execute();
-
-    if(shareResponse.code() != 201)
-      uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
-    else
-      uiValue(handleResult, null);
-  }
-
-  private void doRevoke(UUID readerId, String type, ResultHandler<Void> handleResult) throws IOException, E3DBException {
-    removeAccessKey(clientId, clientId, readerId, type);
-    retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-      clientId.toString(),
-      clientId.toString(),
-      readerId.toString(),
-      type,
-      RequestBody.create(APPLICATION_JSON, deny)).execute();
-
-    if(shareResponse.code() != 201)
-      uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
-    else
-      uiValue(handleResult, null);
-  }
-
   /**
    * Generates a private key that can be used for Curve25519
    * public-key encryption.
@@ -899,23 +854,6 @@ public class Client {
     });
   }
 
-  public void share(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
-    checkNotEmpty(type, "type");
-    checkNotEmpty(readerEmail, "readerEmail");;
-
-    onBackground(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          JsonNode info = doLookup(readerEmail);
-          doShare(UUID.fromString(info.get("client_id").asText()), type, handleResult);
-        } catch (Throwable e) {
-          uiError(handleResult, e);
-        }
-      }
-    });
-  }
-
   public void share(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(readerId, "readerId");
@@ -923,26 +861,35 @@ public class Client {
     onBackground(new Runnable() {
       public void run() {
         try {
-          doShare(readerId, type, handleResult);
+          if(getAccessKey(clientId, clientId, readerId, type) == null) {
+            final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(readerId).execute();
+            if (clientInfo.code() == 404) {
+              uiError(handleResult, new E3DBClientNotFoundException(readerId.toString()));
+              return;
+            } else if (clientInfo.code() != 200) {
+              uiError(handleResult, E3DBException.find(clientInfo.code(), clientInfo.message()));
+              return;
+            }
+
+            byte[] ak = getOwnAccessKey(type);
+            JsonNode info = mapper.readTree(clientInfo.body().string());
+            byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
+            setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak);
+          }
+
+          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
+            clientId.toString(),
+            clientId.toString(),
+            readerId.toString(),
+            type,
+            RequestBody.create(APPLICATION_JSON, allow)).execute();
+
+          if(shareResponse.code() != 201)
+            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
+          else
+            uiValue(handleResult, null);
         }
         catch(Throwable e) {
-          uiError(handleResult, e);
-        }
-      }
-    });
-  }
-
-  public void revoke(final String type, final String readerEmail, final ResultHandler<Void> handleResult) {
-    checkNotEmpty(type, "type");
-    checkNotEmpty(readerEmail, "readerEmail");
-
-    onBackground(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          JsonNode info = doLookup(readerEmail);
-          doRevoke(UUID.fromString(info.get("client_id").asText()), type, handleResult);
-        } catch (Throwable e) {
           uiError(handleResult, e);
         }
       }
@@ -956,7 +903,18 @@ public class Client {
     onBackground(new Runnable() {
       public void run() {
         try {
-          doRevoke(readerId, type, handleResult);
+          removeAccessKey(clientId, clientId, readerId, type);
+          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
+            clientId.toString(),
+            clientId.toString(),
+            readerId.toString(),
+            type,
+            RequestBody.create(APPLICATION_JSON, deny)).execute();
+
+          if(shareResponse.code() != 201)
+            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
+          else
+            uiValue(handleResult, null);
         } catch (Throwable e) {
           uiError(handleResult, e);
         }

@@ -1,12 +1,13 @@
 E3DB Java SDK
 ====
 
+The Tozny End-to-End Encrypted Database (E3DB) is a storage platform
+with powerful sharing and consent management features. [Read more on
+our
+blog.](https://tozny.com/blog/announcing-project-e3db-the-end-to-end-encrypted-database/)
+
 This repo contains an E3DB SDK that can be used with both Android
 devices and plain Java programs.
-
-E3DB enables end-to-end encryption of data created on mobile devices.
-Your application can have any number of users, who can securely share
-data between themselves, your application, and each other.
 
 ## Terms of Service
 
@@ -30,9 +31,13 @@ meant to be secret and is safe to embed in your app.
 
 ## Documentation
 
-Full API documentation can be found at
-(https://tozny.github.io/e3db-client-x). Code examples for the most
-common operations can be found below.
+Full API documentation for various versions can be found at the
+following locations:
+
+* [2.0](https://tozny.github.io/e3db-client-x/docs/2.0/) - The most recently released version of the client.
+* [1.0.2](https://tozny.github.io/e3db-client-x/docs/1.0.2/)
+
+Code examples for the most common operations can be found below.
 
 Using the SDK with Android
 ====
@@ -40,17 +45,50 @@ Using the SDK with Android
 The E3DB SDK targets Android API 19 and higher. To use the SDK in your
 app, add it as a dependency to your build. In Gradle, use:
 
-    compile('com.tozny.e3db:e3db-client-android:2.0@aar') {
-        transitive = true
-    }
-
-(Note that `transitive = true` is specific to Gradle.)
+```
+compile('com.tozny.e3db:e3db-client-android:2.0.0@aar') {
+    transitive = true
+}
+```
 
 Because the SDK contacts Tozny's E3DB service, your application also
-needs to requrest INTERNET permissions.
+needs to request INTERNET permissions.
 
 Using the SDK with Plain Java
 ====
+
+For use with Maven, declare the following repository and dependencies:
+
+```
+<repositories>
+  <repository>
+    <id>tozny-repo</id>
+    <name>Tozny Repository</name>
+    <url>https://maven.tozny.com/repo</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>com.tozny.e3db</groupId>
+    <artifactId>e3db-client-plain</artifactId>
+    <version>2.0.0</version>
+  </dependency>
+</dependencies>
+```
+
+libsodium
+----
+
+The plain Java SDK requires that the libsodium .so/.dll be on your
+path in order to use the SDK. On Linux or MacOS, use a package manager
+to install libsodium.
+
+Windows users should download a recent "MSVC" build of libsodium from
+https://download.libsodium.org/libsodium/releases. Unzip the archive
+and find the most recent "Release" version of libsodium.dll
+for your architecture (32 or 64 bits), and copy that that file to a location
+on your PATH environment variable.
 
 Asynchronous Result Handling
 ====
@@ -78,7 +116,7 @@ Registering a Client
 
 Registering creates a new client that can be used to interact with
 E3DB. Each client has a unique ID and is associated with your Tozny
-account. Registering only needs to happen once for a given client -
+account. Registering only needs to happen once for a given client --
 after credentials have been stored securely, the client can be
 authenticated again using the stored credentials.
 
@@ -92,20 +130,19 @@ import com.tozny.e3db.Config;
 String token = "<registration token>";
 String host = null;
 
-Client.register(
-  token, clientName, host, new ResultHandler<Config>() {
-    @Override
-    public void handle(Result<Config> r) {
-      if(! r.isError()) {
-        // write credentials to secure storage
-        writeFile("credentials.json", r.asValue().json());
-      }
-      else {
-        // throw to indicate registration error
-        throw new RuntimeException(r.asError().other())
-      }
+Client.register(token, clientName, host, new ResultHandler<Config>() {
+  @Override
+  public void handle(Result<Config> r) {
+    if(! r.isError()) {
+      // write credentials to secure storage
+      writeFile("credentials.json", r.asValue().json());
     }
-  });
+    else {
+      // throw to indicate registration error
+      throw new RuntimeException(r.asError().other())
+    }
+  }
+});
 
 ```
 
@@ -118,7 +155,7 @@ that can interact with E3DB:
 
 ```java
 
-String storedCredentials = ...; // Read from securre storage
+String storedCredentials = ...; // Read from secure storage
 Client client = new ClientBuilder()
   .fromConfig(Config.fromJson(storedCredentials))
   .build();
@@ -163,9 +200,9 @@ All values will be encrypted locally before being stored in E3DB.
 However, field names (for example, "song" and "artist" above) will
 remain unencrypted.
 
-To store JSON documents, make sure you "stringify" all JSON values
-prior to storing them in E3DB, and then reverse the process when you
-read them again.
+Any data format, such as JSON or raw bytes, can be stored as long as
+it is first converted to a String for a write operation. Just be sure
+to reverse the process later when reading the data.
 
 Query records
 ====
@@ -202,7 +239,7 @@ will be populated; `data()` will return an empty Map). Other possible
 filters include:
 
 - `setWriterIds`: Filter to records written by these IDs
-- `setWserIds`: Filter to records with these user IDs
+- `setUserIds`: Filter to records with these user IDs
 - `setRecordIds`: Filter to only the records identified by these IDs
 - `setTypes`: Filter to records that match the given types
 - `setIncludeAllWriters`: Set this flag to include records that have been shared
@@ -260,17 +297,18 @@ while(! done.get()) {
   
   wait.await(30, TimeUnit.SECONDS);
 }
+```
 
 Sharing Records
 ====
 
-E3DB allows the writer of a record to securely share that reocrd with
+E3DB allows the writer of a record to securely share that record with
 other E3DB clients. To share, you must know the client ID of the
 recipient. (The client ID of a given client is contained in the
 response given when registering.)
 
 Records are shared by `type`; the below shows sharing "lyric" records
-with a recipient represented by the variable `readerID`:
+with a recipient represented by the variable `readerId`:
 
 ```java
 client.share("lyric", readerId, new ResultHandler<Void>() {
@@ -299,7 +337,7 @@ client.revoke("lyric", readerId, new ResultHandler<Void>() {
 ```
 
 Note that the `Void` type means that the `Result` passed to `handle`
-represents whether an error occurred or not, and nothign else. Sharing
+represents whether an error occurred or not, and nothing else. Sharing
 operations do not return any useful information on success.
 
 

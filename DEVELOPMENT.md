@@ -25,7 +25,7 @@ Testing
 ====
 
 The e3dbtest directory contains a set of integration tests that cover
-basic functionality: regiser, read, writer, query, and sharing.
+basic functionality: register, read, write, query, and sharing.
 
 The tests use a hard-coded registration token (which is safe to use and distribute). However,
 you can replace the token via System properies:

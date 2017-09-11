@@ -23,7 +23,7 @@ used in an Android application or "plain" Java environment (such as a
 server), the SDK presents the same API for using E3DB.
 
 Before using the SDK, go to [Tozny's
-Console](https://console.tozny.com), create a free account, and go to
+Console](https://console.tozny.com), create an account, and go to
 the `Manage Clients` section. Click the `Create Token` button under
 the `Client Registration Tokens` heading. This value will allow your
 app to self-register a new user with E3DB. Note that this value is not

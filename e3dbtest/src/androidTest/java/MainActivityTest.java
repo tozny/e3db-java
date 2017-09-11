@@ -399,4 +399,19 @@ public class MainActivityTest {
       fail("Exception during test: " + e);
     }
   }
+
+  @Test
+  public void testVariadic() {
+    QueryParamsBuilder builder = new QueryParamsBuilder();
+    builder.setTypes(null);
+    assertTrue(builder.getTypes() == null);
+    builder.setTypes((String[]) null);
+    assertTrue(builder.getTypes() == null);
+    builder.setTypes();
+    assertTrue(builder.getTypes().size() == 0);
+    builder.setTypes((String) null);
+    assertTrue(builder.getTypes().size() == 1);
+    builder.setTypes(null, null);
+    assertTrue(builder.getTypes().size() == 2);
+  }
 }

@@ -15,22 +15,12 @@ public class AndroidCrypto implements Crypto {
   }
 
   @Override
-  public byte[] decryptSecretBox(String message, byte[] key) {
-    throw new IllegalStateException();
-  }
-
-  @Override
   public CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey) {
     throw new IllegalStateException();
   }
 
   @Override
   public byte[] decryptBox(CipherWithNonce message, byte[] publicKey, byte[] privateKey) {
-    throw new IllegalStateException();
-  }
-
-  @Override
-  public byte[] decryptBox(String message, byte[] publicKey, byte[] privateKey) {
     throw new IllegalStateException();
   }
 

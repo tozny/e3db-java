@@ -39,6 +39,18 @@ To run the tests, simply execute `MainActivityTest` in Android Studio. On the co
 can attempt `gradlew :e3dbtest:connectedAndroidTest` to run all tests, assuming a phone is
 plugged in and has USB debugging enabled.
 
+Creating Javadocs
+=====
+
+To generate documentation, run the following command from the root of the repo:
+
+```
+$ ./gradlew :e3db:javadoc
+```
+
+A directory named `docs\<version>` (where _version_ can be found in `./publish/build.gradle`) will be
+created, containing the generated javadocs.
+
 Publishing
 ====
 
@@ -48,8 +60,10 @@ $ gradlew :publish:plain:publishToMavenLocal :publish:android:publishToMavenLoca
 
 The published artifacts have different names, but should share versions. They are:
 
-* Plain Java - 'com.tozny.e3db:e3db-client-plain:2.0-SNAPSHOT'
-* Android - 'com.tozny.e3db:e3db-client-android:2.0-SNAPSHOT@aar'
+* Plain Java - 'com.tozny.e3db:e3db-client-plain:2.0.0-SNAPSHOT'
+* Android - 'com.tozny.e3db:e3db-client-android:2.0.0-SNAPSHOT@aar'
+
+(The version is specified in the file `./publish/build.gradle`.)
 
 Writing Android Apps
 ====

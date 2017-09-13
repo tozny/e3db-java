@@ -7,7 +7,8 @@ import java.util.UUID;
  *
  * <p>This class carries the result of a given asynchronous operation.
  *
- * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} type has this class -- the
+ * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} instance has this class &mdash; the
+ * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} instance has this class &mdash; the
  * {@link Result#isError()} and {@link Result#asValue()} methods work together to do the same.
  *
  * @param <R> The type of value returned by the operation.
@@ -21,7 +22,6 @@ public class ValueResult<R> implements Result<R> {
 
   /**
    * Always {@code false}.
-   * @return
    */
   @Override
   public boolean isError() {
@@ -30,7 +30,6 @@ public class ValueResult<R> implements Result<R> {
 
   /**
    * Always {@code null}.
-   * @return
    */
   @Override
   public ErrorResult<R> asError() {
@@ -45,7 +44,6 @@ public class ValueResult<R> implements Result<R> {
    * specifies a {@link Void} result type, of which {@code null} is the only valid value. In that
    * case, the fact that {@code isError} is {@code false} is the only information necessary to know
    * the operation completed successfully.
-   * @return
    */
   @Override
   public R asValue() {

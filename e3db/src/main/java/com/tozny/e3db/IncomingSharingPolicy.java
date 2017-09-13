@@ -3,9 +3,11 @@ package com.tozny.e3db;
 import java.util.UUID;
 
 /**
- * Describes a sharing relationship.
+ * Describes records shared with a client.
  *
- * <p>This class describes a sharing relationship from the reader's perspective.
+ * <p>This class describes a sharing relationship from the reader's perspective (that is, "who shares with me?").
+ *
+ * <p>Use {@link Client#getIncomingSharing(ResultHandler)} to get a list of record types shared with a client.
  */
 public class IncomingSharingPolicy {
   /**

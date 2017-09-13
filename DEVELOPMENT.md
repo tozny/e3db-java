@@ -3,6 +3,11 @@ E3DB Java SDK
 
 This repo contains an E3DB SDK that can be used with both Android devices and plain Java programs.
 
+Android Studio
+====
+
+If you wish to use Android Studio for development, you must use 3.0 or later.
+
 Structure
 ====
 

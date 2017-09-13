@@ -55,7 +55,7 @@ import static com.tozny.e3db.Checks.*;
  * All E3DB network communication occurs on a background thread (created by the class). Results are delivered via the callback argument given. On Android,
  * results are delivered on the UI thread. On all other platforms, results are delivered on the same background thread that performed the E3DB operation.
  *
- * <p>Note that no E3DB operations have a defined timeout -- your application is responsible for setting timeouts and performing appropriate action.
+ * <p>Note that no E3DB operations have a defined timeout &mdash; your application is responsible for setting timeouts and performing appropriate action.
  *
  * <h2><i>ResultHandler</i> &amp; <i>Result</i> Values</h2>
  * The {@link ResultHandler} callback accepts a {@link Result} value, which signals whether an error occurred or if the operation completed
@@ -65,7 +65,7 @@ import static com.tozny.e3db.Checks.*;
  * <p>More details are available on the documentation for {@link Result}.
  *
  * <h1>Registering a Client</h1>
- * Registration requires a "token", which associates each
+ * Registration requires a "token," which associates each
  * client with your Tozny account. Before using the SDK, go to <a href="https://console.tozny.com">https://console.tozny.com</a>,
  * create an account, and go to
  * the "Manage Clients" section. Click the "Create Token" button under
@@ -625,7 +625,6 @@ public class Client {
    * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
    *
    * The returned value represents the key as a Base64URL-encoded string.
-   * @return
    */
   public static String newPrivateKey() {
     byte [] key = crypto.newPrivateKey();
@@ -638,8 +637,6 @@ public class Client {
    * <p>The private key must be a Base64URL-encoded string.
    *
    * The returned value represents the key as a Base64URL-encoded string.
-   * @param privateKey
-   * @return
    */
   public static String getPublicKey(String privateKey) {
     checkNotEmpty(privateKey, "privateKey");
@@ -650,7 +647,6 @@ public class Client {
 
   /**
    * The ID of this client.
-   * @return
    */
   public UUID clientId() {
     return clientId;
@@ -758,14 +754,13 @@ public class Client {
    *
    * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
    * @param fields Values to encrypt and store.
-   * @param plain A JSON document that will be stored as plaintext (not encrypted) alongside
-   *              the record. If null, an empty JSON document is assumed.
+   * @param plain Additional, user-defined metadata that will <b>NOT</b> be encrypted. Can be null.
    * @param handleResult Result of the operation. If successful, returns the newly written record .
    */
   public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(fields, "fields");
-    if(plain != null)
+    if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     onBackground(new Runnable() {
@@ -817,7 +812,7 @@ public class Client {
    * @param recordMeta Metadata for the record being replaced (obtained from a previous {@code write} or
    *                   {@code query} call).
    * @param fields Field names and values. Wrapped in a {@link RecordData} instance to prevent confusing with the {@code plain} parameter.
-   * @param plain Any metadata associated with the record that should <b>NOT</b> be encrypted. Can be null, but cannot be empty if present.
+   * @param plain Any metadata associated with the record that will <b>NOT</b> be encrypted. If null, any existing metadata will not be changed.
    * @param handleResult If the update succeeds, returns the updated record. If the update fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
    * {@link E3DBVersionException} when {@code asError().error()} is called.
    */
@@ -1059,9 +1054,7 @@ public class Client {
    *
    * <p>This operation lists all record types shared with this client, as well as the client (writer)
    * sharing those records.
-   *
-   * <p>The resulting list may be empty but never null.
-   * @param handleResult
+   * @param handleResult If successful, returns a list of records types shared with this client. The resulting list may be empty but never null.
    */
   public void getIncomingSharing(final ResultHandler<List<IncomingSharingPolicy>> handleResult) {
     onBackground(new Runnable() {
@@ -1098,9 +1091,7 @@ public class Client {
    *
    * <p>This operation returns a list of record types shared by this client, including the
    * client (reader) that the records are shared with.
-   *
-   * <p>The resulting list may be empty but will never be null.
-   * @param handleResult
+   * @param handleResult If successful, returns a list of record types that this client has shared. The resulting list may be empty but will never be null.
    */
   public void getOutgoingSharing(final ResultHandler<List<OutgoingSharingPolicy>> handleResult) {
     onBackground(new Runnable() {

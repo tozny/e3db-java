@@ -12,13 +12,11 @@ public interface Record {
    *
    * Includes items such as writer ({@link RecordMeta#writerId()}),
    * creation date ({@link RecordMeta#created()}, type ({@link RecordMeta#type}), etc.
-   * @return
    */
   RecordMeta meta();
 
   /**
    * Decrypted field names and values.
-   * @return
    */
   Map<String, String> data();
 }

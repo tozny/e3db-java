@@ -8,8 +8,6 @@ import java.util.Map;
 public class Checks {
   /**
    * Throws if the given string is null or blank.
-   * @param str
-   * @param name
    */
   public static void checkNotEmpty(String str, String name) {
     if(str == null || str.trim().length() == 0)
@@ -18,8 +16,6 @@ public class Checks {
 
   /**
    * Throws if the given array is null or empty.
-   * @param arr
-   * @param name
    */
   public static void checkNotEmpty(byte[] arr, String name) {
     if(arr == null || arr.length == 0)
@@ -28,9 +24,6 @@ public class Checks {
 
   /**
    * Throws if the given value is null.
-   * @param obj
-   * @param name
-   * @param <R>
    */
   public static <R> void checkNotNull(R obj, String name) {
     if(obj == null)
@@ -40,8 +33,6 @@ public class Checks {
   /**
    * Throws if the given map is empty, if it contains a key that is empty,
    * or if it contains a value that is null.
-   * @param map
-   * @param name
    */
   public static void checkMap(Map<String, String> map, String name) {
     if(map.size() == 0)

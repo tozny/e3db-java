@@ -10,7 +10,7 @@ import static com.tozny.e3db.Checks.*;
  * (representing a specific E3DB error); in the second, {@link #error()} will return {@code null}, and
  * you should use {@link #other()} to get the specific exception that occurred.
  *
- * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} type has this class -- the
+ * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} instance has this class &mdash; the
  * {@link Result#isError()} and {@link Result#asError()} methods work together to do the same.
  *
  * @param <R> The type of value returned when an operation completes successfully. Only present because
@@ -26,7 +26,6 @@ public class ErrorResult<R> implements Result<R> {
 
   /**
    * Always {@code true}.
-   * @return
    */
   @Override
   public boolean isError() {
@@ -35,7 +34,6 @@ public class ErrorResult<R> implements Result<R> {
 
   /**
    * Always this instance.
-   * @return
    */
   @Override
   public ErrorResult<R> asError() {
@@ -44,7 +42,6 @@ public class ErrorResult<R> implements Result<R> {
 
   /**
    * Always {@code null}.
-   * @return
    */
   @Override
   public R asValue() {
@@ -56,7 +53,6 @@ public class ErrorResult<R> implements Result<R> {
    *
    * <p>This method will return {@code null} if a general exception
    * occurred during the operation; otherwise, it will return a specific E3DB error.
-   * @return
    */
   public E3DBException error() {
     if(error instanceof E3DBException)
@@ -70,7 +66,6 @@ public class ErrorResult<R> implements Result<R> {
    *
    * <p>This method always returns a value. However, this method should not be used if
    * {@link #error()} returns a non-{@code null} value.
-   * @return
    */
   public Throwable other() {
     return this.error;

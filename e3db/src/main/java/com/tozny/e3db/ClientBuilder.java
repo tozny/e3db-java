@@ -17,8 +17,8 @@ import static com.tozny.e3db.Checks.*;
  * <p>Two shortcut methods are available for creating a client:
  *
  * <ul>
- *   <li>{@link #fromConfig(Config)} -- Creates a client based on a {@link Config} object.</li>
- *   <li>{@link #fromCredentials(ClientCredentials, String)} -- Creates a client based on credentials and a private key.</li>
+ *   <li>{@link #fromConfig(Config)} &mdash; Creates a client based on a {@link Config} object.</li>
+ *   <li>{@link #fromCredentials(ClientCredentials, String)} &mdash; Creates a client based on credentials and a private key.</li>
  * </ul>
  *
  * <p>Otherwise, the following methods must be called before {@code build} will succeed:
@@ -51,7 +51,6 @@ public class ClientBuilder {
 
   /**
    * Configure this object using the {@code info} argument.
-   * @param info
    * @return This instance.
    */
   public ClientBuilder fromConfig(Config info) {
@@ -69,7 +68,7 @@ public class ClientBuilder {
    * and private key.
    * @param creds Credentials holding the username (API key), password (API secret) and client ID for the
    *              client.
-   * @param privateKey A Base64URL-encoded string representing a Curve 25519 private key.
+   * @param privateKey A Base64URL-encoded string representing a Curve25519 private key.
    * @return This instance.
    */
   public ClientBuilder fromCredentials(ClientCredentials creds, String privateKey) {
@@ -85,7 +84,6 @@ public class ClientBuilder {
   /**
    * Configure the username (API key) for this instance.
    *
-   * @param apiKey
    * @return This instance.
    */
   public ClientBuilder setApiKey(String apiKey) {
@@ -96,7 +94,6 @@ public class ClientBuilder {
   /**
    * Configure the password (API  secret) for this instance.
    *
-   * @param apiSecret
    * @return This instance.
    */
   public ClientBuilder setApiSecret(String apiSecret) {
@@ -107,7 +104,6 @@ public class ClientBuilder {
   /**
    * Configure the Client ID for this instance.
    *
-   * @param clientId
    * @return This instance.
    */
   public ClientBuilder setClientId(UUID clientId) {
@@ -119,7 +115,6 @@ public class ClientBuilder {
    * Configure the host for this instance.
    *
    * Not normally necessary, defaults to {@code https://api.e3db.com}.
-   * @param host
    * @return This instance.
    */
   public ClientBuilder setHost(String host) {
@@ -130,7 +125,7 @@ public class ClientBuilder {
   /**
    * Configure the private key for this instance
    *
-   * @param privateKey A Base64URL-encoded string representing a Curve 25519 private key.
+   * @param privateKey A Base64URL-encoded string representing a Curve25519 private key.
    * @return This instance.
    */
   public ClientBuilder setPrivateKey(String privateKey) {

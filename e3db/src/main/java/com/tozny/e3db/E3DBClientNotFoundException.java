@@ -7,10 +7,13 @@ package com.tozny.e3db;
  * recipient is not found.
  */
 public class E3DBClientNotFoundException extends E3DBException {
-  private final String clientEmail;
+  /**
+   * ID of the client that was not found.
+   */
+  public final String id;
 
   public E3DBClientNotFoundException(String id) {
     super("'" + id + "' not found.");
-    this.clientEmail = id;
+    this.id = id;
   }
 }

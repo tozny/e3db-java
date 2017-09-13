@@ -36,7 +36,7 @@ public class Config {
    */
   public final String apiSecret;
   /**
-   * Curve 25519 private key for the client, as a Base64URL-encoded string.
+   * Curve25519 private key for the client, as a Base64URL-encoded string.
    */
   public final String privateKey;
   /**
@@ -74,8 +74,7 @@ public class Config {
   /**
    * Create a Config instance from the given credentials and private key.
    * @param creds Username (API key), password (API secret), and client ID.
-   * @param privateKey Curve 25519 private key, as a Base64URL-encoded string.
-   * @return
+   * @param privateKey Curve25519 private key, as a Base64URL-encoded string.
    */
   public static Config fromCredentials(ClientCredentials creds, String privateKey) {
     checkNotNull(creds, "creds");
@@ -90,9 +89,6 @@ public class Config {
    * <p>The JSON document given in {@code doc} must be generated (at some previous time)
    * using the {@link #json()} method.
    *
-   * @param doc
-   * @return
-   * @throws IOException
    */
   public static Config fromJson(String doc) throws IOException {
     checkNotEmpty(doc, "doc");

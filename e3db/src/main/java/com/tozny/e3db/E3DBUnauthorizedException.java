@@ -7,7 +7,10 @@ package com.tozny.e3db;
  * are not valid.
  */
 public class E3DBUnauthorizedException extends E3DBException {
-  public static final int code = 401;
+  private static final int code = 401;
+  /**
+   * Message sent by the server.
+   */
   public final String message;
 
   public E3DBUnauthorizedException(String message) {

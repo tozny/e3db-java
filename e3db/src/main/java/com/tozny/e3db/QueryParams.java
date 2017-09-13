@@ -22,9 +22,9 @@ import java.util.UUID;
  * <h1>Behavior with Multiple Filters</h1>
  *
  * All filters specified act as conjunctions; that is, a record must match <b>every</b> filter criteria
- * to be returned. For example, if record types and record IDs are given (via {@code types} and
- * {@code recordIds}), then records will only be returned if they have one of the give IDs <b>and</b> if
- * they have the given content type. The same applies for {@code writerIds} and {@code userIds}.
+ * to be returned. For example, if record types and writer IDs are given (via {@code types} and
+ * {@code writerIds}), then records will only be returned if they were written by one of the given IDs <b>and</b> if
+ * they have the given record type.
  *
  * <h1>Getting all Shared Records</h1>
  *
@@ -100,8 +100,6 @@ public class QueryParams {
 
   /**
    * Create a builder matching the parameters in this instance.
-   *
-   * @return
    */
   public QueryParamsBuilder buildOn() {
     QueryParamsBuilder builder = new QueryParamsBuilder();

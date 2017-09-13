@@ -4,7 +4,7 @@ package com.tozny.e3db;
  * Provides cryptographic operations necessary for interacting with E3DB. Android and
  * plain Java implementations of this class are automatically included in each respective
  * client library (see <a href="package-summary.html#package.description">the package overview</a> for
- * insrtructions on referencing this library from each type of application).
+ * instructions on referencing this library from each type of application).
  */
 public interface Crypto {
   /**

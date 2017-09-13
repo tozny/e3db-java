@@ -8,7 +8,6 @@ import java.util.UUID;
  * <p>This class carries the result of a given asynchronous operation.
  *
  * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} instance has this class &mdash; the
- * <p><b>Note</b>: You should never need to use {@code instanceof} to test that a {@link Result} instance has this class &mdash; the
  * {@link Result#isError()} and {@link Result#asValue()} methods work together to do the same.
  *
  * @param <R> The type of value returned by the operation.

@@ -107,7 +107,6 @@ public class Config {
    *
    * <p>The value returned contains a JSON document which can be passed to the
    * {@link #fromJson(String)} method to re-create this {@code Config} instance.
-   * @return
    */
   public String json() {
     Map<String, String> info = new HashMap<>();

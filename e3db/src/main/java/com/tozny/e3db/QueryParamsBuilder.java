@@ -128,7 +128,6 @@ public class QueryParamsBuilder {
 
   /**
    * Sets the number of records to return. Pass {@code -1} to use the server default of 50.
-   * @param count
    */
   public QueryParamsBuilder setCount(int count) {
     this.count = count;
@@ -164,7 +163,6 @@ public class QueryParamsBuilder {
   /**
    * When {@code true}, results should include records shared with this client (that also match
    * any other criteria). Defaults to {@code null}, which uses the server default {@code false}.
-   * @param includeAllWriters
    */
   public QueryParamsBuilder setIncludeAllWriters(Boolean includeAllWriters) {
     this.includeAllWriters = includeAllWriters;

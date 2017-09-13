@@ -6,7 +6,7 @@ This repo contains an E3DB SDK that can be used with both Android devices and pl
 Android Studio
 ====
 
-If you wish to use Android Studio for development, you must use 3.0 or later.
+If you wish to use Android Studio for development, you must use 3.0 (in beta and available at https://developer.android.com/studio/preview/index.html).
 
 Structure
 ====

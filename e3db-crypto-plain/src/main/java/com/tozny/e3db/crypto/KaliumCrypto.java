@@ -14,7 +14,7 @@ import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305
 import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_NONCEBYTES;
 
 public class KaliumCrypto implements Crypto {
-  private static Random random = new Random();
+  private final static Random random = new Random();
 
   @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
@@ -29,14 +29,6 @@ public class KaliumCrypto implements Crypto {
     checkNotNull(message, "message");
     checkNotEmpty(key, "key");
     return new SecretBox(key).decrypt(message.getNonce(), message.getCipher());
-  }
-
-  @Override
-  public byte[] decryptSecretBox(String message, byte[] key) {
-    checkNotEmpty(message, "message");
-    checkNotEmpty(key, "key");
-    CipherWithNonce x = CipherWithNonce.decode(message);
-    return new SecretBox(key).decrypt(x.getNonce(), x.getCipher());
   }
 
   @Override
@@ -56,14 +48,6 @@ public class KaliumCrypto implements Crypto {
     checkNotNull(privateKey, "privateKey");
     Box box = new Box(publicKey, privateKey);
     return box.decrypt(message.getNonce(), message.getCipher());
-  }
-
-  @Override
-  public byte[] decryptBox(String message, byte[] publicKey, byte[] privateKey) {
-    checkNotEmpty(message, "message");
-    checkNotEmpty(publicKey, "publicKey");
-    checkNotEmpty(privateKey, "privateKey");
-    return decryptBox(CipherWithNonce.decode(message), publicKey, privateKey);
   }
 
   @Override

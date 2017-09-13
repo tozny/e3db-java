@@ -9,6 +9,8 @@ sourceSets {
   }
 }
 
+evaluationDependsOn(':publish')
+
 publishing {
   publications {
     maven(MavenPublication) {

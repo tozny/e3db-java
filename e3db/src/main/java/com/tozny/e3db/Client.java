@@ -43,6 +43,73 @@ import static com.tozny.e3db.Base64.decodeURL;
 import static com.tozny.e3db.Base64.encodeURL;
 import static com.tozny.e3db.Checks.*;
 
+/**
+ * Implements interactions with E3DB.
+ *
+ * <p>This class provides all communication with E3DB. Use it to read, write, update, delete and
+ * query records. It can also be used to add and remove sharing rules (through the {@code share} and {@code revoke}
+ * methods).
+ *
+ * <h1>Asynchronous Result Handling</h1>
+ * Most methods in this class have a {@code void} return type, and instead return results via a callback argument of type {@link ResultHandler}.
+ * All E3DB network communication occurs on a background thread (created by the class). Results are delivered via the callback argument given. On Android,
+ * results are delivered on the UI thread. On all other platforms, results are delivered on the same background thread that performed the E3DB operation.
+ *
+ * <p>Note that no E3DB operations have a defined timeout &mdash; your application is responsible for setting timeouts and performing appropriate action.
+ *
+ * <h2><i>ResultHandler</i> &amp; <i>Result</i> Values</h2>
+ * The {@link ResultHandler} callback accepts a {@link Result} value, which signals whether an error occurred or if the operation completed
+ * successfully. The {@link Result#isError()} method will return {@code true} if some error
+ * occurred. If not, {@link Result#asValue()} will give the value of the operation that occurred.
+ *
+ * <p>More details are available on the documentation for {@link Result}.
+ *
+ * <h1>Registering a Client</h1>
+ * Registration requires a "token," which associates each
+ * client with your Tozny account. Before using the SDK, go to <a href="https://console.tozny.com">https://console.tozny.com</a>,
+ * create an account, and go to
+ * the "Manage Clients" section. Click the "Create Token" button under
+ * the "Client Registration Tokens" heading. Use the token value created to register
+ * new clients. Note that this value is not
+ * meant to be secret and is safe to embed in your app.
+ *
+ * <p>The {@link #register(String, String, String, ResultHandler)} method can be used to
+ * register a client. After registration, save the resulting credentials for use later.
+ *
+ * <h1>Creating a Client</h1>
+ * Use the {@link ClientBuilder} class to create a {@link Client} instance from stored credentials. The
+ * convenience method {@link ClientBuilder#fromConfig(Config)} makes it easy to load all client
+ * information from one location. The
+ * {@link Config} class also provides methods for converting credentials to and from JSON.
+ *
+ * <p>However, <b>ALWAYS</b> be sure to store client credentials securely. Those are the username,
+ * password, and private key used by the {@link Client} instance!
+ *
+ * <h1>Write, Update and Delete Records</h1>
+ *
+ * Records can be written with the {@link #write(String, RecordData, Map, ResultHandler)} method,
+ * updated with {@link #update(RecordMeta, RecordData, Map, ResultHandler)}, and deleted with {@link #delete(UUID, String, ResultHandler)}.
+ *
+ * <h1>Reading &amp; Querying Records</h1>
+ *
+ * You can read a single record with the {@link #read(UUID, ResultHandler)} method.
+ *
+ * <p>Multiple records (matching some criteria) can be read using the {@link #query(QueryParams, ResultHandler)} method. You must pass a {@link QueryParams} instance
+ * to specify the selection critera for records; use the {@link QueryParamsBuilder} object to build the query.
+ *
+ * <h2>Pagination</h2>
+ * Query result pagination depends on the {@link QueryResponse#last()} value, which returns an index indicating the last record
+ * in a given page of results. Pass the {@code last()} value obtained to the {@link QueryParamsBuilder#setAfter}) method to
+ * obtain records following the last record.
+ *
+ * <h1>Sharing</h1>
+ * Sharing allows one client to give read access to a set of that client's records to another client, without compromising end-to-end encryption. To share
+ * records, a client must know the ID of the client they wish to share with. The SDK does not provide support for looking up client IDs - you will have to
+ * implement such support out of band.
+ *
+ * <p>To share records, use the {@link #share(String, UUID, ResultHandler)} method. To remove sharing access, use the {@link #revoke(String, UUID, ResultHandler)}} method.
+ *
+ */
 public class Client {
   private static final ObjectMapper mapper = new ObjectMapper();
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
@@ -368,10 +435,10 @@ public class Client {
   private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBException, ParseException {
     Map<String, Object> searchRequest = new HashMap<>();
 
-    if(params.after != null)
+    if(params.after > 0)
       searchRequest.put("after_index", params.after);
 
-    if(params.count != null)
+    if(params.count != -1)
       searchRequest.put("count", params.count);
 
     if(params.includeData != null)
@@ -531,7 +598,7 @@ public class Client {
       return null;
     } else if (response.code() == 200) {
       JsonNode eakResponse = mapper.readTree(response.body().string());
-      byte[] ak = crypto.decryptBox(eakResponse.get("eak").asText(),
+      byte[] ak = crypto.decryptBox(CipherWithNonce.decode(eakResponse.get("eak").asText()),
         decodeURL(eakResponse.get("authorizer_public_key").get("curve25519").asText()),
         this.privateKey);
       return ak;
@@ -551,26 +618,13 @@ public class Client {
     }
   }
 
-  private JsonNode doLookup(String readerEmail) throws IOException, E3DBException {
-    final retrofit2.Response<ResponseBody> infoResponse = shareClient.lookupClient(readerEmail).execute();
-    if(infoResponse.code() == 404) {
-      throw new E3DBClientNotFoundException(readerEmail);
-    }
-    else if(infoResponse.code() != 200) {
-      throw E3DBException.find(infoResponse.code(), infoResponse.message());
-    }
-
-    return mapper.readTree(infoResponse.body().string());
-  }
-
   /**
    * Generates a private key that can be used for Curve25519
    * public-key encryption.
    *
-   * The associated public key be retrieve using {@link getPublicKey}.
+   * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
    *
    * The returned value represents the key as a Base64URL-encoded string.
-   * @return
    */
   public static String newPrivateKey() {
     byte [] key = crypto.newPrivateKey();
@@ -578,13 +632,11 @@ public class Client {
   }
 
   /**
-   * Gets the public key calculated from the given private key.
+   * Gets the public key for the given private key.
    *
-   * The private key must be a Base64URL-encoded string.
+   * <p>The private key must be a Base64URL-encoded string.
    *
    * The returned value represents the key as a Base64URL-encoded string.
-   * @param privateKey
-   * @return
    */
   public static String getPublicKey(String privateKey) {
     checkNotEmpty(privateKey, "privateKey");
@@ -593,10 +645,23 @@ public class Client {
     return encodeURL(crypto.getPublicKey(arr));
   }
 
+  /**
+   * The ID of this client.
+   */
   public UUID clientId() {
     return clientId;
   }
 
+  /**
+   * Registers a new client. This method creates a new public/private key pair for the client
+   * to use when encrypting and decrypting records.
+   *
+   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName Name of the client; for informational purposes only.
+   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
+   *                     a secure location, and loaded later.
+   */
   public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
@@ -621,6 +686,19 @@ public class Client {
     });
   }
 
+  /**
+   * Registers a new client with a given public key.
+   *
+   * <p>This method does not create a private/public key pair; rather, the public key should be provided
+   * by the caller.
+   *
+   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName Name of the client; for informational purposes only.
+   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                  private key. Consider using {@link #newPrivateKey()} to generate a private key.
+   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param handleResult Handles the result of registration.
+   */
   public static void register(final String token, final String clientName, final String publicKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
@@ -676,15 +754,13 @@ public class Client {
    *
    * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
    * @param fields Values to encrypt and store.
-   * @param plain A JSON document that will be stored as plaintext (not encrypted) alongside
-   *              the record. If null, an empty JSON document is assumed.
-   * @param handleResult
-   * @return
+   * @param plain Additional, user-defined metadata that will <b>NOT</b> be encrypted. Can be null.
+   * @param handleResult Result of the operation. If successful, returns the newly written record .
    */
   public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(fields, "fields");
-    if(plain != null)
+    if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     onBackground(new Runnable() {
@@ -728,14 +804,18 @@ public class Client {
   }
 
   /**
-   * Replace the given record with new data and plaintext. All existing data and plaintext
-   * will be overwritten.
-   * @param recordMeta
-   * @param fields
-   * @param plain
-   * @param type
-   * @param handleResult
-   * @return    */
+   * Replace the given record with new data.
+   *
+   * <p>The {@code recordMeta} argument is only used to obtain information about the record to replace. No metadata
+   * updates by the client are allowed.
+   *
+   * @param recordMeta Metadata for the record being replaced (obtained from a previous {@code write} or
+   *                   {@code query} call).
+   * @param fields Field names and values. Wrapped in a {@link RecordData} instance to prevent confusing with the {@code plain} parameter.
+   * @param plain Any metadata associated with the record that will <b>NOT</b> be encrypted. If null, any existing metadata will not be changed.
+   * @param handleResult If the update succeeds, returns the updated record. If the update fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
+   * {@link E3DBVersionException} when {@code asError().error()} is called.
+   */
   public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotNull(recordMeta, "recordMeta");
     checkNotNull(fields, "fields");
@@ -778,6 +858,14 @@ public class Client {
     });
   }
 
+  /**
+   * Deletes a given record.
+   *
+   * @param recordId ID of the record to delete. Obtained from {@link RecordMeta#recordId()}.
+   * @param version Version associated with the record. Obtained from {@link RecordMeta#version()}.
+   * @param handleResult If the deletion succeeds, returns no useful information. If the delete fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
+   * {@link E3DBVersionException} when {@code asError().error()} is called.
+   */
   public void delete(final UUID recordId, final String version, final ResultHandler<Void> handleResult) {
     checkNotNull(recordId, "recordId");
     checkNotEmpty(version, "version");
@@ -802,6 +890,13 @@ public class Client {
     });
   }
 
+  /**
+   * Read a record.
+   *
+   * @param recordId ID of the record to read. Especially useful with {@code query} results that do not include
+   *                 the actual data.
+   * @param handleResult If successful, return the record read.
+   */
   public void read(final UUID recordId, final ResultHandler<Record> handleResult) {
     checkNotNull(recordId, "recordId");
     onBackground(new Runnable() {
@@ -836,6 +931,16 @@ public class Client {
     });
   }
 
+  /**
+   * Get a list of records matching some criteria.
+   *
+   * <p>By default, results are limited to 50 records and do not include encrypted data (a separate
+   * read must be made to get the data for a record).
+   *
+   * @param params The criteria to filter records by. Use the {@link QueryParamsBuilder} class to make this object.
+   * @param handleResult If successful, returns a page of results. The {@link QueryResponse#last()} method can be used
+   *                     in conjunction with the {@link QueryParamsBuilder#setAfter(long)} method to implement pagination.
+   */
   public void query(final QueryParams params, final ResultHandler<QueryResponse> handleResult) {
     checkNotNull(params, "params");
 
@@ -854,6 +959,17 @@ public class Client {
     });
   }
 
+  /**
+   * Give another client the ability to read records.
+   *
+   * <p>This operation gives read access for records of {@code type}, written by this client, to the
+   * the recipient specified by {@code readerId}.
+   *
+   * @param type The type of records to grant access to.
+   * @param readerId ID of client to give access to.
+   * @param handleResult If successful, returns no useful information (except that the operation
+   *                     completed).
+   */
   public void share(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(readerId, "readerId");
@@ -896,6 +1012,17 @@ public class Client {
     });
   }
 
+  /**
+   * Remove permission for another client to read records.
+   *
+   * <p>This operation removes previously granted permission for the client specified by {@code readerId} to
+   * read records, written by this client, of type {@code type}.
+   *
+   * @param type The type of records to remove access to.
+   * @param readerId ID of client to remove access from.
+   * @param handleResult If successful, returns no useful information (except that the operation
+   *                     completed).
+   */
   public void revoke(final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(readerId, "readerId");
@@ -915,6 +1042,80 @@ public class Client {
             uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
           else
             uiValue(handleResult, null);
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get a list of record types shared with this client.
+   *
+   * <p>This operation lists all record types shared with this client, as well as the client (writer)
+   * sharing those records.
+   * @param handleResult If successful, returns a list of records types shared with this client. The resulting list may be empty but never null.
+   */
+  public void getIncomingSharing(final ResultHandler<List<IncomingSharingPolicy>> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> response = shareClient.getIncoming().execute();
+          if(response.code() != 200) {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
+            return;
+          }
+
+          JsonNode results = mapper.readTree(response.body().string());
+          ArrayList<IncomingSharingPolicy> policies = new ArrayList<>(results.size());
+          if(results.isArray()) {
+            for(JsonNode policy : results) {
+              String writer_name = policy.get("writer_name") == null ? "" : policy.get("writer_name").asText();
+              String writer_id = policy.get("writer_id").asText();
+              String record_type = policy.get("record_type").asText();
+              policies.add(new IncomingSharingPolicy(UUID.fromString(writer_id), writer_name, record_type));
+            }
+          }
+
+          uiValue(handleResult, policies);
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get a list of record types shared by this client.
+   *
+   * <p>This operation returns a list of record types shared by this client, including the
+   * client (reader) that the records are shared with.
+   * @param handleResult If successful, returns a list of record types that this client has shared. The resulting list may be empty but will never be null.
+   */
+  public void getOutgoingSharing(final ResultHandler<List<OutgoingSharingPolicy>> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> response = shareClient.getOutgoing().execute();
+          if(response.code() != 200) {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
+            return;
+          }
+
+          JsonNode results = mapper.readTree(response.body().string());
+          ArrayList<OutgoingSharingPolicy> policies = new ArrayList<>(results.size());
+          if(results.isArray()) {
+            for(JsonNode policy : results) {
+              String reader_name = policy.get("reader_name") == null ? "" : policy.get("reader_name").asText();
+              String reader_id = policy.get("reader_id").asText();
+              String record_type = policy.get("record_type").asText();
+              policies.add(new OutgoingSharingPolicy(UUID.fromString(reader_id), reader_name, record_type));
+            }
+          }
+
+          uiValue(handleResult, policies);
         } catch (Throwable e) {
           uiError(handleResult, e);
         }

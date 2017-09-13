@@ -38,13 +38,6 @@ public class AndroidCrypto implements Crypto {
   }
 
   @Override
-  public byte[] decryptSecretBox(String message, byte[] key) {
-    checkNotEmpty(message, "message");
-    checkNotEmpty(key, "key");
-    return decryptSecretBox(CipherWithNonce.decode(message), key);
-  }
-
-  @Override
   public CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey) {
     checkNotNull(message, "message");
     checkNotEmpty(publicKey, "publicKey");
@@ -60,14 +53,6 @@ public class AndroidCrypto implements Crypto {
     checkNotNull(publicKey, "publicKey");
     checkNotNull(privateKey, "privateKey");
     return new Box(publicKey, privateKey).decrypt(message.getNonce(), message.getCipher());
-  }
-
-  @Override
-  public byte[] decryptBox(String message, byte[] publicKey, byte[] privateKey) {
-    checkNotEmpty(message, "message");
-    checkNotEmpty(publicKey, "publicKey");
-    checkNotEmpty(privateKey, "privateKey");
-    return decryptBox(CipherWithNonce.decode(message), publicKey, privateKey);
   }
 
   @Override

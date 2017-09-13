@@ -20,4 +20,10 @@ interface ShareAPI {
 
   @PUT("/v1/storage/policy/{user_id}/{writer_id}/{reader_id}/{type}")
   Call<ResponseBody> putPolicy(@Path("user_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId, @Path("type") String type, @Body RequestBody policy);
+
+  @GET("/v1/storage/policy/incoming")
+  Call<ResponseBody> getIncoming();
+
+  @GET("/v1/storage/policy/outgoing")
+  Call<ResponseBody> getOutgoing();
 }

@@ -7,6 +7,8 @@ import com.tozny.e3db.Config;
 import com.tozny.e3db.Client;
 import com.tozny.e3db.ClientBuilder;
 import com.tozny.e3db.E3DBNotFoundException;
+import com.tozny.e3db.IncomingSharingPolicy;
+import com.tozny.e3db.OutgoingSharingPolicy;
 import com.tozny.e3db.QueryParams;
 import com.tozny.e3db.QueryParamsBuilder;
 import com.tozny.e3db.QueryResponse;
@@ -126,14 +128,15 @@ public class MainActivityTest {
       wait.await(30, TimeUnit.SECONDS);
     }
 
-    CI from = getClient();
-    CI to = getClient(shareProfile);
+    final CI from = getClient();
+    final CI to = getClient(shareProfile);
     Config toConfig = Config.fromJson(profiles.get(shareProfile));
     Config fromConfig = Config.fromJson(profiles.get("default"));
 
     // Log.i("info", "to: " + toConfig.json());
     // Log.i("info", "from: " + fromConfig.json());
 
+    final String recordType = "lyric";
     Map<String, String> cleartext = new HashMap<>();
     cleartext.put("song", "triangle man");
     cleartext.put(FIELD, "Is he a dot, or is he a speck?");
@@ -142,7 +145,7 @@ public class MainActivityTest {
     // Use default client to write a record
     {
       final CountDownLatch wait = new CountDownLatch(2);
-      from.client.write("lyric", new RecordData(cleartext), null, new ResultHandler<Record>() {
+      from.client.write(recordType, new RecordData(cleartext), null, new ResultHandler<Record>() {
         @Override
         public void handle(Result<Record> r) {
           assertFalse("Error writing record", r.isError());
@@ -152,7 +155,7 @@ public class MainActivityTest {
       });
       wait.await(30, TimeUnit.SECONDS);
 
-      from.client.share("lyric", to.clientId, new ResultHandler<Void>() {
+      from.client.share(recordType, to.clientId, new ResultHandler<Void>() {
         @Override
         public void handle(Result<Void> r) {
           assertFalse("Error sharing lyric record.", r.isError());
@@ -181,11 +184,54 @@ public class MainActivityTest {
       wait.await(30, TimeUnit.SECONDS);
     }
 
+    {
+      // check from shares
+      from.client.getIncomingSharing(new ResultHandler<List<IncomingSharingPolicy>>() {
+        @Override
+        public void handle(Result<List<IncomingSharingPolicy>> r) {
+          assertFalse("Incoming sharing gave an error", r.isError());
+          assertTrue("From client should not have any records shared.", r.asValue().size() == 0);
+        }
+      });
+
+      from.client.getOutgoingSharing(new ResultHandler<List<OutgoingSharingPolicy>>() {
+        @Override
+        public void handle(Result<List<OutgoingSharingPolicy>> r) {
+          assertFalse("Outgoing sharing gave an error", r.isError());
+          assertTrue("From client should share only one record type.", r.asValue().size() == 1);
+          assertEquals("From client should share be sharing with to client.", to.clientId, r.asValue().get(0).readerId);
+          assertEquals("Record type did not match", recordType, r.asValue().get(0).type);
+
+        }
+      });
+    }
+
+    {
+      // check to shares
+      to.client.getIncomingSharing(new ResultHandler<List<IncomingSharingPolicy>>() {
+        @Override
+        public void handle(Result<List<IncomingSharingPolicy>> r) {
+          assertFalse("Incoming sharing gave an error", r.isError());
+          assertTrue("To client should have one record type shared.", r.asValue().size() == 1);
+          assertEquals("Reader of shared record type did not match.", from.clientId, r.asValue().get(0).writerId);
+          assertEquals("Record type did not match", recordType, r.asValue().get(0).type);
+        }
+      });
+
+      to.client.getOutgoingSharing(new ResultHandler<List<OutgoingSharingPolicy>>() {
+        @Override
+        public void handle(Result<List<OutgoingSharingPolicy>> r) {
+          assertFalse("Outgoing sharing gave an error", r.isError());
+          assertTrue("To client should not have any records shared.", r.asValue().size() == 0);
+        }
+      });
+    }
+
     // revoke the record
     {
       final CountDownLatch wait = new CountDownLatch(2);
 
-      from.client.revoke("lyric", to.clientId, new ResultHandler<Void>() {
+      from.client.revoke(recordType, to.clientId, new ResultHandler<Void>() {
         @Override
         public void handle(Result<Void> r) {
           assertFalse("Error revoking shared record.", r.isError());

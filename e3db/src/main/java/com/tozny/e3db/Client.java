@@ -635,7 +635,7 @@ public class Client {
   /**
    * Gets the public key for the given private key.
    *
-   * T<p>he private key must be a Base64URL-encoded string.
+   * <p>The private key must be a Base64URL-encoded string.
    *
    * The returned value represents the key as a Base64URL-encoded string.
    * @param privateKey
@@ -698,7 +698,7 @@ public class Client {
    *
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
-   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve 25519
+   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
    *                  private key. Consider using {@link #newPrivateKey()} to generate a private key.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
@@ -1047,6 +1047,84 @@ public class Client {
             uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
           else
             uiValue(handleResult, null);
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get a list of record types shared with this client.
+   *
+   * <p>This operation lists all record types shared with this client, as well as the client (writer)
+   * sharing those records.
+   *
+   * <p>The resulting list may be empty but never null.
+   * @param handleResult
+   */
+  public void getIncomingSharing(final ResultHandler<List<IncomingSharingPolicy>> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> response = shareClient.getIncoming().execute();
+          if(response.code() != 200) {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
+            return;
+          }
+
+          JsonNode results = mapper.readTree(response.body().string());
+          ArrayList<IncomingSharingPolicy> policies = new ArrayList<>(results.size());
+          if(results.isArray()) {
+            for(JsonNode policy : results) {
+              String writer_name = policy.get("writer_name") == null ? "" : policy.get("writer_name").asText();
+              String writer_id = policy.get("writer_id").asText();
+              String record_type = policy.get("record_type").asText();
+              policies.add(new IncomingSharingPolicy(UUID.fromString(writer_id), writer_name, record_type));
+            }
+          }
+
+          uiValue(handleResult, policies);
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get a list of record types shared by this client.
+   *
+   * <p>This operation returns a list of record types shared by this client, including the
+   * client (reader) that the records are shared with.
+   *
+   * <p>The resulting list may be empty but will never be null.
+   * @param handleResult
+   */
+  public void getOutgoingSharing(final ResultHandler<List<OutgoingSharingPolicy>> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> response = shareClient.getOutgoing().execute();
+          if(response.code() != 200) {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
+            return;
+          }
+
+          JsonNode results = mapper.readTree(response.body().string());
+          ArrayList<OutgoingSharingPolicy> policies = new ArrayList<>(results.size());
+          if(results.isArray()) {
+            for(JsonNode policy : results) {
+              String reader_name = policy.get("reader_name") == null ? "" : policy.get("reader_name").asText();
+              String reader_id = policy.get("reader_id").asText();
+              String record_type = policy.get("record_type").asText();
+              policies.add(new OutgoingSharingPolicy(UUID.fromString(reader_id), reader_name, record_type));
+            }
+          }
+
+          uiValue(handleResult, policies);
         } catch (Throwable e) {
           uiError(handleResult, e);
         }

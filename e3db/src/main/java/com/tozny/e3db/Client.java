@@ -804,17 +804,27 @@ public class Client {
   }
 
   /**
-   * Replace the given record with new data.
+   * Replace the given record with new data and plaintext metadata.
    *
-   * <p>The {@code recordMeta} argument is only used to obtain information about the record to replace. No metadata
-   * updates by the client are allowed.
+   * <p>The {@code recordMeta} argument is only used to obtain
+   * information about the record to replace. No metadata updates by
+   * the client are allowed.
    *
-   * @param recordMeta Metadata for the record being replaced (obtained from a previous {@code write} or
+   * @param recordMeta Metadata for the record being replaced
+   *                   (obtained from a previous {@code write} or
    *                   {@code query} call).
-   * @param fields Field names and values. Wrapped in a {@link RecordData} instance to prevent confusing with the {@code plain} parameter.
-   * @param plain Any metadata associated with the record that will <b>NOT</b> be encrypted. If null, any existing metadata will not be changed.
-   * @param handleResult If the update succeeds, returns the updated record. If the update fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
-   * {@link E3DBVersionException} when {@code asError().error()} is called.
+   * @param fields Field names and values. Wrapped in a {@link
+   *               RecordData} instance to prevent confusing with the
+   *               {@code plain} parameter.
+   * @param plain Any metadata associated with the record that will
+   *              <b>NOT</b> be encrypted. If {@code null}, existing
+   *              metadata will be removed.
+   * @param handleResult If the update succeeds, returns the updated
+   *                     record. If the update fails due to a version
+   *                     conflict, the value passed to the {@link
+   *                     ResultHandler#handle(Result)}} method return
+   *                     an instance of {@link E3DBVersionException}
+   *                     when {@code asError().error()} is called.
    */
   public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotNull(recordMeta, "recordMeta");

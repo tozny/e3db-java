@@ -26,11 +26,11 @@ and Java, and two test programs.
 * e3dbtest - Android integration tests.
 * plaintest - A sample plain Java application.
 
-Testing
+Android Testing
 ====
 
-The e3dbtest directory contains a set of integration tests that cover
-basic functionality: register, read, write, query, and sharing.
+The e3dbtest/src/androidTest directory contains a set of integration tests that cover
+basic functionality on a device: register, read, write, query, and sharing.
 
 The tests use a hard-coded registration token (which is safe to use and distribute). However,
 you can replace the token via System properies:
@@ -41,8 +41,21 @@ you can replace the token via System properies:
   `jgbailey+dev3@tozny.com` account.
 
 To run the tests, simply execute `MainActivityTest` in Android Studio. On the command line, you
-can attempt `gradlew :e3dbtest:connectedAndroidTest` to run all tests, assuming a phone is
+can run `gradlew :e3dbtest:connectedAndroidTest` to run all tests, assuming a phone is
 plugged in and has USB debugging enabled.
+
+Plain Java Testing
+====
+
+Tests for the plain Java version of e3db can be found in e3dbtest/src/test. To run
+those tests, execute `gradlew :e3dbtest:junitPlatformTestDebug` (alternately, you can run
+`gradlew :e3dbtest:test` to run tests against Debug and Release versions of the library, but
+that doubles test execution time).
+
+Unit Tests
+----
+
+A set of
 
 Creating Javadocs
 =====

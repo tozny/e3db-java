@@ -1,6 +1,7 @@
 package com.tozny.e3db;
 
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -49,8 +50,7 @@ public interface RecordMeta {
   String type();
 
   /**
-   * A JSON document holding any unencrypted, plaintext metadata stored with the
-   * record. Always a valid document (never null or empty). If no plaintext metadata was stored, will be an empty object (<code>"{}"</code>).
+   * Unencrypted, metadata values stored with the record. May be {@code null}.
    */
-  String plain();
+  Map<String, String> plain();
 }

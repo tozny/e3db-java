@@ -307,7 +307,7 @@ public class Client {
     }
   }
 
-  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
+  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException, JsonProcessingException {
     UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
     UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
     UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
@@ -315,15 +315,27 @@ public class Client {
     Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
     String version = rawMeta.get("version").asText();
     String type = rawMeta.get("type").asText();
-    JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
+
+    String plain;
+    if(rawMeta.has("plain")) {
+      JsonNode plain1 = rawMeta.get("plain");
+      if(plain1.isNull()) {
+        plain = null;
+      }
+      else
+        plain = mapper.writeValueAsString(plain1);
+    }
+    else
+      plain = null;
+
     return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
   }
 
-  private static R makeR(JsonNode rawMeta) throws ParseException {
+  private static R makeR(JsonNode rawMeta) throws ParseException, JsonProcessingException {
     return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
   }
 
-  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
+  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException, JsonProcessingException {
     RecordMeta meta = getRecordMeta(rawMeta);
     Map<String, String> results = decryptObject(accessKey, fields, crypto);
     return new R(results, meta);
@@ -331,18 +343,15 @@ public class Client {
 
   private static class M implements RecordMeta {
     private final UUID recordId;
-
     private final UUID writerId;
     private final UUID userId;
     private final String version;
     private final Date created;
     private final Date lastModified;
-
     private final String type;
+    private final String plain;
 
-    private final JsonNode plain;
-
-    private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
+    private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, String plain) {
       this.recordId = recordId;
       this.writerId = writerId;
       this.userId = userId;
@@ -382,11 +391,7 @@ public class Client {
     }
 
     public String plain() {
-      try {
-        return mapper.writeValueAsString(plain);
-      } catch (JsonProcessingException e) {
-        throw new RuntimeException(e);
-      }
+      return plain;
     }
 
   }
@@ -754,14 +759,27 @@ public class Client {
    *
    * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
    * @param fields Values to encrypt and store.
-   * @param plain Additional, user-defined metadata that will <b>NOT</b> be encrypted. Can be null.
+   * @param plain A JSON document giving additional, user-defined metadata that will
+   *              <b>NOT</b> be encrypted. Can be {@code null}. If not {@code null}, must be a JSON
+   *              object.
    * @param handleResult Result of the operation. If successful, returns the newly written record .
    */
-  public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
+  public void write(final String type, final RecordData fields, String plain, final ResultHandler<Record> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(fields, "fields");
-    if(plain != null && plain.size() > 0)
-      checkMap(plain, "plain");
+    final JsonNode plainJson;
+    try {
+      if(plain != null) {
+        plainJson = mapper.readTree(plain);
+        if(! plainJson.isObject())
+          throw new IllegalArgumentException("elain must be an object; was " + plainJson.getNodeType());
+      }
+      else {
+        plainJson = null;
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid JSON document: plain", e);
+    }
 
     onBackground(new Runnable() {
       @Override
@@ -781,8 +799,8 @@ public class Client {
           meta.put("user_id", clientId.toString());
           meta.put("type", type.trim());
 
-          if (plain != null)
-            meta.put("plain", plain);
+          if (plainJson != null)
+            meta.put("plain", plainJson);
 
           Map<String, Object> record = new HashMap<>();
           record.put("meta", meta);
@@ -811,26 +829,35 @@ public class Client {
    * the client are allowed.
    *
    * @param recordMeta Metadata for the record being replaced
-   *                   (obtained from a previous {@code write} or
-   *                   {@code query} call).
+   * (obtained from a previous {@code write} or {@code query} call).
    * @param fields Field names and values. Wrapped in a {@link
-   *               RecordData} instance to prevent confusing with the
-   *               {@code plain} parameter.
-   * @param plain Any metadata associated with the record that will
-   *              <b>NOT</b> be encrypted. If {@code null}, existing
-   *              metadata will be removed.
+   * RecordData} instance to prevent confusing with the {@code plain}
+   * parameter.
+   * @param plain A JSON document giving additional, user-defined metadata that will
+   *              <b>NOT</b> be encrypted. Can be {@code null}. If not {@code null}, must be a JSON
+   *              object.
    * @param handleResult If the update succeeds, returns the updated
-   *                     record. If the update fails due to a version
-   *                     conflict, the value passed to the {@link
-   *                     ResultHandler#handle(Result)}} method return
-   *                     an instance of {@link E3DBVersionException}
-   *                     when {@code asError().error()} is called.
+   * record. If the update fails due to a version conflict, the value
+   * passed to the {@link ResultHandler#handle(Result)}} method returns
+   * an instance of {@link E3DBVersionException} when {@code
+   * asError().error()} is called.
    */
-  public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
+  public void update(final RecordMeta recordMeta, final RecordData fields, String plain, final ResultHandler<Record> handleResult) {
     checkNotNull(recordMeta, "recordMeta");
     checkNotNull(fields, "fields");
-    if(plain != null)
-      checkMap(plain, "plain");
+    final JsonNode plainJson;
+    try {
+      if(plain != null) {
+        plainJson = mapper.readTree(plain);
+        if(! plainJson.isObject())
+          throw new IllegalArgumentException("plain must be an object; was " + plainJson.getNodeType());
+      }
+      else {
+        plainJson = null;
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid JSON document: plain", e);
+    }
 
     onBackground(new Runnable() {
       @Override
@@ -844,8 +871,8 @@ public class Client {
           meta.put("user_id", clientId.toString());
           meta.put("type", recordMeta.type().trim());
 
-          if (plain != null)
-            meta.put("plain", plain);
+          if (plainJson != null)
+            meta.put("plain", plainJson);
 
           Map<String, Object> fields = new HashMap<>();
           fields.put("meta", meta);

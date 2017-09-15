@@ -50,7 +50,7 @@ public interface RecordMeta {
 
   /**
    * A JSON document holding any unencrypted, plaintext metadata stored with the
-   * record. Always a valid document (never null or empty). If no plaintext metadata was stored, will be an empty object (<code>"{}"</code>).
+   * record. Can be {@code null}.
    */
   String plain();
 }

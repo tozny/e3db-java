@@ -52,11 +52,6 @@ those tests, execute `gradlew :e3dbtest:junitPlatformTestDebug` (alternately, yo
 `gradlew :e3dbtest:test` to run tests against Debug and Release versions of the library, but
 that doubles test execution time).
 
-Unit Tests
-----
-
-A set of
-
 Creating Javadocs
 =====
 

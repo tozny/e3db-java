@@ -3,7 +3,6 @@ package com.tozny.e3db;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tozny.e3db.crypto.AndroidCrypto;
@@ -341,7 +340,7 @@ public class Client {
     private final String type;
 
     private final JsonNode plain;
-    private Map<String, String> plainMap = null;
+    private volatile Map<String, String> plainMap = null;
 
     private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
       this.recordId = recordId;
@@ -352,21 +351,6 @@ public class Client {
       this.lastModified = lastModified;
       this.type = type;
       this.plain = plain;
-    }
-
-    private synchronized void convertPlain() {
-      if(plainMap == null) {
-        Iterable<Map.Entry<String, JsonNode>> entries = new Iterable<Map.Entry<String, JsonNode>>() {
-          @Override
-          public Iterator<Map.Entry<String, JsonNode>> iterator() {
-            return plain.fields();
-          }
-        };
-        plainMap = new HashMap<>();
-        for (Map.Entry<String, JsonNode> entry : entries) {
-          plainMap.put(entry.getKey(), entry.getValue().asText());
-        }
-      }
     }
 
     public UUID recordId() {
@@ -398,14 +382,30 @@ public class Client {
     }
 
     public Map<String, String> plain() {
-      if(plain == null) {
-        return null;
-      } else {
-        if(plainMap == null) {
-          convertPlain();
+      // Source: Effective Java, 2nd edition.
+      // From http://www.oracle.com/technetwork/articles/java/bloch-effective-08-qa-140880.html ("More Effective Java With Google's Joshua Bloch")
+      Map<String, String> result = plainMap;
+      if (result == null) {
+        synchronized (this) {
+          result = plainMap;
+          if (result == null) {
+            result = new HashMap<>();
+            if (plain != null) {
+              Iterable<Map.Entry<String, JsonNode>> entries = new Iterable<Map.Entry<String, JsonNode>>() {
+                @Override
+                public Iterator<Map.Entry<String, JsonNode>> iterator() {
+                  return plain.fields();
+                }
+              };
+              for (Map.Entry<String, JsonNode> entry : entries) {
+                result.put(entry.getKey(), entry.getValue().asText());
+              }
+            }
+            plainMap = result;
+          }
         }
-        return plainMap;
       }
+      return result;
     }
   }
 

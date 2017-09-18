@@ -3,7 +3,6 @@ package com.tozny.e3db;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tozny.e3db.crypto.AndroidCrypto;
@@ -341,6 +340,7 @@ public class Client {
     private final String type;
 
     private final JsonNode plain;
+    private volatile Map<String, String> plainMap = null;
 
     private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
       this.recordId = recordId;
@@ -381,15 +381,34 @@ public class Client {
       return type;
     }
 
-    public String plain() {
-      try {
-        return mapper.writeValueAsString(plain);
-      } catch (JsonProcessingException e) {
-        throw new RuntimeException(e);
+    public Map<String, String> plain() {
+      // Source: Effective Java, 2nd edition.
+      // From http://www.oracle.com/technetwork/articles/java/bloch-effective-08-qa-140880.html ("More Effective Java With Google's Joshua Bloch")
+      Map<String, String> result = plainMap;
+      if (result == null) {
+        synchronized (this) {
+          result = plainMap;
+          if (result == null) {
+            result = new HashMap<>();
+            if (plain != null) {
+              Iterable<Map.Entry<String, JsonNode>> entries = new Iterable<Map.Entry<String, JsonNode>>() {
+                @Override
+                public Iterator<Map.Entry<String, JsonNode>> iterator() {
+                  return plain.fields();
+                }
+              };
+              for (Map.Entry<String, JsonNode> entry : entries) {
+                result.put(entry.getKey(), entry.getValue().asText());
+              }
+            }
+            plainMap = result;
+          }
+        }
       }
+      return result;
     }
-
   }
+
   private static class R implements Record {
 
     private final Map<String, String> data;
@@ -804,22 +823,32 @@ public class Client {
   }
 
   /**
-   * Replace the given record with new data.
+   * Replace the given record with new data and plaintext metadata.
    *
-   * <p>The {@code recordMeta} argument is only used to obtain information about the record to replace. No metadata
-   * updates by the client are allowed.
+   * <p>The {@code recordMeta} argument is only used to obtain
+   * information about the record to replace. No metadata updates by
+   * the client are allowed.
    *
-   * @param recordMeta Metadata for the record being replaced (obtained from a previous {@code write} or
+   * @param recordMeta Metadata for the record being replaced
+   *                   (obtained from a previous {@code write} or
    *                   {@code query} call).
-   * @param fields Field names and values. Wrapped in a {@link RecordData} instance to prevent confusing with the {@code plain} parameter.
-   * @param plain Any metadata associated with the record that will <b>NOT</b> be encrypted. If null, any existing metadata will not be changed.
-   * @param handleResult If the update succeeds, returns the updated record. If the update fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
-   * {@link E3DBVersionException} when {@code asError().error()} is called.
+   * @param fields Field names and values. Wrapped in a {@link
+   *               RecordData} instance to prevent confusing with the
+   *               {@code plain} parameter.
+   * @param plain Any metadata associated with the record that will
+   *              <b>NOT</b> be encrypted. If {@code null}, existing
+   *              metadata will be removed.
+   * @param handleResult If the update succeeds, returns the updated
+   *                     record. If the update fails due to a version
+   *                     conflict, the value passed to the {@link
+   *                     ResultHandler#handle(Result)}} method return
+   *                     an instance of {@link E3DBVersionException}
+   *                     when {@code asError().error()} is called.
    */
   public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotNull(recordMeta, "recordMeta");
     checkNotNull(fields, "fields");
-    if(plain != null)
+    if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     onBackground(new Runnable() {

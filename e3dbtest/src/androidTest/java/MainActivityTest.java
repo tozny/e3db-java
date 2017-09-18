@@ -1,15 +1,18 @@
 package com.tozny.e3dbtest;
 
 import android.os.Bundle;
+import android.util.ArrayMap;
+import android.util.JsonReader;
 import android.util.Log;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tozny.e3db.Config;
 import com.tozny.e3db.Client;
 import com.tozny.e3db.ClientBuilder;
 import com.tozny.e3db.E3DBNotFoundException;
 import com.tozny.e3db.IncomingSharingPolicy;
 import com.tozny.e3db.OutgoingSharingPolicy;
-import com.tozny.e3db.QueryParams;
 import com.tozny.e3db.QueryParamsBuilder;
 import com.tozny.e3db.QueryResponse;
 import com.tozny.e3db.Record;
@@ -33,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static junit.framework.Assert.*;
 
 public class MainActivityTest {
+  private static final ObjectMapper mapper = new ObjectMapper();
 
   public static final String INFO = "info";
   private static final String FIELD = "line";
@@ -67,9 +71,7 @@ public class MainActivityTest {
     return new CI(client, info.clientId);
   }
 
-  private void write1(final ResultHandler<Record> handleResult) throws IOException {
-    Client client = getClient().client;
-
+  private void write1(Client client, final ResultHandler<Record> handleResult) throws IOException {
     Map<String, String> record = new HashMap<>();
     record.put(FIELD, MESSAGE);
     client.write(TYPE, new RecordData(record), null, new ResultHandler<Record>() {
@@ -257,7 +259,7 @@ public class MainActivityTest {
   private void delete1(final ResultHandler<Void> handleResult) throws IOException {
     final Client client = getClient().client;
 
-    write1(new ResultHandler<Record>() {
+    write1(client, new ResultHandler<Record>() {
       @Override
       public void handle(Result<Record> r) {
         final Record record = r.asValue();
@@ -286,7 +288,7 @@ public class MainActivityTest {
   private void update1(final ResultHandler<Record> handleResult) throws IOException {
     final Client client = getClient().client;
     final String updatedMessage = "Not to put too fine a point on it";
-    write1(new ResultHandler<Record>() {
+    write1(client, new ResultHandler<Record>() {
       @Override
       public void handle(Result<Record> r) {
 
@@ -323,7 +325,7 @@ public class MainActivityTest {
       {
         final AtomicReference<UUID> recordId = new AtomicReference<>();
         final CountDownLatch wait = new CountDownLatch(2);
-        write1(new ResultHandler<Record>() {
+        write1(getClient().client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             recordId.set(r.asValue().meta().recordId());
@@ -378,7 +380,7 @@ public class MainActivityTest {
       {
         final AtomicReference<UUID> recordId = new AtomicReference<>();
         final CountDownLatch wait = new CountDownLatch(3);
-        write1(new ResultHandler<Record>() {
+        write1(getClient().client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             recordId.set(r.asValue().meta().recordId());
@@ -447,17 +449,242 @@ public class MainActivityTest {
   }
 
   @Test
-  public void testVariadic() {
-    QueryParamsBuilder builder = new QueryParamsBuilder();
-    builder.setTypes(null);
-    assertTrue(builder.getTypes() == null);
-    builder.setTypes((String[]) null);
-    assertTrue(builder.getTypes() == null);
-    builder.setTypes();
-    assertTrue(builder.getTypes().size() == 0);
-    builder.setTypes((String) null);
-    assertTrue(builder.getTypes().size() == 1);
-    builder.setTypes(null, null);
-    assertTrue(builder.getTypes().size() == 2);
+  public void testUpdate() throws InterruptedException, IOException {
+    final AtomicReference<Client> clientRef = new AtomicReference<>();
+    final AtomicReference<Record> recordRef = new AtomicReference<>();
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
+        @Override
+        public void handle(Result<Config> r) {
+          if(r.isError())
+            fail("Exception occurred " + r.asError().other());
+          clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+          wait.countDown();
+        }
+      });
+
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    {
+      // Write record
+      final CountDownLatch wait = new CountDownLatch(1);
+      write1(clientRef.get(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if(r.isError())
+            fail("Error occurred" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait.countDown();
+        }
+      });
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    Map<String, String> plain = new ArrayMap<>();
+    plain.put("foo", "bar");
+    final JsonNode plainJson = mapper.readTree(mapper.writeValueAsString(plain));
+
+    // Update with new plaintext
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), plain, new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if (r.isError())
+            fail("Error updating record" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait.countDown();
+        }
+      });
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().read(recordRef.get().meta().recordId(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          try {
+          if(r.isError())
+            fail("Error reading record" + r.asError().other());
+
+            assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
+            JsonNode jsonNode = mapper.readTree(mapper.writeValueAsString(r.asValue().meta().plain()));
+            assertTrue("Plaintext key 'foo' missing.", jsonNode.has("foo"));
+            assertEquals("Plaintext value incorrect", plainJson, jsonNode);
+            wait.countDown();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
+
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    // Update with null plaintext
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), null, new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if (r.isError())
+            fail("Error updating record" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait.countDown();
+        }
+      });
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().read(recordRef.get().meta().recordId(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if(r.isError())
+            fail("Error reading record" + r.asError().other());
+
+          assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
+          assertEquals("Plaintext should be empty.", 0, r.asValue().meta().plain().size());
+          wait.countDown();
+        }
+      });
+
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    // Update with empty plaintext
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), new ArrayMap<String, String>(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if (r.isError())
+            fail("Error updating record" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait.countDown();
+        }
+      });
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      clientRef.get().read(recordRef.get().meta().recordId(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if(r.isError())
+            fail("Error reading record" + r.asError().other());
+
+          assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
+          assertEquals("Plaintext should be empty.", 0, r.asValue().meta().plain().size());
+          wait.countDown();
+        }
+      });
+
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+  }
+
+  @Test
+  public void testWritePlain() throws InterruptedException, IOException {
+    final AtomicReference<Client> clientRef = new AtomicReference<>();
+    {
+      final CountDownLatch wait = new CountDownLatch(1);
+      registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
+        @Override
+        public void handle(Result<Config> r) {
+          if(r.isError())
+            fail("Exception occurred " + r.asError().other());
+          clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+          wait.countDown();
+        }
+      });
+
+      wait.await(30, TimeUnit.SECONDS);
+    }
+
+    Map<String, String> poem = new ArrayMap<>();
+    poem.put("line", "All mimsy were the borogoves,");
+    RecordData data = new RecordData(poem);
+
+    {
+      // Write record
+      final AtomicReference<Record> recordRef = new AtomicReference<>();
+      final CountDownLatch wait1 = new CountDownLatch(1);
+      Map<String, String> plain = new ArrayMap<>();
+      plain.put("author", "Lewis Carrol");
+      final JsonNode plainJson = mapper.readTree(mapper.writeValueAsString(plain));
+      clientRef.get().write("poem", data, plain, new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if(r.isError())
+            fail("Error occurred" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait1.countDown();
+        }
+      });
+      wait1.await(30, TimeUnit.SECONDS);
+
+      final CountDownLatch wait2 = new CountDownLatch(1);
+      clientRef.get().read(recordRef.get().meta().recordId(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          try {
+            if(r.isError())
+              fail("Read failed: " + r.asError().other());
+            assertEquals("Plain did not match", plainJson, mapper.readTree(mapper.writeValueAsString(r.asValue().meta().plain())));
+            wait2.countDown();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
+      wait2.await(30, TimeUnit.SECONDS);
+    }
+
+    {
+      // Write record
+      final AtomicReference<Record> recordRef = new AtomicReference<>();
+      final CountDownLatch wait1 = new CountDownLatch(1);
+      Map<String, String> plain = new ArrayMap<>();
+      final JsonNode plainJson = mapper.readTree(mapper.writeValueAsString(plain));
+      clientRef.get().write("poem", data, plain, new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          if(r.isError())
+            fail("Error occurred" + r.asError().other());
+
+          recordRef.set(r.asValue());
+          wait1.countDown();
+        }
+      });
+      wait1.await(30, TimeUnit.SECONDS);
+
+      final CountDownLatch wait2 = new CountDownLatch(1);
+      clientRef.get().read(recordRef.get().meta().recordId(), new ResultHandler<Record>() {
+        @Override
+        public void handle(Result<Record> r) {
+          try {
+            if(r.isError())
+              fail("Read failed: " + r.asError().other());
+            assertEquals("Plain did not match", plainJson, mapper.readTree(mapper.writeValueAsString(r.asValue().meta().plain())));
+            wait2.countDown();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      });
+      wait2.await(30, TimeUnit.SECONDS);
+    }
   }
 }

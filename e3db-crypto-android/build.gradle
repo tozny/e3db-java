@@ -32,6 +32,6 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.0'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.0'
     compileOnly project(':e3db-crypto-interface')
-    compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.6'
+    compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
 }
 

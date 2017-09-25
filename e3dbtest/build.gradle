@@ -33,24 +33,18 @@ dependencies {
     implementation 'com.android.support:appcompat-v7:26.0.1'
     implementation 'com.android.support.constraint:constraint-layout:1.0.2'
 
-    compile project(path: ':e3db')
-    compile 'commons-io:commons-io:2.5'
-
     androidTestCompile 'com.android.support.test:runner:1.0.1'
     androidTestCompile 'com.android.support.test:rules:1.0.1'
     androidTestCompile 'com.android.support.test.espresso:espresso-core:3.0.1'
+    androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+    androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+    androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+
+    androidTestCompile project(path: ':e3db')
     androidTestCompile project(path: ':e3db-crypto-android')
-
-    // To match version in e3db library.
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-
-    compile project(path: ':e3db')
-    compile project(path: ':e3db-crypto-android')
-    compile 'commons-io:commons-io:2.5'
 
     testImplementation junit5()
     testCompileOnly "de.mannodermaus.gradle.plugins:android-junit5-embedded-runtime:1.0.0"
+    testCompile project(path: ':e3db')
     testCompile project(path: ':e3db-crypto-plain')
 }

@@ -4,6 +4,7 @@ import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.Crypto;
 
 import org.libsodium.jni.NaCl;
+import org.libsodium.jni.Sodium;
 import org.libsodium.jni.crypto.Box;
 import org.libsodium.jni.crypto.Random;
 import org.libsodium.jni.crypto.SecretBox;
@@ -16,9 +17,19 @@ import static org.libsodium.jni.Sodium.crypto_secretbox_noncebytes;
 import static org.libsodium.jni.SodiumJNI.crypto_box_keypair;
 
 public class AndroidCrypto implements Crypto {
-  private Random random = new Random();
+  private final Sodium sodium;
+  private final Random random;
 
   public AndroidCrypto() {
+    // Make sure libsodium initialization occurs.
+    sodium = SodiumInit.sodium;
+    random = new Random();
+  }
+
+  private static class SodiumInit {
+    // Static inner class as a singleton to make sure
+    // Sodium library is initalized once and only once.
+    public static Sodium sodium = NaCl.sodium();
   }
 
   @Override
@@ -57,8 +68,8 @@ public class AndroidCrypto implements Crypto {
 
   @Override
   public byte[] newPrivateKey() {
-    byte[] privateKey = new byte[NaCl.sodium().crypto_box_secretkeybytes()];
-    byte[] publicKey = new byte[NaCl.sodium().crypto_box_publickeybytes()];
+    byte[] privateKey = new byte[sodium.crypto_box_secretkeybytes()];
+    byte[] publicKey = new byte[sodium.crypto_box_publickeybytes()];
     crypto_box_keypair(privateKey, publicKey);
     return privateKey;
   }
@@ -66,8 +77,8 @@ public class AndroidCrypto implements Crypto {
   @Override
   public byte[] getPublicKey(byte[] privateKey) {
     checkNotEmpty(privateKey, "privateKey");
-    byte[] publicKey = new byte[NaCl.sodium().crypto_box_publickeybytes()];
-    NaCl.sodium().crypto_scalarmult_base(publicKey, privateKey);
+    byte[] publicKey = new byte[sodium.crypto_box_publickeybytes()];
+    sodium.crypto_scalarmult_base(publicKey, privateKey);
     return publicKey;
   }
 

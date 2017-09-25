@@ -5,11 +5,14 @@ buildscript {
         jcenter()
         google()
         mavenCentral()
-        maven { url "" }
+        mavenLocal()
+        maven { url "https://maven.tozny.com/repo" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.0.0-beta5'
+        classpath 'com.android.tools.build:gradle:3.0.0-beta6'
         classpath "de.mannodermaus.gradle.plugins:android-junit5:1.0.0"
+        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:0.7.3'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
     }
 }
 

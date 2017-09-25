@@ -78,5 +78,5 @@ dependencies {
   compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
   compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
   compile 'com.squareup.okio:okio:1.13.0'
-  compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.6'
+  compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
 }

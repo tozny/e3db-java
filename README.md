@@ -2,12 +2,19 @@ E3DB Java SDK
 ====
 
 The Tozny End-to-End Encrypted Database (E3DB) is a storage platform
-with powerful sharing and consent management features. [Read more on
-our
-blog.](https://tozny.com/blog/announcing-project-e3db-the-end-to-end-encrypted-database/)
+with powerful sharing and consent management features.
 
-This repo contains an E3DB SDK that can be used with both Android
+This repo contains an SDK that can be used with both Android
 devices and plain Java programs.
+
+## LICENSE
+
+This Tozny non-commercial license permits use of the software only by
+government agencies, schools, universities, non-profit organizations
+or individuals on projects that do not receive external funding other
+than government research grants and contracts. Any other use requires
+a commercial license. For the full license, please see
+[LICENSE.md](LICENSE.md), in this source repository.
 
 ## Terms of Service
 
@@ -34,8 +41,8 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [2.0](https://tozny.github.io/e3db-client-x/docs/2.0/) - The most recently released version of the client.
-* [1.0.2](https://tozny.github.io/e3db-client-x/docs/1.0.2/) - An older, deprecated version of the client.
+* [2.0](https://tozny.github.io/e3db-java/docs/2.0.0/) - The most recently released version of the client.
+* [1.0.2](https://tozny.github.io/e3db-java/docs/1.0.2/) - An older, deprecated version of the client.
 
 Code examples for the most common operations can be found below.
 

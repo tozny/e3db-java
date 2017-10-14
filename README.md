@@ -53,6 +53,10 @@ The E3DB SDK targets Android API 19 and higher. To use the SDK in your
 app, add it as a dependency to your build. In Gradle, use:
 
 ```
+repositories {
+  maven { url "https://maven.tozny.com/repo" }
+}
+
 compile('com.tozny.e3db:e3db-client-android:2.0.0@aar') {
     transitive = true
 }

@@ -1,0 +1,28 @@
+package com.tozny.e3db;
+
+import java.util.UUID;
+
+/**
+ * An encrypted key, intended for a given
+ * client, that can be used to encrypt or
+ * decrypt documents.
+ */
+public interface EAKInfo {
+  /**
+   * The encrypted key, as a Base64URL-encoded string.
+   * @return key.
+   */
+  String getKey();
+
+  /**
+   * Public key of the authorizer, as a Base64URL-encoded string.
+   * @return publicKey.
+   */
+  String getPublicKey();
+
+  /**
+   * ID of the authorizer.
+   * @return authorizerId.
+   */
+  UUID getAuthorizerId();
+}

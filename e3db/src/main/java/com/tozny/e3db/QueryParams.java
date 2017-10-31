@@ -100,6 +100,8 @@ public class QueryParams {
 
   /**
    * Create a builder matching the parameters in this instance.
+   *
+   * @return The builder.
    */
   public QueryParamsBuilder buildOn() {
     QueryParamsBuilder builder = new QueryParamsBuilder();

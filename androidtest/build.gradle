@@ -1,9 +1,7 @@
 apply plugin: 'com.android.application'
-apply plugin: "de.mannodermaus.android-junit5"
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.1"
 
     defaultConfig {
         applicationId "com.tozny.e3dbtest"
@@ -23,10 +21,6 @@ android {
     }
 }
 
-ext.junitPlatformVersion = '1.0.0'
-ext.junitJupiterVersion  = '5.0.0'
-ext.log4jVersion         = '2.6.2'
-
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
@@ -41,10 +35,13 @@ dependencies {
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
 
     androidTestCompile project(path: ':e3db')
+    androidTestCompile project(path: ':e3db-crypto-interface')
     androidTestCompile project(path: ':e3db-crypto-android')
+}
 
-    testImplementation junit5()
-    testCompileOnly "de.mannodermaus.gradle.plugins:android-junit5-embedded-runtime:1.0.0"
-    testCompile project(path: ':e3db')
-    testCompile project(path: ':e3db-crypto-plain')
+tasks.withType(Test) {
+    testLogging {
+        showStackTraces = true
+        exceptionFormat="full"
+    }
 }

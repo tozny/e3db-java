@@ -15,6 +15,8 @@ public class RecordData {
   /**
    * Create a new instance using the provided {@code Map}.
    * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
+   *
+   * @param cleartext cleartext.
    */
   public RecordData(Map<String, String> cleartext) {
     if(cleartext == null)
@@ -27,6 +29,8 @@ public class RecordData {
 
   /**
    * The unencrypted data that will be encrypted and written to E3DB.
+   *
+   * @return cleartext.
    */
   public Map<String, String> getCleartext() {
     return cleartext;

@@ -28,6 +28,7 @@ public interface Crypto {
 
   /**
    * Encrypt a message using public-key cryptography.
+   *
    * @param message Bytes to encrypt. Can be empty but never null.
    * @param publicKey The public key of the recipient. A 32-byte array.
    * @param privateKey Private key of the sender. A 32-byte array. Private keys can be generated
@@ -66,4 +67,39 @@ public interface Crypto {
    * @return A new secret key.
    */
   byte[] newSecretKey();
+
+  /**
+   * Returns an Ed255119 private key that can be used for creating signatures.
+   *
+   * @return A new Ed25519 private key.
+   */
+  byte [] newPrivateSigningKey();
+
+  /**
+   * Extract the public key portion from a secret signing key.
+   *
+   * @param privateKey Ed25519 private key.
+   * @return Public key portion of the private key.
+   */
+  byte[] getPublicSigningKey(byte[] privateKey);
+
+  /**
+   * Creates an Ed25519 signature over the given message.
+   *
+   * @param message Message to sign.
+   * @param signingKey Private Ed25519 key to use.
+   * @return An Ed25519 signature.
+   */
+  byte[] signature(byte [] message, byte[] signingKey);
+
+  /**
+   * Verify a signature, given a document and public key.
+   *
+   * @param signature The Ed255199 signature to verify.
+   * @param message Message used to generate the signature.
+   * @param publicSigningKey Public portion of the Ed25519  key used to create the signature given.
+   * @return {@code true} if the signatue was generated for the given document, using the private key
+   * associated with the public key given. {@code false} otherwise.
+   */
+  boolean verify(Signature signature, byte[] message, byte[] publicSigningKey);
 }

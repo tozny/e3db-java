@@ -3,14 +3,17 @@ package com.tozny.e3db;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.tozny.e3db.crypto.AndroidCrypto;
 import com.tozny.e3db.crypto.KaliumCrypto;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -20,7 +23,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -110,7 +117,7 @@ import static com.tozny.e3db.Checks.*;
  *
  */
 public class Client {
-  private static final ObjectMapper mapper = new ObjectMapper();
+  private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
@@ -119,6 +126,14 @@ public class Client {
   private static final Crypto crypto;
   private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
+  private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
+  private final String apiKey;
+  private final String apiSecret;
+  private final UUID clientId;
+  private final byte[] privateEncryptionKey;
+  private final byte[] privateSigningKey;
+  private final StorageAPI storageClient;
+  private final ShareAPI shareClient;
 
   static {
     backgroundExecutor = new ThreadPoolExecutor(1,
@@ -165,21 +180,17 @@ public class Client {
         }
       };
     }
+
+    mapper = new ObjectMapper();
+    mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
   }
 
-  private final String apiKey;
-  private final String apiSecret;
-
-  private final UUID clientId;
-  private final byte[] privateKey;
-  private final StorageAPI storageClient;
-  private final ShareAPI shareClient;
-
-  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey) {
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.clientId = clientId;
-    this.privateKey = privateKey;
+    this.privateEncryptionKey = privateKey;
+    this.privateSigningKey = privateSigningKey;
 
     Retrofit build = new Retrofit.Builder()
       .callbackExecutor(this.uiExecutor)
@@ -200,6 +211,7 @@ public class Client {
     private final String name;
     private final String publicKey;
     private final URI host;
+
     private final boolean enabled;
 
     public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, String host, boolean enabled) {
@@ -241,105 +253,23 @@ public class Client {
     public String host() {
       return host.toASCIIString();
     }
-
     @Override
     public boolean enabled() {
       return enabled;
     }
-  }
 
-  private void onBackground(Runnable runnable) {
-    backgroundExecutor.execute(runnable);
-  }
-
-  private static <R> void executeError(Executor executor, final ResultHandler<R> handler, final Throwable e) {
-    if (handler != null)
-      executor.execute(new Runnable() {
-        @Override
-        public void run() {
-          handler.handle(new ErrorResult<R>(e));
-        }
-      });
-  }
-
-  private static <R> void executeValue(Executor executor, final ResultHandler<R> handler, final R value) {
-    if (handler != null)
-      executor.execute(new Runnable() {
-        @Override
-        public void run() {
-          handler.handle(new ValueResult<R>(value));
-        }
-      });
-  }
-
-  /**
-   * Obtains a Tozny JWT, if necessary, and adds it to every request.
-   */
-
-  private <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
-    if (handleError != null)
-      uiExecutor.execute(new Runnable() {
-        @Override
-        public void run() {
-          handleError.handle(new ErrorResult<R>(e));
-        }
-      });
-  }
-  private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
-    if (handleResult != null)
-      uiExecutor.execute(new Runnable() {
-        @Override
-        public void run() {
-          handleResult.handle(new ValueResult<R>(r));
-        }
-      });
-  }
-
-  private static class ER {
-    public final CipherWithNonce edk; // encrypted data key
-    public final CipherWithNonce ef; // encrypted field
-
-    public ER(String quad) {
-      int split = quad.indexOf(".", quad.indexOf(".") + 1);
-      edk = CipherWithNonce.decode(quad.substring(0, split));
-      ef = CipherWithNonce.decode(quad.substring(split + 1));
-    }
-  }
-
-  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
-    UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
-    UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
-    UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
-    Date created = iso8601.parse(rawMeta.get("created").asText());
-    Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
-    String version = rawMeta.get("version").asText();
-    String type = rawMeta.get("type").asText();
-    JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
-    return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
-  }
-
-  private static R makeR(JsonNode rawMeta) throws ParseException {
-    return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
-  }
-
-  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
-    RecordMeta meta = getRecordMeta(rawMeta);
-    Map<String, String> results = decryptObject(accessKey, fields, crypto);
-    return new R(results, meta);
   }
 
   private static class M implements RecordMeta {
     private final UUID recordId;
-
     private final UUID writerId;
     private final UUID userId;
     private final String version;
     private final Date created;
     private final Date lastModified;
-
     private final String type;
-
     private final JsonNode plain;
+
     private volatile Map<String, String> plainMap = null;
 
     private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
@@ -380,7 +310,6 @@ public class Client {
     public String type() {
       return type;
     }
-
     public Map<String, String> plain() {
       // Source: Effective Java, 2nd edition.
       // From http://www.oracle.com/technetwork/articles/java/bloch-effective-08-qa-140880.html ("More Effective Java With Google's Joshua Bloch")
@@ -409,10 +338,224 @@ public class Client {
     }
   }
 
+  private static class EAKCacheKey {
+    private final UUID writerId;
+    private final UUID userId;
+    private final String type;
+
+    private EAKCacheKey(UUID writerId, UUID userId, String type) {
+      this.writerId = writerId;
+      this.userId = userId;
+      this.type = type;
+    }
+
+    public static EAKCacheKey fromRecord(Record r) {
+      return new EAKCacheKey(r.meta().writerId(), r.meta().userId(), r.meta().type());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      EAKCacheKey eakCacheKey = (EAKCacheKey) o;
+
+      if (!writerId.equals(eakCacheKey.writerId)) return false;
+      if (!userId.equals(eakCacheKey.userId)) return false;
+      if (!type.equals(eakCacheKey.type)) return false;
+
+      return true;
+    }
+    @Override
+    public int hashCode() {
+      int result = writerId.hashCode();
+      result = 31 * result + userId.hashCode();
+      result = 31 * result + type.hashCode();
+      return result;
+    }
+
+  }
+
+  private static class EAKEntry {
+    private final byte[] ak;
+    private final EAKInfo eakInfo;
+
+    private EAKEntry(byte[] ak, EAKInfo eakInfo) {
+      this.ak = ak;
+      this.eakInfo = eakInfo;
+    }
+    public byte[] getAk() {
+      return ak;
+    }
+
+    public EAKInfo getEAK() {
+      return eakInfo;
+    }
+  }
+
+  private static class ClientMeta implements RecordMeta {
+    private final UUID writerId;
+    private final UUID userId;
+    private final String type;
+    private final Map<String, String> plain;
+
+    private ClientMeta(UUID writerId, UUID userId, String type, Map<String, String> plain) {
+      this.writerId = writerId;
+      this.userId = userId;
+      this.type = type;
+      this.plain = plain;
+    }
+
+    @Override
+    public UUID recordId() {
+      throw new IllegalStateException("recordId not defined");
+    }
+
+    @Override
+    public UUID writerId() {
+      return writerId;
+    }
+
+    @Override
+    public UUID userId() {
+      return userId;
+    }
+
+    @Override
+    public Date created() {
+      throw new IllegalStateException("created not defined");
+    }
+
+    @Override
+    public Date lastModified() {
+      throw new IllegalStateException("lastModified not defined");
+    }
+
+    @Override
+    public String version() {
+      throw new IllegalStateException("version not defined");
+    }
+
+    @Override
+    public String type() {
+      return type;
+    }
+    @Override
+    public Map<String, String> plain() {
+      return plain;
+    }
+  }
+
+  private static class ER {
+    public final CipherWithNonce edk; // encrypted data key
+
+    public final CipherWithNonce ef; // encrypted field
+    public ER(String quad) {
+      int split = quad.indexOf(".", quad.indexOf(".") + 1);
+      edk = CipherWithNonce.decode(quad.substring(0, split));
+      ef = CipherWithNonce.decode(quad.substring(split + 1));
+    }
+
+  }
+
+  private void onBackground(Runnable runnable) {
+    backgroundExecutor.execute(runnable);
+  }
+
+  private static <R> void executeError(Executor executor, final ResultHandler<R> handler, final Throwable e) {
+    if (handler != null)
+      executor.execute(new Runnable() {
+        @Override
+        public void run() {
+          handler.handle(new ErrorResult<R>(e));
+        }
+      });
+  }
+
+  private static <R> void executeValue(Executor executor, final ResultHandler<R> handler, final R value) {
+    if (handler != null)
+      executor.execute(new Runnable() {
+        @Override
+        public void run() {
+          handler.handle(new ValueResult<R>(value));
+        }
+      });
+  }
+  /**
+   * Obtains a Tozny JWT, if necessary, and adds it to every request.
+   */
+
+  private <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
+    if (handleError != null)
+      uiExecutor.execute(new Runnable() {
+        @Override
+        public void run() {
+          handleError.handle(new ErrorResult<R>(e));
+        }
+      });
+  }
+
+  private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
+    if (handleResult != null)
+      uiExecutor.execute(new Runnable() {
+        @Override
+        public void run() {
+          handleResult.handle(new ValueResult<R>(r));
+        }
+      });
+  }
+
+  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
+    UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
+    UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
+    UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
+    Date created = iso8601.parse(rawMeta.get("created").asText());
+    Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
+    String version = rawMeta.get("version").asText();
+    String type = rawMeta.get("type").asText();
+    JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
+    return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
+  }
+
+  private static R makeR(JsonNode rawMeta) throws ParseException {
+    return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
+  }
+
+  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
+    RecordMeta meta = getRecordMeta(rawMeta);
+    Map<String, String> encryptedFields = new HashMap<>();
+    Iterator<String> keys = fields.fieldNames();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      encryptedFields.put(key, fields.get(key).asText());
+    }
+
+    Map<String, String> results = decryptObject(accessKey, encryptedFields, crypto);
+    return new R(results, meta);
+  }
+
+  private static class QR implements QueryResponse {
+    private final ArrayList<Record> records;
+    private final long lastIdx;
+
+    private QR(ArrayList<Record> records, long lastIdx) {
+      this.records = records;
+      this.lastIdx = lastIdx;
+    }
+
+    @Override
+    public List<Record> records() {
+      return records;
+    }
+
+    @Override
+    public long last() {
+      return lastIdx;
+    }
+  }
+
   private static class R implements Record {
-
     private final Map<String, String> data;
-
     private final RecordMeta meta;
 
     public R(Map<String, String> data, RecordMeta meta) {
@@ -429,25 +572,108 @@ public class Client {
     public Map<String, String> data() {
       return data;
     }
+
+    @Override
+    public String toSerialized() {
+      try {
+        SortedMap<String, Object> clientMeta = new TreeMap<>();
+        clientMeta.put("writer_id", meta().writerId().toString());
+        clientMeta.put("user_id", meta().userId().toString());
+        clientMeta.put("type", meta().type().toString());
+        clientMeta.put("plain", new TreeMap<String, String>(meta().plain()));
+
+        String clientMetaSerial = mapper.writeValueAsString(clientMeta);
+        String dataSerial = mapper.writeValueAsString(data());
+        return new StringBuffer(clientMetaSerial.length() + dataSerial.length()).append(clientMetaSerial).append(dataSerial).toString();
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
-  private static class QR implements QueryResponse {
+  private static class TokenInterceptor implements Interceptor {
+    private final URI host;
+    private final AuthAPI authClient;
+    private final String basic;
+    private String token = null;
+    private Date replaceAfter = new Date(0L);
 
-    private final ArrayList<Record> records;
-
-    private final long lastIdx;
-
-    private QR(ArrayList<Record> records, long lastIdx) {
-      this.records = records;
-      this.lastIdx = lastIdx;
+    private TokenInterceptor(String apiKey, String apiSecret, URI host) {
+      this.host = host;
+      this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(StandardCharsets.UTF_8)).base64()).toString();
+      authClient = new Retrofit.Builder()
+        .baseUrl(host.resolve("/").toString())
+        .build()
+        .create(AuthAPI.class);
     }
+
     @Override
-    public List<Record> records() {
-      return records;
+    public Response intercept(Chain chain) throws IOException {
+      Request req = chain.request();
+      if (req.header("Authorization") != null) {
+        return chain.proceed(req);
+      } else {
+        if (replaceAfter.before(new Date())) {
+          retrofit2.Response<ResponseBody> response = authClient.getToken(basic, RequestBody.create(PLAIN_TEXT, "grant_type=client_credentials")).execute();
+          if (response.code() != 200)
+            throw new IOException("Unable to renew token.");
+
+          JsonNode token = mapper.readTree(response.body().string());
+          Calendar c = Calendar.getInstance();
+          c.add(Calendar.SECOND, Math.max(60, Math.min(15 * 60, token.get("expires_in").asInt() - 60)));
+          replaceAfter = c.getTime();
+          this.token = token.get("access_token").asText();
+        }
+
+        return chain.proceed(req.newBuilder().addHeader("Authorization", "Bearer " + token).build());
+      }
     }
+  }
+
+  private static class EAKImpl implements EAKInfo {
+    private final String key;
+    private final String publicKey;
+    private final UUID authorizerId;
+
+    public EAKImpl(String key, String publicKey, UUID authorizerId) {
+      this.key = key;
+      this.publicKey = publicKey;
+      this.authorizerId = authorizerId;
+    }
+
     @Override
-    public long last() {
-      return lastIdx;
+    public String getKey() {
+      return key;
+    }
+
+    @Override
+    public String getPublicKey() {
+      return publicKey;
+    }
+
+    @Override
+    public UUID getAuthorizerId() {
+      return authorizerId;
+    }
+  }
+
+  private class SD<T extends Signable> implements SignedDocument<T> {
+    private final T document;
+    private final String signature;
+
+    private SD(T document, String signature) {
+      this.document = document;
+      this.signature = signature;
+    }
+
+    @Override
+    public String signature() {
+      return signature;
+    }
+
+    @Override
+    public T document() {
+      return document;
     }
   }
 
@@ -498,7 +724,7 @@ public class Client {
         record = makeR(crypto.decryptBox(
             CipherWithNonce.decode(access_key.get("eak").asText()),
             decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
-            privateKey
+          privateEncryptionKey
           ),
           queryRecord.get("meta"),
           queryRecord.get("record_data"),
@@ -522,74 +748,27 @@ public class Client {
     return objects;
   }
 
-  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, Crypto crypto) throws UnsupportedEncodingException {
+  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, Crypto crypto)  {
     Map<String, String> encFields = new HashMap<>();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
       byte[] dk = crypto.newSecretKey();
 
       String encField = new StringBuilder(crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
-        .append(crypto.encryptSecretBox(entry.getValue().getBytes("UTF-8"), dk).toMessage()).toString();
+        .append(crypto.encryptSecretBox(entry.getValue().getBytes(StandardCharsets.UTF_8), dk).toMessage()).toString();
       encFields.put(entry.getKey(), encField);
     }
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, JsonNode record, Crypto crypto) throws UnsupportedEncodingException {
+  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record, Crypto crypto) throws UnsupportedEncodingException {
     Map<String, String> decryptedFields = new HashMap<>();
-    Iterator<String> keys = record.fieldNames();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      ER er = new ER(record.get(key).asText());
+    for(Map.Entry<String,String> entry : record.entrySet()) {
+      ER er = new ER(entry.getValue());
       byte[] dk = crypto.decryptSecretBox(er.edk, accessKey);
-      String value = new String(crypto.decryptSecretBox(er.ef, dk), "UTF-8");
-      decryptedFields.put(key, value);
+      String value = new String(crypto.decryptSecretBox(er.ef, dk), StandardCharsets.UTF_8);
+      decryptedFields.put(entry.getKey(), value);
     }
     return decryptedFields;
-  }
-  private static class TokenInterceptor implements Interceptor {
-    private final URI host;
-
-    private final AuthAPI authClient;
-    private final String basic;
-
-    private String token = null;
-
-    private Date replaceAfter = new Date(0L);
-    private TokenInterceptor(String apiKey, String apiSecret, URI host) {
-      this.host = host;
-      try {
-        this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes("UTF-8")).base64()).toString();
-      } catch (UnsupportedEncodingException e) {
-        throw new RuntimeException(e);
-      }
-      authClient = new Retrofit.Builder()
-        .baseUrl(host.resolve("/").toString())
-        .build()
-        .create(AuthAPI.class);
-    }
-
-    @Override
-    public Response intercept(Chain chain) throws IOException {
-      Request req = chain.request();
-      if (req.header("Authorization") != null) {
-        return chain.proceed(req);
-      } else {
-        if (replaceAfter.before(new Date())) {
-          retrofit2.Response<ResponseBody> response = authClient.getToken(basic, RequestBody.create(PLAIN_TEXT, "grant_type=client_credentials")).execute();
-          if (response.code() != 200)
-            throw new IOException("Unable to renew token.");
-
-          JsonNode token = mapper.readTree(response.body().string());
-          Calendar c = Calendar.getInstance();
-          c.add(Calendar.SECOND, Math.max(60, Math.min(15 * 60, token.get("expires_in").asInt() - 60)));
-          replaceAfter = c.getTime();
-          this.token = token.get("access_token").asText();
-        }
-
-        return chain.proceed(req.newBuilder().addHeader("Authorization", "Bearer " + token).build());
-      }
-    }
-
   }
 
   private byte[] getOwnAccessKey(String type) throws E3DBException, IOException {
@@ -597,7 +776,14 @@ public class Client {
     if (ak == null) {
       // Write new AK
       ak = crypto.newSecretKey();
-      setAccessKey(this.clientId, this.clientId, this.clientId, type, crypto.getPublicKey(this.privateKey), ak);
+      try {
+        setAccessKey(this.clientId, this.clientId, this.clientId, type, crypto.getPublicKey(this.privateEncryptionKey), ak);
+      }
+      catch(E3DBConflictException ex) {
+        ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
+        if(ak == null)
+          throw new RuntimeException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
+      }
     }
 
     return ak;
@@ -608,33 +794,70 @@ public class Client {
     if(response.code() != 204) {
       throw E3DBException.find(response.code(), response.message());
     }
+
+    EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
+    eakCache.remove(cacheEntry);
   }
 
   private byte[] getAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws E3DBException, IOException {
-    // TODO: cache AKs.
-    retrofit2.Response<ResponseBody> response = storageClient.getAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
-    if (response.code() == 404) {
-      return null;
-    } else if (response.code() == 200) {
-      JsonNode eakResponse = mapper.readTree(response.body().string());
-      byte[] ak = crypto.decryptBox(CipherWithNonce.decode(eakResponse.get("eak").asText()),
-        decodeURL(eakResponse.get("authorizer_public_key").get("curve25519").asText()),
-        this.privateKey);
-      return ak;
+    EAKEntry eak = getEAK(writerId, userId, readerId, type);
+    return eak == null ? null : eak.ak;
+  }
+
+  private EAKEntry getEAK(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException {
+    EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
+    EAKEntry cachedEak = eakCache.get(cacheEntry);
+
+    if(cachedEak != null)
+      return cachedEak;
+    else {
+      retrofit2.Response<ResponseBody> response = storageClient.getAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
+      if (response.code() == 404) {
+        return null;
+      } else if (response.code() != 200) {
+        throw E3DBException.find(response.code(), response.message());
+      } else {
+        JsonNode eakResponse = mapper.readTree(response.body().string());
+        String eak = eakResponse.get("eak").asText();
+        String publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
+        UUID authorizerId = UUID.fromString(eakResponse.get("authorizer_id").asText());
+
+        byte[] ak = crypto.decryptBox(CipherWithNonce.decode(eak),
+          decodeURL(publicKey),
+          this.privateEncryptionKey);
+        EAKEntry entry = new EAKEntry(ak, new EAKImpl(eak, publicKey, authorizerId));
+        eakCache.put(cacheEntry, entry);
+        return entry;
+      }
     }
-    else
-      throw E3DBException.find(response.code(), response.message());
   }
 
   private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak) throws E3DBException, IOException {
-    Map<String, String> eak = new HashMap<>();
-    eak.put("eak", crypto.encryptBox(ak, readerKey, this.privateKey).toMessage());
+    EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
+    String encryptedAk = crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
+    eakCache.remove(cacheEntry);
 
-    RequestBody body = RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(eak));
+    Map<String, String> doc = new HashMap<>();
+    doc.put("eak", encryptedAk);
+
+    RequestBody body = RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(doc));
     retrofit2.Response<ResponseBody> response = storageClient.putAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type, body).execute();
     if (response.code() != 201) {
       throw E3DBException.find(response.code(), response.message());
     }
+
+    eakCache.put(cacheEntry, new EAKEntry(ak, new EAKImpl(encryptedAk, encodeURL(readerKey), this.clientId)));
+  }
+
+  private byte[] getCachedAccessKey(Record record, EAKInfo eakInfo) {
+    EAKCacheKey key = EAKCacheKey.fromRecord(record);
+    EAKEntry entry = eakCache.get(key);
+    if(entry == null) {
+      entry = new EAKEntry(crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
+      eakCache.putIfAbsent(key, entry);
+    }
+
+    return entry.getAk();
   }
 
   /**
@@ -643,11 +866,41 @@ public class Client {
    *
    * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
    *
-   * The returned value represents the key as a Base64URL-encoded string.
+   * @return A Base64URL-encoded string representing the new private key.
+   *
    */
   public static String newPrivateKey() {
-    byte [] key = crypto.newPrivateKey();
-    return encodeURL(key);
+    return encodeURL(crypto.newPrivateKey());
+  }
+
+  /**
+   * Gets the public signing key for the given private key.
+   *
+   * <p>The private key must be a Base64URL-encoded string.
+   *
+   * The returned value represents the key as a Base64URL-encoded string.
+   *
+   * @param privateSigningKey Ed25519 private key as a Base64URL-encoded string.
+   * @return The public key portion of the private key, as a Base64URL-encoded string.
+   */
+  public static String getPublicSigningKey(String privateSigningKey) {
+    checkNotEmpty(privateSigningKey, "privateSigningKey");
+    byte[] arr = decodeURL(privateSigningKey);
+    checkNotEmpty(arr, "privateSigningKey");
+    return encodeURL(crypto.getPublicSigningKey(arr));
+  }
+
+  /**
+   * Generates a private key that can be used for Ed25519
+   * public-key signatures.
+   *
+   * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
+   *
+   * @return A Base64URL-encoded string representing the new private key.
+   *
+   */
+  public static String newPrivateSigningKey() {
+    return encodeURL(crypto.newPrivateSigningKey());
   }
 
   /**
@@ -656,6 +909,9 @@ public class Client {
    * <p>The private key must be a Base64URL-encoded string.
    *
    * The returned value represents the key as a Base64URL-encoded string.
+   *
+   * @param privateKey Curve25519 private key as a Base64URL-encoded string.
+   * @return The public key portion of the private key, as a Base64URL-encoded string.
    */
   public static String getPublicKey(String privateKey) {
     checkNotEmpty(privateKey, "privateKey");
@@ -666,6 +922,8 @@ public class Client {
 
   /**
    * The ID of this client.
+   *
+   * @return clientId.
    */
   public UUID clientId() {
     return clientId;
@@ -689,6 +947,9 @@ public class Client {
     final byte[] privateKey = crypto.newPrivateKey();
     final String publicKey = encodeURL(crypto.getPublicKey(privateKey));
 
+    final byte[] privateSigningKey = crypto.newPrivateSigningKey();
+    final String publicSigningKey = encodeURL(crypto.getPublicSigningKey(privateSigningKey));
+
     register(token, clientName, publicKey, host, new ResultHandler<ClientCredentials>() {
       @Override
       public void handle(Result<ClientCredentials> r) {
@@ -698,7 +959,7 @@ public class Client {
         else {
           final ClientCredentials credentials = r.asValue();
           Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
-            publicKey);
+            publicKey, encodeURL(privateSigningKey), publicSigningKey);
           executeValue(uiExecutor, handleResult, info);
         }
       }
@@ -786,12 +1047,6 @@ public class Client {
       @Override
       public void run() {
         try {
-          if (fields == null) {
-            uiError(handleResult, new IllegalArgumentException("data null"));
-          }
-          if (type == null || type.trim().length() == 0) {
-            uiError(handleResult, new IllegalArgumentException("type null"));
-          }
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
 
@@ -946,12 +1201,11 @@ public class Client {
           final byte[] key = getAccessKey(UUID.fromString(meta.get("writer_id").asText()),
             UUID.fromString(meta.get("user_id").asText()),
             clientId, meta.get("type").asText());
-          try {
-            uiValue(handleResult, makeR(key, meta, result.get("data"), crypto));
-          } catch (ParseException e) {
-            uiError(handleResult, e);
-          } catch (UnsupportedEncodingException e) {
-            uiError(handleResult, e);
+          if(key == null) {
+            uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
+          }
+          else {
+              uiValue(handleResult, makeR(key, meta, result.get("data"), crypto));
           }
         } catch (final Throwable e) {
           uiError(handleResult, e);
@@ -1006,7 +1260,6 @@ public class Client {
     onBackground(new Runnable() {
       public void run() {
         try {
-          if(getAccessKey(clientId, clientId, readerId, type) == null) {
             final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(readerId).execute();
             if (clientInfo.code() == 404) {
               uiError(handleResult, new E3DBClientNotFoundException(readerId.toString()));
@@ -1016,11 +1269,15 @@ public class Client {
               return;
             }
 
-            byte[] ak = getOwnAccessKey(type);
-            JsonNode info = mapper.readTree(clientInfo.body().string());
-            byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
-            setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak);
-          }
+            try {
+              byte[] ak = getOwnAccessKey(type);
+              JsonNode info = mapper.readTree(clientInfo.body().string());
+              byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
+              setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak);
+            }
+            catch(E3DBConflictException ex) {
+              // no-op
+            }
 
           retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
             clientId.toString(),
@@ -1077,7 +1334,6 @@ public class Client {
       }
     });
   }
-
   /**
    * Get a list of record types shared with this client.
    *
@@ -1150,5 +1406,162 @@ public class Client {
         }
       }
     });
+  }
+
+  /**
+   * Creates (or retrieves) a key that can be used to locally encrypt records.
+   *
+   * @param type Type of the records to encrypt.
+   * @param handleResult Handle the EAKInfo object retrieved.
+   */
+  public void createWriterKey(final String type, final ResultHandler<EAKInfo> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          byte[] publicKey = crypto.getPublicKey(Client.this.privateEncryptionKey);
+          byte[] ak = crypto.newSecretKey();
+
+          try {
+            setAccessKey(Client.this.clientId, Client.this.clientId, Client.this.clientId, type, publicKey, ak);
+          } catch (E3DBConflictException e) {
+            // no-op
+          }
+
+          String encryptedAk = crypto.encryptBox(ak, publicKey, Client.this.privateEncryptionKey).toMessage();
+          EAKEntry eak = getEAK(Client.this.clientId, Client.this.clientId, Client.this.clientId, type);
+          if(eak == null)
+            uiError(handleResult, new RuntimeException("Can't create writer key for " + type));
+          else
+            uiValue(handleResult, eak.eakInfo);
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Retrieve a key for reading a shared record.
+   *  @param writerId ID of the client that wrote the record.
+   * @param userId ID of the user associated with the record (normally equal to {@code writerId}).
+   * @param type Type of record that was shared.
+   * @param handleResult Handle the EAKInfo object retrieved.
+   */
+  public void getReaderKey(final UUID writerId, final UUID userId, final String type, final ResultHandler<EAKInfo> handleResult) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          EAKEntry eak = getEAK(writerId, userId, Client.this.clientId, type);
+          if(eak == null)
+            uiError(handleResult, new E3DBException("Access key not not found."));
+          else
+            uiValue(handleResult, eak.eakInfo);
+        }
+        catch(Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Decrypt a locally-encrypted record.
+   *
+   * @param record The record to encrypt.
+   * @param eakInfo The key to use for encrypting.
+   * @return The deccrypted record.
+   */
+  public Record decryptExisting(Record record, EAKInfo eakInfo) {
+    byte[] ak = getCachedAccessKey(record, eakInfo);
+
+    try {
+      Map<String, String> plainRecord = decryptObject(ak, record.data(), crypto);
+      return new R(plainRecord, record.meta());
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Encrypt an existing record for local storage.
+   *
+   * @param record The record to encrypt.
+   * @param eakInfo The key to use for encrypting.
+   * @return The encrypted record. Note that server-provided metadata values will not throw if accessed.
+   */
+  public Record encryptExisting(Record record, EAKInfo eakInfo) {
+    checkNotNull(record, "record");
+    checkNotNull(eakInfo, "eak");
+
+    byte[] ak = getCachedAccessKey(record, eakInfo);
+    return new R(encryptObject(ak, record.data(), crypto), record.meta());
+  }
+
+  /**
+   * Encrypt a record for local storage.
+   *
+   * @param type The type of the record.
+   * @param data Fields to encrypt.
+   * @param plain Plaintext metadata which will be stored with the record.
+   * @param eakInfo The key to use for encrypting.
+   * @return The encrypted record. Note that server-provided metadata values ({@code recordId}, {@code createdd}, etc.)
+   * will throw if accessed.
+   */
+  public Record encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
+    checkNotNull(type, "type");
+    checkNotNull(data, "data");
+    checkMap(data.getCleartext(), "data");
+
+    if(plain != null && plain.size() > 0)
+      checkMap(plain, "plain");
+
+    return encryptExisting(new R(data.getCleartext(), new ClientMeta(this.clientId, this.clientId, type, plain)), eakInfo);
+  }
+
+  /**
+   * Derives a signature using this client's private Ed25519 key and the document given.
+   *
+   * @param document The document to sign.
+   * @param <T> T.
+   * @return A {@link SignedDocument} instance, holding the document given and a signature
+   * for it.
+   */
+  public <T extends Signable> SignedDocument<T> sign(T document) {
+    checkNotNull(document, "document");
+    checkNotNull(this.privateSigningKey, "signingKey");
+
+    return new SD<T>(document, Base64.encodeURL(
+      crypto.signature(
+        document.toSerialized().getBytes(StandardCharsets.UTF_8), this.privateSigningKey
+      )
+    ));
+  }
+
+  /**
+   * Verifies that the signature attached to the document was:
+   *
+   * <ul>
+   * <li>Produced by the holder of the private key associated with the {@code publicSigningKey} given.</li>
+   * <li>Was derived from the document given.
+   * </ul>
+   *
+   * @param signedDocument Document and signature to verify.
+   * @param publicSigningKey Public portion of the Ed25519 key used to produce the signature, as a Base64URL-encoded
+   *                         string.
+   * @return {@code true} if the signature matches; {@code false} otherwise.
+   */
+  public boolean verify(SignedDocument signedDocument, String publicSigningKey) {
+    checkNotNull(signedDocument, "signedDocument");
+    checkNotNull(publicSigningKey, "publicSigningKey");
+
+    String signature = signedDocument.signature();
+    Signable document = signedDocument.document();
+
+    checkNotNull(signature, "signature");
+    checkNotNull(document, "document");
+
+    return crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(StandardCharsets.UTF_8), Base64.decodeURL(publicSigningKey));
   }
 }

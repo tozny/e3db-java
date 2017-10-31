@@ -2,19 +2,24 @@ package com.tozny.e3db.crypto;
 
 import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.Crypto;
+import com.tozny.e3db.Signature;
 
+import org.abstractj.kalium.NaCl;
 import org.abstractj.kalium.crypto.Box;
 import org.abstractj.kalium.crypto.Random;
 import org.abstractj.kalium.crypto.SecretBox;
 import org.abstractj.kalium.keys.KeyPair;
 
+import java.util.Arrays;
+
+import javax.print.attribute.standard.MediaSize;
+
 import static com.tozny.e3db.Checks.*;
-import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_BOX_CURVE25519XSALSA20POLY1305_NONCEBYTES;
-import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_KEYBYTES;
-import static org.abstractj.kalium.NaCl.Sodium.CRYPTO_SECRETBOX_XSALSA20POLY1305_NONCEBYTES;
+import static org.abstractj.kalium.NaCl.Sodium.*;
 
 public class KaliumCrypto implements Crypto {
   private final static Random random = new Random();
+  private final static int ED25519_SEEDBYTES = 32;
 
   @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
@@ -64,5 +69,58 @@ public class KaliumCrypto implements Crypto {
   @Override
   public byte[] newSecretKey() {
     return random.randomBytes(CRYPTO_SECRETBOX_XSALSA20POLY1305_KEYBYTES);
+  }
+
+  @Override
+  public byte[] signature(byte [] message, byte[] signingKey) {
+    checkNotNull(message, "message");
+    checkNotNull(signingKey, "signingKey");
+
+    byte[] combined = new byte[CRYPTO_SIGN_ED25519_BYTES + message.length];
+    int result = NaCl.sodium().crypto_sign_ed25519(combined, null, message, message.length, signingKey);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_sign_ed25519: " + result);
+
+    return Arrays.copyOf(combined, CRYPTO_SIGN_ED25519_BYTES);
+  }
+
+  @Override
+  public boolean verify(Signature signature, byte[] message, byte[] publicSigningKey) {
+    checkNotNull(signature, "bytes");
+    checkNotNull(message, "message");
+    checkNotNull(publicSigningKey, "publicSigningKey");
+
+    byte[] combined = new byte[signature.bytes.length + message.length];
+    System.arraycopy(signature.bytes, 0, combined, 0, signature.bytes.length);
+    System.arraycopy(message, 0, combined, signature.bytes.length, message.length);
+    return NaCl.sodium().crypto_sign_ed25519_open(new byte[message.length], null, combined, combined.length, publicSigningKey) == 0;
+  }
+
+  @Override
+  public byte[] newPrivateSigningKey() {
+    byte[] seed = new byte[ED25519_SEEDBYTES];
+    byte[] publicSigningKey = new byte[CRYPTO_SIGN_ED25519_PUBLICKEYBYTES];
+    byte[] privateSigningKey = new byte[CRYPTO_SIGN_ED25519_SECRETKEYBYTES];
+
+    NaCl.sodium().randombytes(seed, seed.length);
+    int result = NaCl.sodium().crypto_sign_ed25519_seed_keypair(publicSigningKey, privateSigningKey, seed);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_sign_ed25519_seed_keypair: " + result);
+
+    return privateSigningKey;
+  }
+
+  @Override
+  public byte[] getPublicSigningKey(byte[] privateKey) {
+    checkNotNull(privateKey, "privateKey");
+
+    byte[] publicSigningKey = new byte[CRYPTO_SIGN_ED25519_PUBLICKEYBYTES];
+    // From libsodium's crypto_sign_ed25519_sk_to_pk (see
+    // https://github.com/jedisct1/libsodium/blob/1a3b474f7f6e6c01c56f2b3f53c1d30ed74e54ef/src/libsodium/crypto_sign/ed25519/sign_ed25519.c)
+
+    System.arraycopy(privateKey, ED25519_SEEDBYTES, publicSigningKey, 0, publicSigningKey.length);
+    return publicSigningKey;
   }
 }

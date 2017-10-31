@@ -2,6 +2,7 @@ package com.tozny.e3db.crypto;
 
 import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.Crypto;
+import com.tozny.e3db.Signature;
 
 import org.libsodium.jni.NaCl;
 import org.libsodium.jni.Sodium;
@@ -9,12 +10,11 @@ import org.libsodium.jni.crypto.Box;
 import org.libsodium.jni.crypto.Random;
 import org.libsodium.jni.crypto.SecretBox;
 
+import java.io.UnsupportedEncodingException;
+
 import static com.tozny.e3db.Checks.*;
 
-import static org.libsodium.jni.Sodium.crypto_box_noncebytes;
-import static org.libsodium.jni.Sodium.crypto_secretbox_keybytes;
-import static org.libsodium.jni.Sodium.crypto_secretbox_noncebytes;
-import static org.libsodium.jni.SodiumJNI.crypto_box_keypair;
+import static org.libsodium.jni.Sodium.*;
 
 public class AndroidCrypto implements Crypto {
   private final Sodium sodium;
@@ -70,7 +70,11 @@ public class AndroidCrypto implements Crypto {
   public byte[] newPrivateKey() {
     byte[] privateKey = new byte[sodium.crypto_box_secretkeybytes()];
     byte[] publicKey = new byte[sodium.crypto_box_publickeybytes()];
-    crypto_box_keypair(privateKey, publicKey);
+    int result = sodium.crypto_box_keypair(privateKey, publicKey);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_box_keypair: " + result);
+
     return privateKey;
   }
 
@@ -78,12 +82,59 @@ public class AndroidCrypto implements Crypto {
   public byte[] getPublicKey(byte[] privateKey) {
     checkNotEmpty(privateKey, "privateKey");
     byte[] publicKey = new byte[sodium.crypto_box_publickeybytes()];
-    sodium.crypto_scalarmult_base(publicKey, privateKey);
+    int result = sodium.crypto_scalarmult_base(publicKey, privateKey);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_scalarmult_base: " + result);
+
     return publicKey;
   }
 
   @Override
   public byte[] newSecretKey() {
     return random.randomBytes(crypto_secretbox_keybytes());
+  }
+
+  @Override
+  public byte[] signature(byte[] message, byte[] signingKey) {
+    byte[] dst = new byte[sodium.crypto_sign_bytes()];
+    int result = sodium.crypto_sign_detached(dst, new int[0], message, message.length, signingKey);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_sign_detached: " + result);
+
+    return dst;
+  }
+
+  @Override
+  public boolean verify(Signature signature, byte[] message, byte[] publicSigningKey) {
+    checkNotNull(signature, "signature");
+    checkNotNull(message, "message");
+    checkNotNull(publicSigningKey, "publicSigningKey");
+
+    return sodium.crypto_sign_verify_detached(signature.bytes, message, message.length, publicSigningKey) == 0;
+  }
+
+  @Override
+  public byte[] newPrivateSigningKey() {
+    byte[] sk = new byte[crypto_sign_secretkeybytes()];
+    byte[] pk = new byte[crypto_sign_publickeybytes()];
+    int result = sodium.crypto_sign_keypair(pk, sk);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_sign_keypair: " + result);
+
+    return sk;
+  }
+
+  @Override
+  public byte[] getPublicSigningKey(byte[] privateKey) {
+    byte[] dst = new byte[crypto_sign_publickeybytes()];
+    int result = crypto_sign_ed25519_sk_to_pk(dst, privateKey);
+
+    if(result != 0)
+      throw new RuntimeException("crypto_sign_ed25519_sk_to_pk: " + result);
+
+    return dst;
   }
 }

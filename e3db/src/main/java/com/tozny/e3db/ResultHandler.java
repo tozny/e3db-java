@@ -17,6 +17,8 @@ public interface ResultHandler<R> {
    *
    * <p>See the documentation for {@link Client} for more information about asynchronous
    * operations.
+   *
+   * @param r result.
    */
   void handle(Result<R> r);
 }

@@ -68,6 +68,9 @@ public class QueryParamsBuilder {
 
   /**
    * Specify the type of records to match. Defaults to {@code null}.
+   *
+   * @param types types.
+   * @return This instance.
    */
   public QueryParamsBuilder setTypes(String... types) {
     this.types = types == null ? null : Arrays.asList(types);
@@ -76,6 +79,8 @@ public class QueryParamsBuilder {
 
   /**
    * The list of types to match. Defaults to {@code null}.
+   *
+   * @return types.
    */
   public List<String> getTypes() {
     return this.types;
@@ -83,6 +88,9 @@ public class QueryParamsBuilder {
 
   /**
    * Filter records to those written by the given IDs. Defaults to {@code null}.
+   *
+   * @param writerIds writerIds.
+   * @return This instance.
    */
   public QueryParamsBuilder setWriters(UUID... writerIds) {
     this.writerIds = writerIds == null ? null : Arrays.asList(writerIds);
@@ -91,6 +99,8 @@ public class QueryParamsBuilder {
 
   /**
    * The list of writers to match. Defaults to {@code null}.
+   *
+   * @return writers.
    */
   public List<UUID> getWriters() {
     return this.writerIds;
@@ -98,6 +108,9 @@ public class QueryParamsBuilder {
 
   /**
    * Filter records to those about the given IDs. Defaults to {@code null}.
+   *
+   * @param userIds userIds.
+   * @return This instance.
    */
   public QueryParamsBuilder setUsers(UUID... userIds) {
     this.userIds = userIds == null ? null : Arrays.asList(userIds);
@@ -106,6 +119,8 @@ public class QueryParamsBuilder {
 
   /**
    * The list of user IDs to match. Defaults to {@code null}.
+   *
+   * @return users.
    */
   public List<UUID> getUsers() {
     return this.userIds;
@@ -113,6 +128,9 @@ public class QueryParamsBuilder {
 
   /**
    * Filter records to this in the given set of IDs. Defaults to {@code null}.
+   *
+   * @param recordIds recordIds.
+   * @return This instance.
    */
   public QueryParamsBuilder setRecords(UUID... recordIds) {
     this.recordIds = recordIds == null ? null : Arrays.asList(recordIds);
@@ -121,6 +139,8 @@ public class QueryParamsBuilder {
 
   /**
    * The list of record IDs to match. Defaults to {@code null}.
+   *
+   * @return records.
    */
   public List<UUID> getRecords() {
     return this.recordIds;
@@ -128,6 +148,9 @@ public class QueryParamsBuilder {
 
   /**
    * Sets the number of records to return. Pass {@code -1} to use the server default of 50.
+   *
+   * @param count count.
+   * @return This instance.
    */
   public QueryParamsBuilder setCount(int count) {
     this.count = count;
@@ -137,6 +160,8 @@ public class QueryParamsBuilder {
   /**
    * The number of records to return. Defaults to {@code -1}, which uses the server default
    * of 50.
+   *
+   * @return count.
    */
   public int getCount() {
     return this.count;
@@ -147,6 +172,9 @@ public class QueryParamsBuilder {
    * which means results should start at the first record that matches.
    *
    * <p>The {@code after} value should be obtained from value returned by {@link QueryResponse#last()}.
+   *
+   * @param after after.
+   * @return This instance.
    */
   public QueryParamsBuilder setAfter(long after) {
     this.after = after;
@@ -155,6 +183,8 @@ public class QueryParamsBuilder {
 
   /**
    * The index after which to start returning results. Defaults to {@code 0}.
+   *
+   * @return after.
    */
   public long getAfter() {
     return this.after;
@@ -163,6 +193,9 @@ public class QueryParamsBuilder {
   /**
    * When {@code true}, results should include records shared with this client (that also match
    * any other criteria). Defaults to {@code null}, which uses the server default {@code false}.
+   *
+   * @param includeAllWriters includeAllWriters
+   * @return This instance.
    */
   public QueryParamsBuilder setIncludeAllWriters(Boolean includeAllWriters) {
     this.includeAllWriters = includeAllWriters;
@@ -171,6 +204,8 @@ public class QueryParamsBuilder {
 
   /**
    * Whether to include shared records in results. Defaults to {@code null}.
+   *
+   * @return includeAllWriters.
    */
   public Boolean getIncludeAllWriters() {
     return this.includeAllWriters;
@@ -179,6 +214,9 @@ public class QueryParamsBuilder {
   /**
    * Specifies whether to include record data with results. Defaults to {@code null}, which uses
    * the server default of {@code false}.
+   *
+   * @param includeData includeData
+   * @return This instance.
    */
   public QueryParamsBuilder setIncludeData(Boolean includeData) {
     this.includeData = includeData;
@@ -188,6 +226,8 @@ public class QueryParamsBuilder {
   /**
    * Whether record data should be included in results or not. Defaults to {@code null}, which uses
    * the server default of {@code false}.
+   *
+   * @return includeData.
    */
   public Boolean getIncludeData() {
     return this.includeData;
@@ -195,6 +235,8 @@ public class QueryParamsBuilder {
 
   /**
    * Create a {@code QueryParams} instance based on the criteria specified.
+   * 
+   * @return A query params instance.
    */
   public QueryParams build() {
     checkState();

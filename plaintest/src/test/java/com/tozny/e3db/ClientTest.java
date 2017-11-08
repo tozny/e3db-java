@@ -982,7 +982,7 @@ public class ClientTest {
     Record local = new Record() {
       @Override
       public RecordMeta meta() {
-        return new LocalMeta(plain, recordType, client.clientId());
+        return new LocalMeta(client.clientId(), client.clientId(), recordType, plain);
       }
 
       @Override

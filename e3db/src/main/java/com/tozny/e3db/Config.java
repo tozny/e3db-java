@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.tozny.e3db.Base64.decodeURL;
+import static com.tozny.e3db.Base64.encodeURL;
 import static com.tozny.e3db.Checks.*;
 
 /**
@@ -39,7 +41,7 @@ public class Config {
   /**
    * Curve25519 public key for this client, as a Base64URL-encoded string.
    */
-  public final String publicEncryptionKey;
+  public final String publicKey;
   /**
    * Curve25519 private key for the client, as a Base64URL-encoded string.
    */
@@ -57,50 +59,83 @@ public class Config {
    */
   public final String host;
   /**
-   * Ed25519 public key for the client, as a Base64URL-encoded string.
+   * Ed25519 public key for the client, as a Base64URL-encoded string. Can be {@code null}.
    */
   public final String publicSigningKey;
   /**
-   * Ed25519 private key for the client, as a Base64URL-encoded string.
+   * Ed25519 private key for the client, as a Base64URL-encoded string. Can be {@code null}.
    */
   public final String privateSigningKey;
 
-  Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateKey, String publicEncryptionKey, String privateSigningKey, String publicSigningKey) {
+  Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateEncryptionKey, String privateSigningKey) {
     checkNotEmpty(apiKey, "apiKey");
     checkNotEmpty(apiSecret, "apiSecret");
     checkNotEmpty(host, "host");
-    checkNotEmpty(privateKey, "privateKey");
-    checkNotEmpty(publicEncryptionKey, "privateSigningKey");
-    checkNotEmpty(privateSigningKey, "privateSigningKey");
-    checkNotEmpty(publicSigningKey, "publicSigningKey");
-
+    checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
     checkNotNull(clientId, "clientId");
     checkNotNull(name, "name");
 
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
-    this.privateKey = privateKey;
     this.clientId = clientId;
     this.name = name;
     this.host = host;
-    this.publicEncryptionKey = publicEncryptionKey;
+    this.privateKey = privateEncryptionKey;
+    this.publicKey = encodeURL(Platform.crypto.getPublicKey(decodeURL(this.privateKey)));
     this.privateSigningKey = privateSigningKey;
-    this.publicSigningKey = publicSigningKey;
+
+    if(this.privateSigningKey != null)
+      this.publicSigningKey = encodeURL(Platform.crypto.getPublicSigningKey(decodeURL(this.privateSigningKey)));
+    else
+      this.publicSigningKey = null;
+  }
+
+
+  /**
+   * Create a Config instance from the given credentials and private encryption key.
+   *
+   * @param creds Username (API key), password (API secret), and client ID.
+   * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
+   * @param publicSigningKey Ed25519 public key, as a Base64URL-encoded string.
+   * @return A {@link Config} instance.
+   */
+  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey) {
+    checkNotNull(creds, "creds");
+    checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
+
+    return new Config(creds.apiKey(),
+      creds.apiSecret(),
+      creds.clientId(),
+      creds.name(),
+      "https://api.e3db.com",
+      privateEncryptionKey,
+      null
+    );
   }
 
   /**
-   * Create a Config instance from the given credentials and private key.
+   * Create a Config instance from the given credentials, private encryption key and private
+   * signing key.
+   *
    * @param creds Username (API key), password (API secret), and client ID.
-   * @param privateKey Curve25519 private key, as a Base64URL-encoded string.
+   * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
    * @param publicSigningKey Ed25519 public key, as a Base64URL-encoded string.
    * @param privateSigningKey Ed25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
-  public static Config fromCredentials(ClientCredentials creds, String privateKey, String publicSigningKey, String privateSigningKey) {
+  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey, String privateSigningKey) {
     checkNotNull(creds, "creds");
-    checkNotEmpty(privateKey, "privateKey");
+    checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
+    checkNotEmpty(privateSigningKey, "privateSigningKey");
 
-    return new Config(creds.apiKey(), creds.apiSecret(), creds.clientId(), creds.name(), "https://api.e3db.com", privateKey, creds.publicKey(), privateSigningKey, publicSigningKey);
+    return new Config(creds.apiKey(),
+      creds.apiSecret(),
+      creds.clientId(),
+      creds.name(),
+      "https://api.e3db.com",
+      privateEncryptionKey,
+      privateSigningKey
+    );
   }
 
   /**
@@ -126,6 +161,7 @@ public class Config {
     JsonNode public_key = info.get("public_key");
     JsonNode public_signing_key = info.get("public_signing_key");
     JsonNode private_signing_key = info.get("private_signing_key");
+    JsonNode version = info.get("version");
 
     checkNotNull(api_key_id, "api_key_id");
     checkNotNull(api_secret, "api_secret");
@@ -134,8 +170,11 @@ public class Config {
     checkNotNull(api_url, "api_url");
     checkNotNull(private_key, "private_key");
     checkNotNull(public_key, "public_key");
-    checkNotNull(private_signing_key, "private_signing_key");
-    checkNotNull(public_signing_key, "public_signing_key");
+
+    if(version != null && version.asInt() > 1) {
+      checkNotNull(private_signing_key, "private_signing_key");
+      checkNotNull(public_signing_key, "public_signing_key");
+    }
 
     return new Config(api_key_id.asText(),
       api_secret.asText(),
@@ -143,9 +182,8 @@ public class Config {
       client_email == null ? "" : client_email.asText(),
       api_url.asText(),
       private_key.asText(),
-      public_key.asText(),
-      private_signing_key.asText(),
-      public_signing_key.asText());
+      private_signing_key == null ? null : private_signing_key.asText()
+    );
   }
 
   /**
@@ -157,16 +195,23 @@ public class Config {
    * @return JSON representation of this object.
    */
   public String json() {
-    Map<String, String> info = new HashMap<>();
+    Map<String, Object> info = new HashMap<>();
     info.put("api_url", host);
     info.put("api_key_id", apiKey);
     info.put("api_secret", apiSecret);
     info.put("client_id", clientId.toString());
     info.put("client_email", name);
-    info.put("public_key", publicEncryptionKey);
+    info.put("public_key", publicKey);
     info.put("private_key", privateKey);
-    info.put("public_signing_key", publicSigningKey);
-    info.put("private_signing_key", privateSigningKey);
+    info.put("version", 1);
+    if(publicSigningKey != null) {
+      info.put("public_signing_key", publicSigningKey);
+      info.put("version", 2);
+    }
+    if(privateSigningKey != null) {
+      info.put("private_signing_key", privateSigningKey);
+      info.put("version", 2);
+    }
 
     try {
       return mapper.writeValueAsString(info);

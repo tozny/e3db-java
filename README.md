@@ -386,7 +386,7 @@ client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
             throw new Error(r.asError().other());
 
         EAKInfo key = r.asValue();
-        Record encrypted = client1.encryptRecord(recordType, new RecordData(lyric), null, r.asValue());
+        Record encrypted = client1.encryptRecord(recordType, new RecordData(lyric), null, key);
         // Write record to storage in suitable format.
     }
 });
@@ -425,7 +425,8 @@ reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new Resul
         EAKInfo readerKey = r.asValue();
         Record decrypted = reader.decryptExisting(encrypted, readerKey);
 
-    });
+    }
+});
 ```
 
 Document Signing & Verification
@@ -433,100 +434,36 @@ Document Signing & Verification
 
 Every E3DB client created with this SDK is capable of signing documents and verifying the signature
 associated with a document. (Note that E3DB records are also stored with a signature attached, but
-verification of that is handled internally to the SDK.)
+verification of that is handled internally to the SDK.) By attaching signatures to documents, clients can
+be confident in:
 
-To create a signature, use the `signature` method:
+  * Document integrity - the document's contents have not been altered (because the signature will not match).
+  * Proof-of-authorship - The author of the document held the private signing key associated with the given public key
+    when the document was created.
 
-```
+To create a signature, use the `sign` method:
+
+```java
 final String recordType = "lyric";
 final Map<String, String> plain = new HashMap<>();
 plain.put("frabjous", "Filibuster vigilantly");
 final Map<String, String> data = new HashMap<>();
 data.put("Jabberwock", "Not to put too fine a point on it");
+UUID writerId = client.clientId();
+UUID userId = client.clientId();
 
-Record local = new Record() {
-  @Override
-  public RecordMeta meta() {
-    final Map<String, String> plain1 = plain;
-    final UUID writerId1 = client.clientId();
-    return new RecordMeta() {
-      private final Map<String, String> plain = plain1;
-      private final String type = recordType;
-      private final UUID writerId = writerId1;
-
-      @Override
-      public UUID recordId() {
-        throw new IllegalStateException();
-      }
-
-      @Override
-      public UUID writerId() {
-        return writerId;
-      }
-
-      @Override
-      public UUID userId() {
-        return writerId;
-      }
-
-      @Override
-      public Date created() {
-        throw new IllegalStateException();
-      }
-
-      @Override
-      public Date lastModified() {
-        throw new IllegalStateException();
-      }
-
-      @Override
-      public String version() {
-        throw new IllegalStateException();
-      }
-
-      @Override
-      public String type() {
-        return type;
-      }
-
-      @Override
-      public Map<String, String> plain() {
-        return plain;
-      }
-    };
-  }
-
-  @Override
-  public Map<String, String> data() {
-    return data;
-  }
-
-  @Override
-  public String toSerialized() {
-    try {
-      Map<String, String> meta = new HashMap<>();
-      meta.put("writerId", this.meta().writerId().toString());
-      meta.put("userId", this.meta().userId().toString());
-      meta.put("type", this.meta().type());
-      meta.put("plain", mapper.writeValueAsString(this.meta().plain()));
-      Map<String, Object> doc = new HashMap<>();
-      doc.put("data", data);
-      doc.put("meta", meta);
-      return mapper.writeValueAsString(doc);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-};
-
-SignedDocument<Record> sign = client.sign(local);
+Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
+SignedDocument<Record> signed = client.sign(local);
 ```
 
-To verify a document, use the `verify` method. Here, we use the same `sign` instance as above. `clientConfig` holds
-the private & public keys for the client:
+To verify a document, use the `verify` method. Here, we use the same `signed` instance as above. `clientConfig` holds
+the private & public keys for the client. (Note that, in general, `verify` requires the public signing key of the client
+that wrote the record):
 
-```
-client.verify(sign, clientConfig.publicSigningKey);
+```java
+if(! client.verify(signed, clientConfig.publicSigningKey)) {
+  // Document failed verification, indicate an error as appropriate
+}
 ```
 
 Exceptions

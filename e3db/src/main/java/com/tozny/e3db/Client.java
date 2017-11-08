@@ -3,12 +3,9 @@ package com.tozny.e3db;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.tozny.e3db.crypto.AndroidCrypto;
-import com.tozny.e3db.crypto.KaliumCrypto;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -23,8 +20,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -116,14 +111,13 @@ import static com.tozny.e3db.Checks.*;
  * <p>To share records, use the {@link #share(String, UUID, ResultHandler)} method. To remove sharing access, use the {@link #revoke(String, UUID, ResultHandler)}} method.
  *
  */
-public class Client {
+public class  Client {
   private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
   private static final Executor uiExecutor;
-  private static final Crypto crypto;
   private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
   private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
@@ -132,7 +126,9 @@ public class Client {
   private final UUID clientId;
   private final byte[] privateEncryptionKey;
   private final byte[] privateSigningKey;
+  private final byte[] publicSigningKey;
   private final StorageAPI storageClient;
+
   private final ShareAPI shareClient;
 
   static {
@@ -152,15 +148,7 @@ public class Client {
         }
       });
 
-    boolean isAndroid = false;
-    try {
-      Class.forName("android.os.Build");
-      isAndroid = true;
-    } catch (ClassNotFoundException ignored) {
-    }
-
-    if (isAndroid) {
-      crypto = new AndroidCrypto();
+    if (Platform.isAndroid()) {
       // Post results to UI thread
       uiExecutor = new Executor() {
         private final Handler handler = new Handler(Looper.getMainLooper());
@@ -171,7 +159,6 @@ public class Client {
         }
       };
     } else {
-      crypto = new KaliumCrypto();
       // Post results to current thread (whatever that is)
       uiExecutor = new Executor() {
         @Override
@@ -191,6 +178,10 @@ public class Client {
     this.clientId = clientId;
     this.privateEncryptionKey = privateKey;
     this.privateSigningKey = privateSigningKey;
+    if(this.privateSigningKey != null)
+      publicSigningKey = Platform.crypto.getPublicSigningKey(privateSigningKey);
+    else
+      publicSigningKey = null;
 
     Retrofit build = new Retrofit.Builder()
       .callbackExecutor(this.uiExecutor)
@@ -393,59 +384,6 @@ public class Client {
     }
   }
 
-  private static class ClientMeta implements RecordMeta {
-    private final UUID writerId;
-    private final UUID userId;
-    private final String type;
-    private final Map<String, String> plain;
-
-    private ClientMeta(UUID writerId, UUID userId, String type, Map<String, String> plain) {
-      this.writerId = writerId;
-      this.userId = userId;
-      this.type = type;
-      this.plain = plain;
-    }
-
-    @Override
-    public UUID recordId() {
-      throw new IllegalStateException("recordId not defined");
-    }
-
-    @Override
-    public UUID writerId() {
-      return writerId;
-    }
-
-    @Override
-    public UUID userId() {
-      return userId;
-    }
-
-    @Override
-    public Date created() {
-      throw new IllegalStateException("created not defined");
-    }
-
-    @Override
-    public Date lastModified() {
-      throw new IllegalStateException("lastModified not defined");
-    }
-
-    @Override
-    public String version() {
-      throw new IllegalStateException("version not defined");
-    }
-
-    @Override
-    public String type() {
-      return type;
-    }
-    @Override
-    public Map<String, String> plain() {
-      return plain;
-    }
-  }
-
   private static class ER {
     public final CipherWithNonce edk; // encrypted data key
 
@@ -517,11 +455,11 @@ public class Client {
     return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
   }
 
-  private static R makeR(JsonNode rawMeta) throws ParseException {
-    return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
+  private static Record makeLocal(JsonNode rawMeta) throws ParseException {
+    return new LocalRecord(new HashMap<String, String>(), getRecordMeta(rawMeta));
   }
 
-  private static R makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, Crypto crypto) throws ParseException, UnsupportedEncodingException {
+  private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields) throws ParseException, UnsupportedEncodingException {
     RecordMeta meta = getRecordMeta(rawMeta);
     Map<String, String> encryptedFields = new HashMap<>();
     Iterator<String> keys = fields.fieldNames();
@@ -530,8 +468,8 @@ public class Client {
       encryptedFields.put(key, fields.get(key).asText());
     }
 
-    Map<String, String> results = decryptObject(accessKey, encryptedFields, crypto);
-    return new R(results, meta);
+    Map<String, String> results = decryptObject(accessKey, encryptedFields);
+    return new LocalRecord(results, meta);
   }
 
   private static class QR implements QueryResponse {
@@ -551,43 +489,6 @@ public class Client {
     @Override
     public long last() {
       return lastIdx;
-    }
-  }
-
-  private static class R implements Record {
-    private final Map<String, String> data;
-    private final RecordMeta meta;
-
-    public R(Map<String, String> data, RecordMeta meta) {
-      this.data = data;
-      this.meta = meta;
-    }
-
-    @Override
-    public RecordMeta meta() {
-      return meta;
-    }
-
-    @Override
-    public Map<String, String> data() {
-      return data;
-    }
-
-    @Override
-    public String toSerialized() {
-      try {
-        SortedMap<String, Object> clientMeta = new TreeMap<>();
-        clientMeta.put("writer_id", meta().writerId().toString());
-        clientMeta.put("user_id", meta().userId().toString());
-        clientMeta.put("type", meta().type().toString());
-        clientMeta.put("plain", new TreeMap<String, String>(meta().plain()));
-
-        String clientMetaSerial = mapper.writeValueAsString(clientMeta);
-        String dataSerial = mapper.writeValueAsString(data());
-        return new StringBuffer(clientMetaSerial.length() + dataSerial.length()).append(clientMetaSerial).append(dataSerial).toString();
-      } catch (JsonProcessingException e) {
-        throw new RuntimeException(e);
-      }
     }
   }
 
@@ -717,21 +618,20 @@ public class Client {
 
     ArrayList<Record> records = new ArrayList<>(currPage.size());
     for (int currRow = 0; currRow < currPage.size(); currRow++) {
-      R record;
+      Record record;
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
-        record = makeR(crypto.decryptBox(
+        record = makeLocal(Platform.crypto.decryptBox(
             CipherWithNonce.decode(access_key.get("eak").asText()),
             decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
-          privateEncryptionKey
-          ),
+          privateEncryptionKey),
           queryRecord.get("meta"),
-          queryRecord.get("record_data"),
-          crypto);
+          queryRecord.get("record_data")
+        );
       }
       else {
-        record = makeR(queryRecord.get("meta"));
+        record = makeLocal(queryRecord.get("meta"));
       }
       records.add(record);
     }
@@ -748,24 +648,24 @@ public class Client {
     return objects;
   }
 
-  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields, Crypto crypto)  {
+  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields)  {
     Map<String, String> encFields = new HashMap<>();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
-      byte[] dk = crypto.newSecretKey();
+      byte[] dk = Platform.crypto.newSecretKey();
 
-      String encField = new StringBuilder(crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
-        .append(crypto.encryptSecretBox(entry.getValue().getBytes(StandardCharsets.UTF_8), dk).toMessage()).toString();
+      String encField = new StringBuilder(Platform.crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
+        .append(Platform.crypto.encryptSecretBox(entry.getValue().getBytes(StandardCharsets.UTF_8), dk).toMessage()).toString();
       encFields.put(entry.getKey(), encField);
     }
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record, Crypto crypto) throws UnsupportedEncodingException {
+  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws UnsupportedEncodingException {
     Map<String, String> decryptedFields = new HashMap<>();
     for(Map.Entry<String,String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
-      byte[] dk = crypto.decryptSecretBox(er.edk, accessKey);
-      String value = new String(crypto.decryptSecretBox(er.ef, dk), StandardCharsets.UTF_8);
+      byte[] dk = Platform.crypto.decryptSecretBox(er.edk, accessKey);
+      String value = new String(Platform.crypto.decryptSecretBox(er.ef, dk), StandardCharsets.UTF_8);
       decryptedFields.put(entry.getKey(), value);
     }
     return decryptedFields;
@@ -775,9 +675,9 @@ public class Client {
     byte[] ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
     if (ak == null) {
       // Write new AK
-      ak = crypto.newSecretKey();
+      ak = Platform.crypto.newSecretKey();
       try {
-        setAccessKey(this.clientId, this.clientId, this.clientId, type, crypto.getPublicKey(this.privateEncryptionKey), ak);
+        setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), ak);
       }
       catch(E3DBConflictException ex) {
         ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
@@ -822,7 +722,7 @@ public class Client {
         String publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
         UUID authorizerId = UUID.fromString(eakResponse.get("authorizer_id").asText());
 
-        byte[] ak = crypto.decryptBox(CipherWithNonce.decode(eak),
+        byte[] ak = Platform.crypto.decryptBox(CipherWithNonce.decode(eak),
           decodeURL(publicKey),
           this.privateEncryptionKey);
         EAKEntry entry = new EAKEntry(ak, new EAKImpl(eak, publicKey, authorizerId));
@@ -834,7 +734,7 @@ public class Client {
 
   private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak) throws E3DBException, IOException {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
-    String encryptedAk = crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
+    String encryptedAk = Platform.crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
     eakCache.remove(cacheEntry);
 
     Map<String, String> doc = new HashMap<>();
@@ -853,11 +753,19 @@ public class Client {
     EAKCacheKey key = EAKCacheKey.fromRecord(record);
     EAKEntry entry = eakCache.get(key);
     if(entry == null) {
-      entry = new EAKEntry(crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
+      entry = new EAKEntry(Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
       eakCache.putIfAbsent(key, entry);
     }
 
     return entry.getAk();
+  }
+
+  /**
+   * @deprecated Use {@link #generateKey()}  instead.
+   */
+  @Deprecated
+  public static String newPrivateKey() {
+    return encodeURL(Platform.crypto.newPrivateKey());
   }
 
   /**
@@ -869,38 +777,8 @@ public class Client {
    * @return A Base64URL-encoded string representing the new private key.
    *
    */
-  public static String newPrivateKey() {
-    return encodeURL(crypto.newPrivateKey());
-  }
-
-  /**
-   * Gets the public signing key for the given private key.
-   *
-   * <p>The private key must be a Base64URL-encoded string.
-   *
-   * The returned value represents the key as a Base64URL-encoded string.
-   *
-   * @param privateSigningKey Ed25519 private key as a Base64URL-encoded string.
-   * @return The public key portion of the private key, as a Base64URL-encoded string.
-   */
-  public static String getPublicSigningKey(String privateSigningKey) {
-    checkNotEmpty(privateSigningKey, "privateSigningKey");
-    byte[] arr = decodeURL(privateSigningKey);
-    checkNotEmpty(arr, "privateSigningKey");
-    return encodeURL(crypto.getPublicSigningKey(arr));
-  }
-
-  /**
-   * Generates a private key that can be used for Ed25519
-   * public-key signatures.
-   *
-   * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
-   *
-   * @return A Base64URL-encoded string representing the new private key.
-   *
-   */
-  public static String newPrivateSigningKey() {
-    return encodeURL(crypto.newPrivateSigningKey());
+  public static String generateKey() {
+    return encodeURL(Platform.crypto.newPrivateKey());
   }
 
   /**
@@ -917,7 +795,37 @@ public class Client {
     checkNotEmpty(privateKey, "privateKey");
     byte[] arr = decodeURL(privateKey);
     checkNotEmpty(arr, "privateKey");
-    return encodeURL(crypto.getPublicKey(arr));
+    return encodeURL(Platform.crypto.getPublicKey(arr));
+  }
+
+  /**
+   * Generates a private key that can be used for Ed25519
+   * public-key signatures.
+   *
+   * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
+   *
+   * @return A Base64URL-encoded string representing the new private key.
+   *
+   */
+  public static String generateSigningKey() {
+    return encodeURL(Platform.crypto.newPrivateSigningKey());
+  }
+
+  /**
+   * Gets the public signing key for the given private key.
+   *
+   * <p>The private key must be a Base64URL-encoded string.
+   *
+   * The returned value represents the key as a Base64URL-encoded string.
+   *
+   * @param privateSigningKey Ed25519 private key as a Base64URL-encoded string.
+   * @return The public key portion of the private key, as a Base64URL-encoded string.
+   */
+  public static String getPublicSigningKey(String privateSigningKey) {
+    checkNotEmpty(privateSigningKey, "privateSigningKey");
+    byte[] arr = decodeURL(privateSigningKey);
+    checkNotEmpty(arr, "privateSigningKey");
+    return encodeURL(Platform.crypto.getPublicSigningKey(arr));
   }
 
   /**
@@ -944,11 +852,11 @@ public class Client {
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(host, "host");
 
-    final byte[] privateKey = crypto.newPrivateKey();
-    final String publicKey = encodeURL(crypto.getPublicKey(privateKey));
+    final byte[] privateKey = Platform.crypto.newPrivateKey();
+    final String publicKey = encodeURL(Platform.crypto.getPublicKey(privateKey));
 
-    final byte[] privateSigningKey = crypto.newPrivateSigningKey();
-    final String publicSigningKey = encodeURL(crypto.getPublicSigningKey(privateSigningKey));
+    final byte[] privateSigningKey = Platform.crypto.newPrivateSigningKey();
+    final String publicSigningKey = encodeURL(Platform.crypto.getPublicSigningKey(privateSigningKey));
 
     register(token, clientName, publicKey, host, new ResultHandler<ClientCredentials>() {
       @Override
@@ -959,7 +867,7 @@ public class Client {
         else {
           final ClientCredentials credentials = r.asValue();
           Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
-            publicKey, encodeURL(privateSigningKey), publicSigningKey);
+            encodeURL(privateSigningKey));
           executeValue(uiExecutor, handleResult, info);
         }
       }
@@ -975,7 +883,7 @@ public class Client {
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
-   *                  private key. Consider using {@link #newPrivateKey()} to generate a private key.
+   *                  private key. Consider using {@link #generateNewKeyPair()} to generate a private key.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */
@@ -1048,7 +956,7 @@ public class Client {
       public void run() {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
-          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
+          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
@@ -1066,7 +974,10 @@ public class Client {
           final retrofit2.Response<ResponseBody> response = storageClient.writeRecord(RequestBody.create(APPLICATION_JSON, content)).execute();
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
-            uiValue(handleResult, makeR(ownAK, result.get("meta"), result.get("data"), crypto));
+            uiValue(handleResult,
+              makeLocal(ownAK,
+                result.get("meta"),
+                result.get("data")));
           } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
@@ -1111,7 +1022,7 @@ public class Client {
       public void run() {
         try {
           final byte[] ownAK = getOwnAccessKey(recordMeta.type());
-          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext(), crypto);
+          Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
@@ -1130,7 +1041,10 @@ public class Client {
             uiError(handleResult, new E3DBVersionException(recordMeta.recordId(), recordMeta.version()));
           } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
-            uiValue(handleResult, makeR(ownAK, result.get("meta"), result.get("data"), crypto));
+            uiValue(handleResult,
+              makeLocal(ownAK,
+                result.get("meta"),
+                result.get("data")));
           }
           else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
@@ -1205,7 +1119,7 @@ public class Client {
             uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
           }
           else {
-              uiValue(handleResult, makeR(key, meta, result.get("data"), crypto));
+            uiValue(handleResult, makeLocal(key, meta, result.get("data")));
           }
         } catch (final Throwable e) {
           uiError(handleResult, e);
@@ -1419,8 +1333,8 @@ public class Client {
       @Override
       public void run() {
         try {
-          byte[] publicKey = crypto.getPublicKey(Client.this.privateEncryptionKey);
-          byte[] ak = crypto.newSecretKey();
+          byte[] publicKey = Platform.crypto.getPublicKey(Client.this.privateEncryptionKey);
+          byte[] ak = Platform.crypto.newSecretKey();
 
           try {
             setAccessKey(Client.this.clientId, Client.this.clientId, Client.this.clientId, type, publicKey, ak);
@@ -1428,7 +1342,7 @@ public class Client {
             // no-op
           }
 
-          String encryptedAk = crypto.encryptBox(ak, publicKey, Client.this.privateEncryptionKey).toMessage();
+          String encryptedAk = Platform.crypto.encryptBox(ak, publicKey, Client.this.privateEncryptionKey).toMessage();
           EAKEntry eak = getEAK(Client.this.clientId, Client.this.clientId, Client.this.clientId, type);
           if(eak == null)
             uiError(handleResult, new RuntimeException("Can't create writer key for " + type));
@@ -1477,8 +1391,8 @@ public class Client {
     byte[] ak = getCachedAccessKey(record, eakInfo);
 
     try {
-      Map<String, String> plainRecord = decryptObject(ak, record.data(), crypto);
-      return new R(plainRecord, record.meta());
+      Map<String, String> plainRecord = decryptObject(ak, record.data());
+      return new LocalRecord(plainRecord, record.meta());
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
@@ -1496,7 +1410,7 @@ public class Client {
     checkNotNull(eakInfo, "eak");
 
     byte[] ak = getCachedAccessKey(record, eakInfo);
-    return new R(encryptObject(ak, record.data(), crypto), record.meta());
+    return new LocalRecord(encryptObject(ak, record.data()), record.meta());
   }
 
   /**
@@ -1517,13 +1431,14 @@ public class Client {
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
-    return encryptExisting(new R(data.getCleartext(), new ClientMeta(this.clientId, this.clientId, type, plain)), eakInfo);
+    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain)), eakInfo);
   }
 
   /**
    * Derives a signature using this client's private Ed25519 key and the document given.
    *
-   * @param document The document to sign.
+   * @param document The document to sign. Consider using {@link LocalRecord}, which implements the
+   *                 {@link Signable} interface.
    * @param <T> T.
    * @return A {@link SignedDocument} instance, holding the document given and a signature
    * for it.
@@ -1533,7 +1448,7 @@ public class Client {
     checkNotNull(this.privateSigningKey, "signingKey");
 
     return new SD<T>(document, Base64.encodeURL(
-      crypto.signature(
+      Platform.crypto.signature(
         document.toSerialized().getBytes(StandardCharsets.UTF_8), this.privateSigningKey
       )
     ));
@@ -1544,7 +1459,7 @@ public class Client {
    *
    * <ul>
    * <li>Produced by the holder of the private key associated with the {@code publicSigningKey} given.</li>
-   * <li>Was derived from the document given.
+   * <li>Derived from the document given.
    * </ul>
    *
    * @param signedDocument Document and signature to verify.
@@ -1562,6 +1477,6 @@ public class Client {
     checkNotNull(signature, "signature");
     checkNotNull(document, "document");
 
-    return crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(StandardCharsets.UTF_8), Base64.decodeURL(publicSigningKey));
+    return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(StandardCharsets.UTF_8), Base64.decodeURL(publicSigningKey));
   }
 }

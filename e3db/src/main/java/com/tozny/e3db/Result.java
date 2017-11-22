@@ -20,6 +20,8 @@ package com.tozny.e3db;
 public interface Result<R> {
   /**
    * Indicates if the operation resulted in an error or not.
+   *
+   * @return isError.
    */
   boolean isError();
 
@@ -28,6 +30,8 @@ public interface Result<R> {
    *
    * <p>This method will return {@code null} if it is called when {@code isError} returns
    * {@code false}.
+   *
+   * @return The error, if any.
    */
   ErrorResult<R> asError();
 
@@ -36,6 +40,8 @@ public interface Result<R> {
    *
    * <P>This method will return {@code null} if it is called when {@code isError} returns
    * {@code true}.
+   *
+   * @return The value, if any.
    */
   R asValue();
 }

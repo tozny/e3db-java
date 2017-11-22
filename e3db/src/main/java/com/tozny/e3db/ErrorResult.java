@@ -53,6 +53,8 @@ public class ErrorResult<R> implements Result<R> {
    *
    * <p>This method will return {@code null} if a general exception
    * occurred during the operation; otherwise, it will return a specific E3DB error.
+   *
+   * @return The  error, if any.
    */
   public E3DBException error() {
     if(error instanceof E3DBException)
@@ -66,6 +68,8 @@ public class ErrorResult<R> implements Result<R> {
    *
    * <p>This method always returns a value. However, this method should not be used if
    * {@link #error()} returns a non-{@code null} value.
+   *
+   * @return The error, if any.
    */
   public Throwable other() {
     return this.error;

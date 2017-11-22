@@ -17,6 +17,9 @@ public class CipherWithNonce {
   /**
    * Create a container holding an encrypted message and the nonce
    * used during encryption.
+   *
+   * @param cipher cipher.
+   * @param nonce nonce.
    */
   public CipherWithNonce(byte[] cipher, byte[] nonce) {
     checkNotNull(cipher, "cipher");
@@ -27,6 +30,8 @@ public class CipherWithNonce {
 
   /**
    * Get the encrypted message.
+   *
+   * @return cipher.
    */
   public byte[] getCipher() {
     return cipher;
@@ -34,6 +39,8 @@ public class CipherWithNonce {
 
   /**
    * Get the nonce used during encryption of the message.
+   *
+   * @return nonce.
    */
   public byte[] getNonce() {
     return nonce;

@@ -37,6 +37,7 @@ public class ClientBuilder {
   private UUID clientId;
   private URI host = URI.create("https://api.e3db.com");
   private byte[] privateKey;
+  private byte[] privateSigningKey;
 
   public ClientBuilder() {
   }
@@ -51,6 +52,8 @@ public class ClientBuilder {
 
   /**
    * Configure this object using the {@code info} argument.
+   *
+   * @param info info.
    * @return This instance.
    */
   public ClientBuilder fromConfig(Config info) {
@@ -60,7 +63,8 @@ public class ClientBuilder {
       .setClientId(info.clientId)
       .setApiKey(info.apiKey)
       .setApiSecret(info.apiSecret)
-      .setPrivateKey(info.privateKey);
+      .setPrivateKey(info.privateKey)
+      .setPrivateSigningKey(info.privateSigningKey);
   }
 
   /**
@@ -84,6 +88,7 @@ public class ClientBuilder {
   /**
    * Configure the username (API key) for this instance.
    *
+   * @param apiKey apiKey.
    * @return This instance.
    */
   public ClientBuilder setApiKey(String apiKey) {
@@ -94,6 +99,7 @@ public class ClientBuilder {
   /**
    * Configure the password (API  secret) for this instance.
    *
+   * @param apiSecret apiSecret.
    * @return This instance.
    */
   public ClientBuilder setApiSecret(String apiSecret) {
@@ -104,6 +110,7 @@ public class ClientBuilder {
   /**
    * Configure the Client ID for this instance.
    *
+   * @param clientId clientId.
    * @return This instance.
    */
   public ClientBuilder setClientId(UUID clientId) {
@@ -115,6 +122,7 @@ public class ClientBuilder {
    * Configure the host for this instance.
    *
    * Not normally necessary, defaults to {@code https://api.e3db.com}.
+   * @param host host.
    * @return This instance.
    */
   public ClientBuilder setHost(String host) {
@@ -133,6 +141,11 @@ public class ClientBuilder {
     return this;
   }
 
+  public ClientBuilder setPrivateSigningKey(String privateSigningKey) {
+    this.privateSigningKey = ByteString.decodeBase64(privateSigningKey).toByteArray();
+    return this;
+  }
+
   /**
    * Create an E3DB Client instance based on configured parameters.
    *
@@ -140,6 +153,6 @@ public class ClientBuilder {
    */
   public Client build() {
     checkState();
-    return new Client(apiKey, apiSecret, clientId, host, privateKey);
+    return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);
   }
 }

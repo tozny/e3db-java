@@ -24,6 +24,7 @@ public class E3DBException extends Exception {
    * return an instance of the {@code E3DBException} class.
    * @param code HTTP status code.
    * @param message HTTP status message.
+   * @return An exception related to the code given.
    */
   public static E3DBException find(int code, String message) {
     switch(code) {
@@ -31,6 +32,8 @@ public class E3DBException extends Exception {
         return new E3DBUnauthorizedException(message);
       case 403:
         return new E3DBForbiddenException(message);
+      case 409:
+        return new E3DBConflictException(message);
       default:
         return new E3DBException("HTTP " + code + " " + message);
     }

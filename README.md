@@ -24,7 +24,7 @@ the linked document.
 Getting Started
 ====
 
-The E3DB SDK for Android and plain Java let's your application
+The E3DB SDK for Android and plain Java lets your application
 interact with our end-to-end encrypted storage solution. Whether
 used in an Android application or "plain" Java environment (such as a
 server), the SDK presents the same API for using E3DB.
@@ -41,7 +41,7 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [2.0](https://tozny.github.io/e3db-java/docs/2.0.0/) - The most recently released version of the client.
+* [2.0.1-SNAPSHOT](https://tozny.github.io/e3db-java/docs/2.0.1-SNAPSHOT/) - The most recently released version of the client.
 * [1.0.2](https://tozny.github.io/e3db-java/docs/1.0.2/) - An older, deprecated version of the client.
 
 Code examples for the most common operations can be found below.
@@ -57,7 +57,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-compile('com.tozny.e3db:e3db-client-android:2.0.0@aar') {
+compile('com.tozny.e3db:e3db-client-android:2.0.1-SNAPSHOT@aar') {
     transitive = true
 }
 ```
@@ -83,7 +83,7 @@ For use with Maven, declare the following repository and dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1-SNAPSHOT</version>
   </dependency>
 </dependencies>
 ```
@@ -349,6 +349,122 @@ Note that the `Void` type means that the `Result` passed to `handle`
 represents whether an error occurred or not, and nothing else. Sharing
 operations do not return any useful information on success.
 
+Local Encryption & Decryption
+====
+
+The E3DB SDK allows you to encrypt documents for local storage, which can
+be decrypted later, by the client that created the document or any client with which
+the document has been `shared`. Note that locally encrypted documents *cannot* be
+written directly to E3DB -- they must be decrypted locally and written using the `write` or
+`update` methods.
+
+Local encryption (and decryption) requires two steps:
+
+1. Create a 'writer key' (for encryption) or obtain a 'reader key' (for decryption).
+2. Call `encryptDocument` (for a new document) or `encryptExisting` (for an existing `Record` instance);
+for decryption, call `decryptExisting`.
+
+The 'writer key' and 'reader key' are both `EAKInfo` objects. An `EAKInfo` object holds an
+encrypted key that can be used by the intended client to encrypt or decrypt associated documents. A
+writer key can be created by calling `createWriterKey`; a 'reader key' can be obtained by calling
+`getReaderKey`. (Note that the client calling `getReaderKey` will only receive a key if the writer
+of those records has given access to the calling client through the `share` operation.)
+
+Here is an example of encrypting a document locally:
+
+```java
+Map<String, String> lyric = new HashMap<>();
+lyric.put("line", "Say I'm the only bee in your bonnet");
+lyric.put("song", "Birdhouse in Your Soul");
+lyric.put("artist", "They Might Be Giants");
+
+String recordType = "lyric";
+client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
+    @Override
+    public void handle(Result<EAKInfo> r) {
+        if(r.isError())
+            throw new Error(r.asError().other());
+
+        EAKInfo key = r.asValue();
+        Record encrypted = client1.encryptRecord(recordType, new RecordData(lyric), null, key);
+        // Write record to storage in suitable format.
+    }
+});
+```
+
+(Note that the `EAKInfo` instance is safe to store with the encrypted data, as it is also encrypted).
+The client can decrypt the given record as follows:
+
+```java
+Record encrypted = // read encrypted record from local storage
+EAKInfo writerKey = // read stored EAKInfo instance from local storage
+
+Record decrypted = client.decryptExisting(encrypted, writerKey);
+```
+
+Local Decryption of Shared Records
+====
+
+When two clients have a sharing relationship, the "reader" can locally decrypt any documents encrypted
+by the "writer," without using E3DB for storage.
+
+The 'writer' must first share records with a 'reader', using the `share` method. The 'reader' can
+then decrypt any locally encrypted records as follows:
+
+```java
+Record encrypted = // read encrypted record from local storage
+UUID writerID = // ID of writer that produced record
+String recordType = "lyric";
+
+reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<EAKInfo>() {
+    @Override
+    public void handle(Result<EAKInfo> r) {
+        if(r.isError())
+            throw new Error(r.asError().other());
+
+        EAKInfo readerKey = r.asValue();
+        Record decrypted = reader.decryptExisting(encrypted, readerKey);
+
+    }
+});
+```
+
+Document Signing & Verification
+====
+
+Every E3DB client created with this SDK is capable of signing documents and verifying the signature
+associated with a document. (Note that E3DB records are also stored with a signature attached, but
+verification of that is handled internally to the SDK.) By attaching signatures to documents, clients can
+be confident in:
+
+  * Document integrity - the document's contents have not been altered (because the signature will not match).
+  * Proof-of-authorship - The author of the document held the private signing key associated with the given public key
+    when the document was created.
+
+To create a signature, use the `sign` method:
+
+```java
+final String recordType = "lyric";
+final Map<String, String> plain = new HashMap<>();
+plain.put("frabjous", "Filibuster vigilantly");
+final Map<String, String> data = new HashMap<>();
+data.put("Jabberwock", "Not to put too fine a point on it");
+UUID writerId = client.clientId();
+UUID userId = client.clientId();
+
+Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
+SignedDocument<Record> signed = client.sign(local);
+```
+
+To verify a document, use the `verify` method. Here, we use the same `signed` instance as above. `clientConfig` holds
+the private & public keys for the client. (Note that, in general, `verify` requires the public signing key of the client
+that wrote the record):
+
+```java
+if(! client.verify(signed, clientConfig.publicSigningKey)) {
+  // Document failed verification, indicate an error as appropriate
+}
+```
 
 Exceptions
 ====

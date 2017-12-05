@@ -21,10 +21,9 @@ public class LocalRecord implements Record {
 
   private final Map<String, String> data;
   private final RecordMeta meta;
-  private final String signature;
 
   /**
-   * Creates a Record without an associated signature.
+   * Creates a representation of a Record suitable for signing or storing locally..
    *
    * @param data Data contained in the record.
    * @param meta Data about the record. Consider using {@link LocalMeta}.
@@ -32,19 +31,6 @@ public class LocalRecord implements Record {
   public LocalRecord(Map<String, String> data, RecordMeta meta) {
     this.data = data;
     this.meta = meta;
-    this.signature = null;
-  }
-
-  /**
-   * Creates a record with an associated signature.
-   *
-   * @param data Data contained in the record.
-   * @param meta Data about the record. Consider using {@link LocalMeta}.
-   */
-  public LocalRecord(Map<String, String> data, RecordMeta meta, String signature) {
-    this.data = data;
-    this.meta = meta;
-    this.signature = signature;
   }
 
   @Override

@@ -7,14 +7,22 @@ with powerful sharing and consent management features.
 This repo contains an SDK that can be used with both Android
 devices and plain Java programs.
 
-## LICENSE
+## TOZNY NON-COMMERCIAL LICENSE
 
-This Tozny non-commercial license permits use of the software only by
-government agencies, schools, universities, non-profit organizations
-or individuals on projects that do not receive external funding other
-than government research grants and contracts. Any other use requires
-a commercial license. For the full license, please see
-[LICENSE.md](LICENSE.md), in this source repository.
+Tozny dual licenses this product. For commercial use, please contact
+info@tozny.com. For non-commercial use, the contents of this file are
+subject to the TOZNY NON-COMMERCIAL LICENSE (the "License") which
+permits use of the software only by government agencies, schools,
+universities, non-profit organizations or individuals on projects that
+do not receive external funding other than government research grants
+and contracts.  Any other use requires a commercial license. You may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at https://tozny.com/legal/non-commercial-license.
+Software distributed under the License is distributed on an "AS IS"
+basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+License for the specific language governing rights and limitations under
+the License. Portions of the software are Copyright (c) TOZNY LLC, 2017.
+All rights reserved.
 
 ## Terms of Service
 
@@ -36,13 +44,14 @@ the `Client Registration Tokens` heading. This value will allow your
 app to self-register a new user with E3DB. Note that this value is not
 meant to be secret and is safe to embed in your app.
 
-## Documentation
+Documentation
+====
 
 Full API documentation for various versions can be found at the
 following locations:
 
-* [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/) - The most recently released version of the client.
-* [1.0.2](https://tozny.github.io/e3db-java/docs/1.0.2/) - An older, deprecated version of the client.
+* [2.1.0](https://tozny.github.io/e3db-java/docs/2.1.0/) - The most recently released version of the client.
+* Older versions: [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/).
 
 Code examples for the most common operations can be found below.
 

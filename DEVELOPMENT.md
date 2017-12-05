@@ -81,8 +81,8 @@ $ gradlew :publish:plain:publishToMavenLocal :publish:android:publishToMavenLoca
 
 The published artifacts have different names, but should share versions. They are:
 
-* Plain Java - 'com.tozny.e3db:e3db-client-plain:2.0.1-SNAPSHOT'
-* Android - 'com.tozny.e3db:e3db-client-android:2.0.1-SNAPSHOT@aar'
+* Plain Java - 'com.tozny.e3db:e3db-client-plain:2.1.0'
+* Android - 'com.tozny.e3db:e3db-client-android:2.1.0@aar'
 
 (The version is specified in the file `./publish/build.gradle`.)
 

@@ -762,6 +762,8 @@ public class  Client {
 
   /**
    * @deprecated Use {@link #generateKey()}  instead.
+   *
+   * @return A Base64URL-encoded string representing the new private key.
    */
   @Deprecated
   public static String newPrivateKey() {
@@ -883,7 +885,7 @@ public class  Client {
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
-   *                  private key. Consider using {@link #generateNewKeyPair()} to generate a private key.
+   *                  private key. Consider using {@link #generateKey()} to generate a private key.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */

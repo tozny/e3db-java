@@ -25,6 +25,6 @@ javadoc {
     source = files(["${project(":e3db").projectDir}/src/main/java",
                     "${project(":e3db-crypto-interface").projectDir}/src/main/java"])
     title = "E3DB API Client"
-    destinationDir = file("${rootDir}/docs/${project(":publish").ext.version}")
+    destinationDir = file("${rootDir}/docs/docs/${project(":publish").ext.version}")
     options.noQualifiers "java.lang", "java.util"
 }

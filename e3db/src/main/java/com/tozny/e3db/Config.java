@@ -24,7 +24,7 @@ import static com.tozny.e3db.Checks.*;
  * <p>Once a {@code Config} instance has been created, use the {@link ClientBuilder#fromConfig(Config)}
  * method to configure a {@code ClientBuilder} that can re-create the client.
  *
- * <p>The {@link #fromCredentials(ClientCredentials, String, String, String)} method can also be used create a {@code Config}
+ * <p>The {@code fromCredentials} method(s) can also be used create a {@code Config}
  * instance, if you do not want to use the built-in JSON document.</p>
  */
 public class Config {
@@ -96,7 +96,6 @@ public class Config {
    *
    * @param creds Username (API key), password (API secret), and client ID.
    * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
-   * @param publicSigningKey Ed25519 public key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
   public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey) {
@@ -119,7 +118,6 @@ public class Config {
    *
    * @param creds Username (API key), password (API secret), and client ID.
    * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
-   * @param publicSigningKey Ed25519 public key, as a Base64URL-encoded string.
    * @param privateSigningKey Ed25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */

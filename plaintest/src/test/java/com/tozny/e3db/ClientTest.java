@@ -979,34 +979,7 @@ public class ClientTest {
     final Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
 
-    Record local = new Record() {
-      @Override
-      public RecordMeta meta() {
-        return new LocalMeta(client.clientId(), client.clientId(), recordType, plain);
-      }
-
-      @Override
-      public Map<String, String> data() {
-        return data;
-      }
-
-      @Override
-      public String toSerialized() {
-        try {
-          Map<String, String> meta = new HashMap<>();
-          meta.put("writerId", this.meta().writerId().toString());
-          meta.put("userId", this.meta().userId().toString());
-          meta.put("type", this.meta().type());
-          meta.put("plain", mapper.writeValueAsString(this.meta().plain()));
-          Map<String, Object> doc = new HashMap<>();
-          doc.put("data", data);
-          doc.put("meta", meta);
-          return mapper.writeValueAsString(doc);
-        } catch (JsonProcessingException e) {
-          throw new RuntimeException(e);
-        }
-      }
-    };
+    Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
     SignedDocument<Record> sign = client.sign(local);
     assertNotNull("Signed document is null", sign);

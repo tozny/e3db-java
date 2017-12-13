@@ -25,4 +25,16 @@ public interface EAKInfo {
    * @return authorizerId.
    */
   UUID getAuthorizerId();
+
+  /**
+   * ID of the signer
+   * @return signerId.
+   */
+  UUID getSignerId();
+
+  /**
+   * Public key of the signer, as a Base64URL-encoded string.
+   * @return signerPublicKey.
+   */
+  String getSignerSigningKey();
 }

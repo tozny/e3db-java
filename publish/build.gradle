@@ -1,5 +1,5 @@
 ext {
-  version = "2.1.0"
+  version = "2.1.0-SNAPSHOT"
   groupId = "com.tozny.e3db"
   baseName = "e3db-client"
 }

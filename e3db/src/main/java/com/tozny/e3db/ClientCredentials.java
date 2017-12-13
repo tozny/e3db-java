@@ -39,6 +39,12 @@ public interface ClientCredentials {
   String publicKey();
 
   /**
+   * Public signing key for the client, as a Base64URL encoded string.
+   * @return publicSignKey.
+   */
+  String publicSignKey();
+
+  /**
    * Indicates if the client is enabled or not.
    * @return enabled.
    */

@@ -849,7 +849,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncryptDecrypt() throws IOException {
+  public void testEncryptDecrypt() throws IOException, E3DBException {
     CI clientInfo = getClient();
     final Client client = clientInfo.client;
     final String type = UUID.randomUUID().toString() + "-type";
@@ -893,7 +893,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncryptDecryptTwoClients() throws IOException {
+  public void testEncryptDecryptTwoClients() throws IOException, E3DBException {
     CI clientInfo1 = getClient();
     final Client client1 = clientInfo1.client;
     final String type = UUID.randomUUID().toString() + "-type";

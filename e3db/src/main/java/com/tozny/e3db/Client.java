@@ -477,12 +477,14 @@ public class  Client {
     }
 
     Map<String, String> results = decryptObject(accessKey, encryptedFields);
-    boolean verified = signature == null || Platform.crypto.verify(new Signature(signature),
-            new LocalRecord(results, meta).toSerialized().getBytes(StandardCharsets.UTF_8),
-            publicSigningKey);
+    if (signature != null && publicSigningKey != null) {
+      boolean verified = signature == null || Platform.crypto.verify(new Signature(signature),
+              new LocalRecord(results, meta).toSerialized().getBytes(StandardCharsets.UTF_8),
+              publicSigningKey);
 
-    if (!verified)
-      throw new E3DBVerificationException(meta);
+      if (!verified)
+        throw new E3DBVerificationException(meta);
+    }
 
     return new LocalRecord(results, meta);
   }
@@ -651,21 +653,14 @@ public class  Client {
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
-        byte[] signature = queryRecord.get("rec_sig") != null ?
-                decodeURL(queryRecord.get("rec_sig").asText()) :
-                null;
-        byte[] signerPublicKey = access_key.get("signer_signing_key") != null ?
-                decodeURL(access_key.get("signer_signing_key").get("ed25519").asText()) :
-                null;
-
         record = makeLocal(Platform.crypto.decryptBox(
                 CipherWithNonce.decode(access_key.get("eak").asText()),
                 decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
                 privateEncryptionKey),
                 queryRecord.get("meta"),
                 queryRecord.get("record_data"),
-                signature,
-                signerPublicKey
+                null,
+                null
         );
       }
       else {
@@ -1098,13 +1093,12 @@ public class  Client {
             uiError(handleResult, new E3DBVersionException(recordMeta.recordId(), recordMeta.version()));
           } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
-            byte[] signature = result.get("rec_sig") == null ? null : decodeURL(result.get("rec_sig").asText());
             uiValue(handleResult,
                     makeLocal(ownAK,
                             result.get("meta"),
                             result.get("data"),
-                            signature,
-                            publicSigningKey));
+                            null,
+                            null));
           }
           else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
@@ -1181,9 +1175,8 @@ public class  Client {
             return;
           }
 
-          byte[] signature = result.get("rec_sig") == null ? null : decodeURL(result.get("rec_sig").asText());
           uiValue(handleResult,
-                  makeLocal(eak.ak, meta, result.get("data"), signature, eak.eakInfo.getSignerSigningKey().getBytes()));
+                  makeLocal(eak.ak, meta, result.get("data"), null, null));
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }
@@ -1451,7 +1444,7 @@ public class  Client {
    * @return The deccrypted record.
    */
   public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
-    if (eakInfo.getSignerSigningKey().isEmpty()) {
+    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty()) {
       throw new E3DBException("EAKInfo has no signing key");
     }
 
@@ -1460,10 +1453,10 @@ public class  Client {
     try {
       Map<String, String> plainRecord = decryptObject(ak, record.data());
 
-      Record decrypted = new LocalRecord(plainRecord, record.meta(), record.signature());
+      Record decrypted = new LocalRecord(plainRecord, record.meta());
+      SignedDocument<Record> signed = new SD<Record>(decrypted, record.signature());
 
-      SignedDocument<Record> document = sign((Record) new LocalRecord(plainRecord, record.meta()));
-      if(!verify(document, eakInfo.getSignerSigningKey())) {
+      if(!verify(signed, eakInfo.getSignerSigningKey())) {
         throw new E3DBVerificationException(record.meta());
       }
 
@@ -1484,8 +1477,14 @@ public class  Client {
     checkNotNull(record, "record");
     checkNotNull(eakInfo, "eak");
 
+    String signature = record.signature();
+    if (signature == null && Client.this.privateSigningKey != null) {
+      SignedDocument<Record> document = sign(record);
+      signature = document.signature();
+    }
+
     byte[] ak = getCachedAccessKey(record, eakInfo);
-    return new LocalRecord(encryptObject(ak, record.data()), record.meta(), record.signature());
+    return new LocalRecord(encryptObject(ak, record.data()), record.meta(), signature);
   }
 
   /**

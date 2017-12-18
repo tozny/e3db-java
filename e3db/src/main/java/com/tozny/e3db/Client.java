@@ -1448,6 +1448,10 @@ public class  Client {
       throw new E3DBException("EAKInfo has no signing key");
     }
 
+    if (record.signature() == null) {
+      throw new E3DBVerificationException(record.meta());
+    }
+
     byte[] ak = getCachedAccessKey(record, eakInfo);
 
     try {

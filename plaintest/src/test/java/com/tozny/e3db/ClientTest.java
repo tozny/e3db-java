@@ -988,4 +988,85 @@ public class ClientTest {
     assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
   }
 
+  @Test
+  public void testEncryptSigning() throws IOException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String recordType = "lyric";
+    final Map<String, String> plain = new HashMap<>();
+    plain.put("frabjous", "Filibuster vigilantly");
+    final Map<String, String> data = new HashMap<>();
+    data.put("Jabberwock", "Not to put too fine a point on it");
+
+    final Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.createWriterKey(recordType, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+          @Override
+          public void handle(Result<EAKInfo> result) {
+            EAKInfo eak = result.asValue();
+            final Record encrypted = client.encryptExisting(local, eak);
+
+            assertNotNull(encrypted.signature());
+
+            SignedDocument<Record> signed = new SignedDocument<Record>() {
+              @Override
+              public String signature() {
+                return encrypted.signature();
+              }
+
+              @Override
+              public Record document() {
+                return local;
+              }
+            };
+
+            client.verify(signed, clientInfo1.clientConfig.publicSigningKey);
+          }
+        }));
+      }
+    });
+  }
+
+  @Test
+  public void testFailedEncryptSigning() throws IOException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String recordType = "signedLyric";
+    final Map<String, String> plain = new HashMap<>();
+    plain.put("frabjous", "Filibuster vigilantly");
+    final Map<String, String> data = new HashMap<>();
+    data.put("Jabberwock", "Not to put too fine a point on it");
+
+    final RecordMeta localMeta = new LocalMeta(client.clientId(), client.clientId(), recordType, plain);
+    final Record local = new LocalRecord(data, localMeta);
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.createWriterKey(recordType, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+          @Override
+          public void handle(Result<EAKInfo> result) {
+            if(result.isError())
+              throw new Error(result.asError().other());
+
+            EAKInfo eak = result.asValue();
+            Record encrypted = client.encryptExisting(local, eak);
+            Record unsigned = new LocalRecord(encrypted.data(), localMeta);
+
+            try {
+              client.decryptExisting(unsigned, eak);
+              fail();
+            } catch (E3DBVerificationException eve) {
+
+            } catch (E3DBException ex) {
+              fail();
+            }
+          }
+        }));
+      }
+    });
+  }
 }

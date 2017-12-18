@@ -121,6 +121,7 @@ public class  Client {
   private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
   private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
+  private final ConcurrentMap<UUID, String> signingKeyCache = new ConcurrentHashMap<>();
   private final String apiKey;
   private final String apiSecret;
   private final UUID clientId;
@@ -201,16 +202,18 @@ public class  Client {
     private final UUID clientId;
     private final String name;
     private final String publicKey;
+    private final String publicSignKey;
     private final URI host;
 
     private final boolean enabled;
 
-    public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, String host, boolean enabled) {
+    public CC(String apiKey, String apiSecret, UUID clientId, String name, String publicKey, String publicSignKey, String host, boolean enabled) {
       this.apiKey = apiKey;
       this.apiSecret = apiSecret;
       this.clientId = clientId;
       this.name = name;
       this.publicKey = publicKey;
+      this.publicSignKey = publicSignKey;
       this.host = URI.create(host);
       this.enabled = enabled;
     }
@@ -238,6 +241,11 @@ public class  Client {
     @Override
     public String publicKey() {
       return publicKey;
+    }
+
+    @Override
+    public String publicSignKey() {
+      return publicSignKey;
     }
 
     @Override
@@ -459,7 +467,7 @@ public class  Client {
     return new LocalRecord(new HashMap<String, String>(), getRecordMeta(rawMeta));
   }
 
-  private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields) throws ParseException, UnsupportedEncodingException {
+  private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
     RecordMeta meta = getRecordMeta(rawMeta);
     Map<String, String> encryptedFields = new HashMap<>();
     Iterator<String> keys = fields.fieldNames();
@@ -469,6 +477,15 @@ public class  Client {
     }
 
     Map<String, String> results = decryptObject(accessKey, encryptedFields);
+    if (signature != null && publicSigningKey != null) {
+      boolean verified = signature == null || Platform.crypto.verify(new Signature(signature),
+              new LocalRecord(results, meta).toSerialized().getBytes(StandardCharsets.UTF_8),
+              publicSigningKey);
+
+      if (!verified)
+        throw new E3DBVerificationException(meta);
+    }
+
     return new LocalRecord(results, meta);
   }
 
@@ -535,11 +552,15 @@ public class  Client {
     private final String key;
     private final String publicKey;
     private final UUID authorizerId;
+    private final UUID signerId;
+    private final String signerSigningKey;
 
-    public EAKImpl(String key, String publicKey, UUID authorizerId) {
+    public EAKImpl(String key, String publicKey, UUID authorizerId, UUID signerId, String signerSigningKey) {
       this.key = key;
       this.publicKey = publicKey;
       this.authorizerId = authorizerId;
+      this.signerId = signerId;
+      this.signerSigningKey = signerSigningKey;
     }
 
     @Override
@@ -555,6 +576,16 @@ public class  Client {
     @Override
     public UUID getAuthorizerId() {
       return authorizerId;
+    }
+
+    @Override
+    public UUID getSignerId() {
+      return signerId;
+    }
+
+    @Override
+    public String getSignerSigningKey() {
+      return signerSigningKey;
     }
   }
 
@@ -623,11 +654,13 @@ public class  Client {
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
         record = makeLocal(Platform.crypto.decryptBox(
-            CipherWithNonce.decode(access_key.get("eak").asText()),
-            decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
-          privateEncryptionKey),
-          queryRecord.get("meta"),
-          queryRecord.get("record_data")
+                CipherWithNonce.decode(access_key.get("eak").asText()),
+                decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
+                privateEncryptionKey),
+                queryRecord.get("meta"),
+                queryRecord.get("record_data"),
+                null,
+                null
         );
       }
       else {
@@ -677,7 +710,7 @@ public class  Client {
       // Write new AK
       ak = Platform.crypto.newSecretKey();
       try {
-        setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), ak);
+        setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), ak, this.clientId, this.publicSigningKey);
       }
       catch(E3DBConflictException ex) {
         ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
@@ -722,17 +755,25 @@ public class  Client {
         String publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
         UUID authorizerId = UUID.fromString(eakResponse.get("authorizer_id").asText());
 
+        JsonNode signer_signing_key = eakResponse.get("signer_signing_key");
+        UUID signerId = null;
+        String signerPublicKey = null;
+        if (signer_signing_key != null) {
+          signerId = UUID.fromString(eakResponse.get("signer_id").asText());
+          signerPublicKey = signer_signing_key.get("ed25519").asText();
+        }
+
         byte[] ak = Platform.crypto.decryptBox(CipherWithNonce.decode(eak),
           decodeURL(publicKey),
           this.privateEncryptionKey);
-        EAKEntry entry = new EAKEntry(ak, new EAKImpl(eak, publicKey, authorizerId));
+        EAKEntry entry = new EAKEntry(ak, new EAKImpl(eak, publicKey, authorizerId, signerId, signerPublicKey));
         eakCache.put(cacheEntry, entry);
         return entry;
       }
     }
   }
 
-  private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak) throws E3DBException, IOException {
+  private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak, UUID signerId, byte[] signerPublicKey) throws E3DBException, IOException {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
     String encryptedAk = Platform.crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
     eakCache.remove(cacheEntry);
@@ -746,7 +787,7 @@ public class  Client {
       throw E3DBException.find(response.code(), response.message());
     }
 
-    eakCache.put(cacheEntry, new EAKEntry(ak, new EAKImpl(encryptedAk, encodeURL(readerKey), this.clientId)));
+    eakCache.put(cacheEntry, new EAKEntry(ak, new EAKImpl(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
   }
 
   private byte[] getCachedAccessKey(Record record, EAKInfo eakInfo) {
@@ -860,7 +901,7 @@ public class  Client {
     final byte[] privateSigningKey = Platform.crypto.newPrivateSigningKey();
     final String publicSigningKey = encodeURL(Platform.crypto.getPublicSigningKey(privateSigningKey));
 
-    register(token, clientName, publicKey, host, new ResultHandler<ClientCredentials>() {
+    register(token, clientName, publicKey, publicSigningKey, host, new ResultHandler<ClientCredentials>() {
       @Override
       public void handle(Result<ClientCredentials> r) {
         if (r.isError()) {
@@ -889,10 +930,11 @@ public class  Client {
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */
-  public static void register(final String token, final String clientName, final String publicKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
+  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(publicKey, "publicKey");
+    checkNotEmpty(publicSignKey, "publicSignKey");
     checkNotEmpty(host, "host");
 
     final RegisterAPI registerClient = new Retrofit.Builder()
@@ -909,9 +951,13 @@ public class  Client {
           Map<String, String> publicKeyInfo = new HashMap<>();
           publicKeyInfo.put("curve25519", publicKey);
 
+          Map<String, String> publicSignKeyInfo = new HashMap<>();
+          publicSignKeyInfo.put("ed25519", publicSignKey);
+
           Map<String, Object> clientInfo = new HashMap<>();
           clientInfo.put("name", clientName);
           clientInfo.put("public_key", publicKeyInfo);
+          clientInfo.put("signing_key", publicSignKeyInfo);
 
           Map<String, Object> registerInfo = new HashMap<>();
           registerInfo.put("token", token);
@@ -928,8 +974,9 @@ public class  Client {
             final UUID clientId = UUID.fromString(creds.get("client_id").asText());
             final String name = creds.get("name").asText();
             final String publicKey = creds.get("public_key").get("curve25519").asText();
+            final String signingKey = creds.get("signing_key").get("ed25519").asText();
             final boolean enabled = creds.get("enabled").asBoolean();
-            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, host, enabled);
+            final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, publicSignKey, host, enabled);
             executeValue(uiExecutor, handleResult, clientCredentials);
           }
         } catch (final Throwable e) {
@@ -977,9 +1024,12 @@ public class  Client {
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-              makeLocal(ownAK,
-                result.get("meta"),
-                result.get("data")));
+                    makeLocal(
+                            ownAK,
+                            result.get("meta"),
+                            result.get("data"),
+                            null,
+                            Client.this.publicSigningKey));
           } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
@@ -1044,9 +1094,11 @@ public class  Client {
           } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-              makeLocal(ownAK,
-                result.get("meta"),
-                result.get("data")));
+                    makeLocal(ownAK,
+                            result.get("meta"),
+                            result.get("data"),
+                            null,
+                            null));
           }
           else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
@@ -1112,17 +1164,19 @@ public class  Client {
             return;
           }
 
-          final JsonNode result = mapper.readTree(response.body().string());
-          final JsonNode meta = result.get("meta");
-          final byte[] key = getAccessKey(UUID.fromString(meta.get("writer_id").asText()),
-            UUID.fromString(meta.get("user_id").asText()),
-            clientId, meta.get("type").asText());
-          if(key == null) {
+          JsonNode result = mapper.readTree(response.body().string());
+          JsonNode meta = result.get("meta");
+          EAKEntry eak = getEAK(UUID.fromString(meta.get("writer_id").asText()),
+                  UUID.fromString(meta.get("user_id").asText()),
+                  clientId, meta.get("type").asText());
+
+          if(eak == null) {
             uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
+            return;
           }
-          else {
-            uiValue(handleResult, makeLocal(key, meta, result.get("data")));
-          }
+
+          uiValue(handleResult,
+                  makeLocal(eak.ak, meta, result.get("data"), null, null));
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }
@@ -1189,7 +1243,7 @@ public class  Client {
               byte[] ak = getOwnAccessKey(type);
               JsonNode info = mapper.readTree(clientInfo.body().string());
               byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
-              setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak);
+              setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak, Client.this.clientId, Client.this.publicSigningKey);
             }
             catch(E3DBConflictException ex) {
               // no-op
@@ -1339,7 +1393,7 @@ public class  Client {
           byte[] ak = Platform.crypto.newSecretKey();
 
           try {
-            setAccessKey(Client.this.clientId, Client.this.clientId, Client.this.clientId, type, publicKey, ak);
+            setAccessKey(Client.this.clientId, Client.this.clientId, Client.this.clientId, type, publicKey, ak, Client.this.clientId, Client.this.publicSigningKey);
           } catch (E3DBConflictException e) {
             // no-op
           }
@@ -1389,11 +1443,27 @@ public class  Client {
    * @param eakInfo The key to use for encrypting.
    * @return The deccrypted record.
    */
-  public Record decryptExisting(Record record, EAKInfo eakInfo) {
+  public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
+    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty()) {
+      throw new E3DBException("EAKInfo has no signing key");
+    }
+
+    if (record.signature() == null) {
+      throw new E3DBVerificationException(record.meta());
+    }
+
     byte[] ak = getCachedAccessKey(record, eakInfo);
 
     try {
       Map<String, String> plainRecord = decryptObject(ak, record.data());
+
+      Record decrypted = new LocalRecord(plainRecord, record.meta());
+      SignedDocument<Record> signed = new SD<Record>(decrypted, record.signature());
+
+      if(!verify(signed, eakInfo.getSignerSigningKey())) {
+        throw new E3DBVerificationException(record.meta());
+      }
+
       return new LocalRecord(plainRecord, record.meta());
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
@@ -1411,8 +1481,14 @@ public class  Client {
     checkNotNull(record, "record");
     checkNotNull(eakInfo, "eak");
 
+    String signature = record.signature();
+    if (signature == null && Client.this.privateSigningKey != null) {
+      SignedDocument<Record> document = sign(record);
+      signature = document.signature();
+    }
+
     byte[] ak = getCachedAccessKey(record, eakInfo);
-    return new LocalRecord(encryptObject(ak, record.data()), record.meta());
+    return new LocalRecord(encryptObject(ak, record.data()), record.meta(), signature);
   }
 
   /**
@@ -1433,7 +1509,13 @@ public class  Client {
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
-    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain)), eakInfo);
+    String signature = null;
+    if (Client.this.privateSigningKey != null) {
+      SignedDocument<Record> document = sign((Record) new LocalRecord(data.getCleartext(), new LocalMeta(clientId, clientId, type.trim(), plain)));
+      signature = document.signature();
+    }
+
+    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain), signature), eakInfo);
   }
 
   /**

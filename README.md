@@ -58,7 +58,7 @@ Code examples for the most common operations can be found below.
 Using the SDK with Android
 ====
 
-The E3DB SDK targets Android API 19 and higher. To use the SDK in your
+The E3DB SDK targets Android API 16 and higher. To use the SDK in your
 app, add it as a dependency to your build. In Gradle, use:
 
 ```

@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -131,6 +131,8 @@ public class  Client {
   private final StorageAPI storageClient;
 
   private final ShareAPI shareClient;
+
+  private static final Charset UTF8 = Charset.forName("UTF-8");
 
   static {
     backgroundExecutor = new ThreadPoolExecutor(1,
@@ -479,7 +481,7 @@ public class  Client {
     Map<String, String> results = decryptObject(accessKey, encryptedFields);
     if (signature != null && publicSigningKey != null) {
       boolean verified = signature == null || Platform.crypto.verify(new Signature(signature),
-              new LocalRecord(results, meta).toSerialized().getBytes(StandardCharsets.UTF_8),
+              new LocalRecord(results, meta).toSerialized().getBytes(UTF8),
               publicSigningKey);
 
       if (!verified)
@@ -518,7 +520,7 @@ public class  Client {
 
     private TokenInterceptor(String apiKey, String apiSecret, URI host) {
       this.host = host;
-      this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(StandardCharsets.UTF_8)).base64()).toString();
+      this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(UTF8)).base64()).toString();
       authClient = new Retrofit.Builder()
         .baseUrl(host.resolve("/").toString())
         .build()
@@ -687,7 +689,7 @@ public class  Client {
       byte[] dk = Platform.crypto.newSecretKey();
 
       String encField = new StringBuilder(Platform.crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
-        .append(Platform.crypto.encryptSecretBox(entry.getValue().getBytes(StandardCharsets.UTF_8), dk).toMessage()).toString();
+        .append(Platform.crypto.encryptSecretBox(entry.getValue().getBytes(UTF8), dk).toMessage()).toString();
       encFields.put(entry.getKey(), encField);
     }
     return encFields;
@@ -698,7 +700,7 @@ public class  Client {
     for(Map.Entry<String,String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
       byte[] dk = Platform.crypto.decryptSecretBox(er.edk, accessKey);
-      String value = new String(Platform.crypto.decryptSecretBox(er.ef, dk), StandardCharsets.UTF_8);
+      String value = new String(Platform.crypto.decryptSecretBox(er.ef, dk), UTF8);
       decryptedFields.put(entry.getKey(), value);
     }
     return decryptedFields;
@@ -1533,7 +1535,7 @@ public class  Client {
 
     return new SD<T>(document, Base64.encodeURL(
       Platform.crypto.signature(
-        document.toSerialized().getBytes(StandardCharsets.UTF_8), this.privateSigningKey
+        document.toSerialized().getBytes(UTF8), this.privateSigningKey
       )
     ));
   }
@@ -1561,6 +1563,6 @@ public class  Client {
     checkNotNull(signature, "signature");
     checkNotNull(document, "document");
 
-    return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(StandardCharsets.UTF_8), Base64.decodeURL(publicSigningKey));
+    return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(UTF8), Base64.decodeURL(publicSigningKey));
   }
 }

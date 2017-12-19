@@ -4,8 +4,8 @@ apply plugin: 'maven-publish'
 android {
     compileSdkVersion 26
     defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 19
+        minSdkVersion 16
+        targetSdkVersion 16
     }
     sourceSets {
       main {

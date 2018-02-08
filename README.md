@@ -50,7 +50,7 @@ Documentation
 Full API documentation for various versions can be found at the
 following locations:
 
-* [2.1.0](https://tozny.github.io/e3db-java/docs/2.1.0/) - The most recently released version of the client.
+* [2.2.0](https://tozny.github.io/e3db-java/docs/2.2.0/) - The most recently released version of the client.
 * Older versions: [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/).
 
 Code examples for the most common operations can be found below.
@@ -66,7 +66,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-compile('com.tozny.e3db:e3db-client-android:2.0.0@aar') {
+compile('com.tozny.e3db:e3db-client-android:2.2.0@aar') {
     transitive = true
 }
 ```
@@ -92,7 +92,7 @@ For use with Maven, declare the following repository and dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>2.0.0</version>
+    <version>2.2.0</version>
   </dependency>
 </dependencies>
 ```

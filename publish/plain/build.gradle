@@ -22,6 +22,15 @@ publishing {
       version project(":publish").ext.version
     }
   }
+  repositories {
+    maven {
+      url "${System.getenv('REPO_URL')}"
+      credentials(AwsCredentials) {
+        accessKey "${System.getenv('AWS_KEY')}"
+        secretKey "${System.getenv('AWS_SECRET')}"
+      }
+    }
+  }
 }
   
 dependencies {

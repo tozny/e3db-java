@@ -8,4 +8,6 @@ include (':e3db',
         ':publish',
         ':publish:android',
         ':publish:plain',
-        ':plaintest' )
+        ':plaintest',
+        ':android-benchmark',
+        ':plain-benchmark')

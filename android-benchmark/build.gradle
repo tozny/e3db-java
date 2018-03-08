@@ -1,0 +1,27 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+android {
+    compileSdkVersion 26
+    defaultConfig {
+        applicationId "com.tozny.e3db.benchmark"
+        minSdkVersion 16
+        targetSdkVersion 26
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jre8:1.2.30"
+    androidTestCompile 'junit:junit:4.12'
+    androidTestCompile 'com.android.support.test:rules:0.4.1'
+    androidTestCompile 'com.android.support.test.espresso:espresso-core:2.2.1'
+    androidTestImplementation 'dk.ilios:spanner:0.6.0'
+    androidTestImplementation('com.tozny.e3db:e3db-client-android:3.0.0-SNAPSHOT@aar') {
+        transitive = true
+    }
+}

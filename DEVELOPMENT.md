@@ -99,3 +99,50 @@ Writing Java Programs
 Java programs requires the following dependency:
 
 * 'com.tozny.e3db:e3db-client-plain:2.0.1-SNAPSHOT'
+
+Benchmarking
+====
+
+The SDK can be benchmarked on Android devices and using plain Java (for desktop/server
+environments). Android benchmarks are in the `android-benchmarks` directory, while plain
+Java benchmarks are in the `plain-benchmarks` directory.
+
+Plain Java
+====
+
+Plain Java benchmarks are implemented using the Java Microbenchmark Harness (JMH) from the
+OpenJDK project. Maven must be used to build the JAR containing the benchmarks:
+
+```bash
+$ mvn clean install 
+```
+
+That command produces an executable jar, which can be used to run all the benchmarks:
+
+```bash
+$ java -jar target\benchmarks.jar -wi 1 -tu  ms -rf CSV -r 5 -bm avgt -f 1
+```
+
+(Pass the `-help` argument  for a complete list of arguments.)
+
+Android
+====
+
+Android benchmarks are implemented using the [Spanner project](https://github.com/cmelchior/spanner).
+
+Benchmarks are run like any other on-device Android unit test. From the root of this repository,
+with a device connected via USB, run the following:
+
+```bash
+$ ./gradlew :android-benchmark:connectedDeviceTest
+```
+
+Results are available via `logcat` output, using the tag `BenchmarkResults`. For example:
+
+```
+03-13 13:18:27.818 8335-8353/com.tozny.e3db.benchmark I/BenchmarkResults: com.tozny.e3db.benchmark.CryptoBenchmark1B#decrypt: min/median/mean/max/99% (ms): 1.792e+00/1.802e+00/1.804e+00/1.838e+00/1.838e+00
+03-13 13:19:18.292 8335-8353/com.tozny.e3db.benchmark I/BenchmarkResults: com.tozny.e3db.benchmark.CryptoBenchmark1B#encrypt: min/median/mean/max/99% (ms): 1.143e+00/1.148e+00/1.150e+00/1.157e+00/1.157e+00
+03-13 13:20:09.698 8335-8353/com.tozny.e3db.benchmark I/BenchmarkResults: com.tozny.e3db.benchmark.CryptoBenchmark1B#sign: min/median/mean/max/99% (ms): 8.154e-01/8.187e-01/8.192e-01/8.224e-01/8.224e-01
+```
+
+etc.

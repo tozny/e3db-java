@@ -217,4 +217,31 @@ public class Config {
       throw new RuntimeException(e);
     }
   }
+
+  /**
+   * TODO
+   * @param helper
+   * @param config
+   */
+  public static void saveConfigSecurely(ConfigStorageHelper helper, Config config) {
+    if (Platform.isAndroid()) {
+      helper.saveConfigSecurely(config.json());
+    } else {
+      throw new IllegalStateException("Method is only available for Android.");
+    }
+  }
+
+  /**
+   * TODO
+   * @param helper
+   * @return
+   * @throws IOException
+   */
+  public static Config loadConfigSecurely(ConfigStorageHelper helper) throws IOException {
+    if (Platform.isAndroid()) {
+      return Config.fromJson(helper.loadConfigSecurely());
+    } else {
+      throw new IllegalStateException("Method is only available for Android.");
+    }
+  }
 }

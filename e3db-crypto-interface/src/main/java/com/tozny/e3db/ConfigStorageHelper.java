@@ -14,7 +14,9 @@ package com.tozny.e3db;
 
 
 public interface ConfigStorageHelper {
-    void saveConfigSecurely(String config);
+    void saveConfigSecurely(String config) throws Exception;
 
-    String loadConfigSecurely();
+    String loadConfigSecurely() throws Exception;
+
+    void removeConfigSecurely() throws Exception;
 }

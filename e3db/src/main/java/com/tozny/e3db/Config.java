@@ -223,7 +223,7 @@ public class Config {
    * @param helper
    * @param config
    */
-  public static void saveConfigSecurely(ConfigStorageHelper helper, Config config) {
+  public static void saveConfigSecurely(ConfigStorageHelper helper, Config config) throws Exception {
     if (Platform.isAndroid()) {
       helper.saveConfigSecurely(config.json());
     } else {
@@ -237,9 +237,23 @@ public class Config {
    * @return
    * @throws IOException
    */
-  public static Config loadConfigSecurely(ConfigStorageHelper helper) throws IOException {
+  public static Config loadConfigSecurely(ConfigStorageHelper helper) throws Exception {
     if (Platform.isAndroid()) {
+      // TODO: Lilli, maybe return null if not there? Currently throwing exception...
       return Config.fromJson(helper.loadConfigSecurely());
+    } else {
+      throw new IllegalStateException("Method is only available for Android.");
+    }
+  }
+
+  /**
+   * TODO
+   * @param helper
+   * @param config
+   */
+  public static void removeConfigSecurely(ConfigStorageHelper helper) throws Exception {
+    if (Platform.isAndroid()) {
+      helper.removeConfigSecurely();
     } else {
       throw new IllegalStateException("Method is only available for Android.");
     }

@@ -3,25 +3,15 @@ package com.tozny.e3db.crypto;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Build;
-import android.security.KeyPairGeneratorSpec;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import com.tozny.e3db.ConfigStorageHelper;
 
-import javax.crypto.Cipher;
-import javax.crypto.CipherInputStream;
-import javax.crypto.CipherOutputStream;
-import javax.security.auth.x500.X500Principal;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.math.BigInteger;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
+import javax.crypto.*;
+import javax.crypto.spec.GCMParameterSpec;
+import java.io.*;
 import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.util.Calendar;
+import java.security.SecureRandom;
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -75,11 +65,14 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
         }
     }
 
-    private final static String SECURE_STRING_STORAGE_DIRECTORY = "com.tozny.e3db.crypto"; // TODO: Lilli, change path?
+    private final static String SECURE_STRING_STORAGE_DIRECTORY = "com.tozny.e3db.crypto";
+    private final static String KEYSTORE_ALIAS                  = "com.tozny.e3db.crypto";
+    private final static String IV_DIRECTORY = "ivs";
 
-    private static String getEncryptedDataFilePath(/*@NotNull*/ Context context, /*@NotNull*/ String alias) throws Exception {
+    private static String filesDirectory(/*@NotNull*/ Context context) throws Exception {
         String filesDirectory = context.getFilesDir().getAbsolutePath();
         File sssDirectory     = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY);
+        File ivDirectory      = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY);
 
         boolean success = true;
         if (!sssDirectory.exists()) {
@@ -90,16 +83,34 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             throw new Exception("Error creating secure string storage directory.");
         }
 
-        return filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + alias;
+        if (!ivDirectory.exists()) {
+            success = ivDirectory.mkdir();
+        }
+
+        if (!success) {
+            throw new Exception("Error creating secure string storage directory.");
+        }
+
+        return filesDirectory;
     }
 
-    private static void checkArgs(Context context, String alias, String string) throws Exception {
+    private static String getInitializationVectorFilePath(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+        return filesDirectory(context) +
+                File.separator + SECURE_STRING_STORAGE_DIRECTORY +
+                File.separator + IV_DIRECTORY + File.separator + fileName;
+    }
+
+    private static String getEncryptedDataFilePath(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+        return filesDirectory(context) + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + fileName;
+    }
+
+    private static void checkArgs(Context context, String fileName, String string) throws Exception {
         if (context == null) {
             throw new IllegalArgumentException("Method parameter 'context' cannot be null.");
         }
 
-        if (alias == null) {
-            throw new IllegalArgumentException("Method parameter 'alias' cannot be null.");
+        if (fileName == null) {
+            throw new IllegalArgumentException("Method parameter 'fileName' cannot be null.");
         }
 
         if (string == null) {
@@ -108,79 +119,105 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     }
 
     //@android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
-    private static void createKeyPairIfNeeded(/*@NotNull*/ Context context, /*@NotNull*/ String alias) throws Exception {
+    private static void createKeyPairIfNeeded() throws Exception {
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
-        if (!keyStore.containsAlias(alias)) {
+        if (!keyStore.containsAlias(KEYSTORE_ALIAS)) {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) { // TODO: Lilli, use annotation instead
-                KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
-                        .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP) // TODO: Lilli, use different keys and stuff for longer strings
+                KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(KEYSTORE_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                         .build();
 
-                KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA", "AndroidKeyStore");
-                generator.initialize(spec);
 
-                KeyPair keyPair = generator.generateKeyPair();
+                KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+                keyGenerator.init(spec);
 
+                SecretKey key = keyGenerator.generateKey();
             }
         }
     }
 
+    private static byte[] getInitializationVector(Context context, String fileName) throws Exception {
+        byte[] bytes = new byte[12];
+
+        if (!new File(getInitializationVectorFilePath(context, fileName)).exists()) {
+
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(bytes);
+
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getInitializationVectorFilePath(context, fileName)));
+            bos.write(bytes);
+            bos.flush();
+            bos.close();
+
+        } else {
+            FileInputStream inputStream = new FileInputStream(getInitializationVectorFilePath(context, fileName));
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            int read = 0;
+            while ((read = inputStream.read(bytes, 0, bytes.length)) != -1) {
+                baos.write(bytes, 0, read);
+            }
+            baos.flush();
+        }
+
+        return bytes;
+    }
+
     /**
-     * Deletes the encrypted string from the file system and removes the encryption key from the keystore.
+     * Deletes the encrypted string from the file system.
      * @param context The application context.
-     * @param alias The alias under which the key is stored and the filename under which the encrypted string is stored.
-     *              Try and make this string unique so as to not step on other files/keys in your app's file system/keystore.
+     * @param fileName The fileName under which the the encrypted string is stored.
      * @return `true` if deletion is successful, `false` if deletion failed or if the key/file does not exist.
      * @throws Exception
      */
-    public static boolean deleteStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String alias) throws Exception {
-        checkArgs(context, alias, "");
+    public static boolean deleteStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+        checkArgs(context, fileName, "");
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
-        if (!keyStore.containsAlias(alias) || !new File(getEncryptedDataFilePath(context, alias)).exists()) {
+        if (!keyStore.containsAlias(KEYSTORE_ALIAS) || !new File(getEncryptedDataFilePath(context, fileName)).exists()) {
             return false;
         }
 
-        keyStore.deleteEntry(alias);
+        // TODO: Also check and delete IV file
 
-        File file = new File(getEncryptedDataFilePath(context, alias));
+        //keyStore.deleteEntry(fileName);
+
+        File file = new File(getEncryptedDataFilePath(context, fileName));
         return file.delete();
     }
-
-    // TODO: Doesn't work w RSA. Can pre-23 do AES, though? https://stackoverflow.com/a/10007285/955856
 
     /**
      * Generates a keypair, and uses it to encrypt the string. Saves the encrypted string to the file system.
      * @param context The application context.
-     * @param alias The alias under which the key is stored and the filename under which the encrypted string is stored.
-     *              Try and make this string unique so as to not step on other files/keys in your app's file system/keystore.
-     * @param string The string to be encrypted. Because library supports pre-API-23, encryption keys use RSA, which limits
-     *               the size of the string to, like, 245 characters or something. Long strings won't work.
+     * @param fileName The fileName under which the encrypted string is stored.
+     * @param string The string to be encrypted.
      * @throws Exception
      */
-    public static void saveStringToSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String alias, /*@NotNull*/ String string) throws Exception {
-        checkArgs(context, alias, string);
+    @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
+    public static void saveStringToSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*@NotNull*/ String string) throws Exception {
+        checkArgs(context, fileName, string);
 
-        createKeyPairIfNeeded(context, alias);
+        createKeyPairIfNeeded();
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
-        KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(alias, null);
-        RSAPublicKey publicKey = (RSAPublicKey) privateKeyEntry.getCertificate().getPublicKey();
+        SecretKey key = (SecretKey) keyStore.getKey(KEYSTORE_ALIAS, null);
+        GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName)); // Use SecureRandom to get 12 random bytes
 
-        Cipher input = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-        input.init(Cipher.ENCRYPT_MODE, publicKey);
+        Cipher input = Cipher.getInstance("AES/GCM/NoPadding");
+        input.init(Cipher.ENCRYPT_MODE, key, params);
 
         CipherOutputStream cipherOutputStream =
-                new CipherOutputStream(new FileOutputStream(getEncryptedDataFilePath(context, alias)), input);
+                new CipherOutputStream(new FileOutputStream(getEncryptedDataFilePath(context, fileName)), input);
 
         cipherOutputStream.write(string.getBytes("UTF-8"));
         cipherOutputStream.close();
@@ -189,36 +226,29 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     /**
      * Loads and decrypts the encrypted string from the file system.
      * @param context The application context.
-     * @param alias The alias under which the key is stored and the filename under which the encrypted string is stored.
-     *              Try and make this string unique so as to not step on other files/keys in your app's file system/keystore.
+     * @param fileName The fileName under which the encrypted string is stored.
      * @return The decrypted string. If the key/file doesn't exist, returns `null`.
      * @throws Exception
      */
-    public static String loadStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String alias) throws Exception {
-        checkArgs(context, alias, "");
+    @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
+    public static String loadStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+        checkArgs(context, fileName, "");
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
-        if (!keyStore.containsAlias(alias) || !new File(getEncryptedDataFilePath(context, alias)).exists()) {
+        if (!keyStore.containsAlias(KEYSTORE_ALIAS) || !new File(getEncryptedDataFilePath(context, fileName)).exists()) {
             return null;
         }
 
-        KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(alias, null);
-        PrivateKey privateKey = privateKeyEntry.getPrivateKey();
+        SecretKey key = (SecretKey) keyStore.getKey(KEYSTORE_ALIAS, null);
+        GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName));
 
-        @SuppressLint("GetInstance") /* https://stackoverflow.com/questions/36016288/cipher-with-ecb-mode-should-not-be-used */
-                Cipher output = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-        output.init(Cipher.DECRYPT_MODE, privateKey);
-
-        //KeyStore.PrivateKeyEntry privateKeyEntry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(alias, null);
-        //RSAPrivateKey privateKey = (RSAPrivateKey) privateKeyEntry.getPrivateKey();
-        //
-        //Cipher output = Cipher.getInstance("RSA/ECB/PKCS1Padding", "AndroidOpenSSL");
-        //output.init(Cipher.DECRYPT_MODE, privateKey);
+        Cipher output = Cipher.getInstance("AES/GCM/NoPadding");
+        output.init(Cipher.DECRYPT_MODE, key, params);
 
         CipherInputStream cipherInputStream =
-                new CipherInputStream(new FileInputStream(getEncryptedDataFilePath(context, alias)), output);
+                new CipherInputStream(new FileInputStream(getEncryptedDataFilePath(context, fileName)), output);
 
         StringBuilder stringBuffer = new StringBuilder();
         int nextByte;

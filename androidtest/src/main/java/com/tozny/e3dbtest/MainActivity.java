@@ -47,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
         label = findViewById(R.id.hello_label);
 
         try {
+
             AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config");
+            //Config.removeConfigSecurely(configStorageHelper);
             Config config = Config.loadConfigSecurely(configStorageHelper);
 
             client = new ClientBuilder()

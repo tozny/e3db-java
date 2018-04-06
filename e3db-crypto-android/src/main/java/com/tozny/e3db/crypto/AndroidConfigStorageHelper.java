@@ -9,6 +9,7 @@ import com.tozny.e3db.ConfigStorageHelper;
 
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -72,7 +73,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private static String filesDirectory(/*@NotNull*/ Context context) throws Exception {
         String filesDirectory = context.getFilesDir().getAbsolutePath();
         File sssDirectory     = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY);
-        File ivDirectory      = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY);
+        File ivDirectory      = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + IV_DIRECTORY);
 
         boolean success = true;
         if (!sssDirectory.exists()) {
@@ -109,7 +110,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             throw new IllegalArgumentException("Method parameter 'context' cannot be null.");
         }
 
-        if (fileName == null) {
+        if (fileName == null) { // TODO: Lilli, verify valid filename
             throw new IllegalArgumentException("Method parameter 'fileName' cannot be null.");
         }
 
@@ -131,6 +132,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                         KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                         .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                        //.setRandomizedEncryptionRequired(false)
                         .build();
 
 
@@ -142,29 +144,43 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
         }
     }
 
-    private static byte[] getInitializationVector(Context context, String fileName) throws Exception {
-        byte[] bytes = new byte[12];
+    private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws Exception {
+        FileOutputStream fos = new FileOutputStream(new File(getInitializationVectorFilePath(context, fileName)));
+        fos.write(bytes);
+        fos.flush();
+        fos.close();
+    }
 
-        if (!new File(getInitializationVectorFilePath(context, fileName)).exists()) {
+    private static byte[] loadInitializationVector(Context context, String fileName) throws Exception {
+//        byte[] bytes = new byte[12];
 
-            SecureRandom random = new SecureRandom();
-            random.nextBytes(bytes);
+//        if (!new File(getInitializationVectorFilePath(context, fileName)).exists()) {
+//
+//            SecureRandom random = new SecureRandom();
+//            random.nextBytes(bytes);
+//
+//            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getInitializationVectorFilePath(context, fileName)));
+//            bos.write(bytes);
+//            bos.flush();
+//            bos.close();
+//
+//        } else {
+//            FileInputStream inputStream = new FileInputStream(getInitializationVectorFilePath(context, fileName));
+//
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//            int read = 0;
+//            while ((read = inputStream.read(bytes, 0, bytes.length)) != -1) {
+//                baos.write(bytes, 0, read);
+//            }
+//            baos.flush();
+//        }
 
-            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(getInitializationVectorFilePath(context, fileName)));
-            bos.write(bytes);
-            bos.flush();
-            bos.close();
-
-        } else {
-            FileInputStream inputStream = new FileInputStream(getInitializationVectorFilePath(context, fileName));
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            int read = 0;
-            while ((read = inputStream.read(bytes, 0, bytes.length)) != -1) {
-                baos.write(bytes, 0, read);
-            }
-            baos.flush();
-        }
+        File file = new File(getInitializationVectorFilePath(context, fileName));
+        int fileSize = (int)file.length();
+        byte[] bytes = new byte[fileSize];
+        FileInputStream fis = new FileInputStream(file);//context.openFileInput(getInitializationVectorFilePath(context, fileName));
+        fis.read(bytes, 0, fileSize);
+        fis.close();
 
         return bytes;
     }
@@ -188,7 +204,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
         // TODO: Also check and delete IV file
 
-        //keyStore.deleteEntry(fileName);
+        //keyStore.deleteEntry(KEYSTORE_ALIAS);
 
         File file = new File(getEncryptedDataFilePath(context, fileName));
         return file.delete();
@@ -211,10 +227,14 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
         keyStore.load(null);
 
         SecretKey key = (SecretKey) keyStore.getKey(KEYSTORE_ALIAS, null);
-        GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName)); // Use SecureRandom to get 12 random bytes
+        //GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName)); // Use SecureRandom to get 12 random bytes
 
         Cipher input = Cipher.getInstance("AES/GCM/NoPadding");
-        input.init(Cipher.ENCRYPT_MODE, key, params);
+        input.init(Cipher.ENCRYPT_MODE, key);//, params);
+
+        IvParameterSpec ivParams = input.getParameters().getParameterSpec(IvParameterSpec.class);
+
+        saveInitializationVector(context, fileName, ivParams.getIV());
 
         CipherOutputStream cipherOutputStream =
                 new CipherOutputStream(new FileOutputStream(getEncryptedDataFilePath(context, fileName)), input);
@@ -237,15 +257,17 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 
-        if (!keyStore.containsAlias(KEYSTORE_ALIAS) || !new File(getEncryptedDataFilePath(context, fileName)).exists()) {
+        if (!keyStore.containsAlias(KEYSTORE_ALIAS) || !new File(getEncryptedDataFilePath(context, fileName)).exists()) { // TODO: Lilli, also check for IV file
             return null;
         }
 
         SecretKey key = (SecretKey) keyStore.getKey(KEYSTORE_ALIAS, null);
-        GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName));
+        //GCMParameterSpec params = new GCMParameterSpec(128, getInitializationVector(context, fileName));
+
+        IvParameterSpec ivParams = new IvParameterSpec(loadInitializationVector(context, fileName));
 
         Cipher output = Cipher.getInstance("AES/GCM/NoPadding");
-        output.init(Cipher.DECRYPT_MODE, key, params);
+        output.init(Cipher.DECRYPT_MODE, key, ivParams);//params);
 
         CipherInputStream cipherInputStream =
                 new CipherInputStream(new FileInputStream(getEncryptedDataFilePath(context, fileName)), output);

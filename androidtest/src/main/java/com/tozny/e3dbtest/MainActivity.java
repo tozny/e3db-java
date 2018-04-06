@@ -15,7 +15,9 @@ import java.util.UUID;
 
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import com.tozny.e3db.*;
+import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -23,7 +25,10 @@ public class MainActivity extends AppCompatActivity {
     private static String clientName = "LilliTest-";
     private static String host = "https://api.e3db.com";
 
-    private static String config = null;
+    private static Client client = null;
+
+    private Button button = null;
+    private TextView label = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,61 +43,99 @@ public class MainActivity extends AppCompatActivity {
 
         // TODO: Add method to e3db to securely save credentials on app's behalf
 
-        final Button button = findViewById(R.id.register_client_button);
+        button = findViewById(R.id.register_client_button);
+        label = findViewById(R.id.hello_label);
+
+        try {
+
+            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config");
+            //Config.removeConfigSecurely(configStorageHelper);
+            Config config = Config.loadConfigSecurely(configStorageHelper);
+
+            client = new ClientBuilder()
+                    .fromConfig(config)
+                    .build();
+
+            button.setText("Send data");
+            label.setText("Config loaded."); // TODO: Lilli, fedex andrea grimshaw
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            label.setText(e.getLocalizedMessage());
+        }
+
         button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
 
-                if (MainActivity.config == null) {
+                if (MainActivity.client == null) {
 
                     Client.register(token, clientName + UUID.randomUUID().toString(), host, new ResultHandler<Config>() {
                         @Override
                         public void handle(Result<Config> r) {
                             if (!r.isError()) {
-                                Log.d("BLAH", r.asValue().json());
+                                try {
+                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config");
+                                    Config.saveConfigSecurely(configStorageHelper, r.asValue());
 
-                                config = r.asValue().json();
+                                    client = new ClientBuilder()
+                                            .fromConfig(r.asValue())
+                                            .build();
 
-                                // write credentials to secure storage
-                                //writeFile("credentials.json", r.asValue().json());
+                                    button.setText("Send data");
+                                    label.setText("Client registered and config saved");
+
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    label.setText(e.getLocalizedMessage());
+                                }
+
                             } else {
-                                // throw to indicate registration error
-                                throw new RuntimeException(r.asError().other());
+                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
+
                             }
                         }
                     });
 
-                    button.setText("Send data");
                 } else {
-                    try {
-                        Client client = new ClientBuilder()
-                                .fromConfig(Config.fromJson(MainActivity.config))
-                                .build();
+                    Map<String, String> lyric = new HashMap<>();
+                    lyric.put("line", "Say I'm the only bee in your bonnet");
+                    lyric.put("song", "Birdhouse in Your Soul");
+                    lyric.put("artist", "They Might Be Giants");
 
-                        Map<String, String> lyric = new HashMap<>();
-                        lyric.put("line", "Say I'm the only bee in your bonnet");
-                        lyric.put("song", "Birdhouse in Your Soul");
-                        lyric.put("artist", "They Might Be Giants");
+                    String recordType = "lyric";
 
-                        String recordType = "lyric";
+                    client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>() {
+                        @Override
+                        public void handle(Result<Record> r) {
+                            if (!r.isError()) {
+                                label.setText("Record updated...");
 
-                        client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>() {
-                            @Override
-                            public void handle(Result<Record> r) {
-                                if (!r.isError()) {
+                            } else {
+                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
 
-                                    //Record record = r.asValue();
-
-                                    Log.d("BLAH BLAH", r.asValue().toString());
-
-                                } else {
-                                    // an error occurred
-                                    throw new RuntimeException(r.asError().other());
-                                }
                             }
-                        });
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                        }
+                    });
+
+                    QueryParams params = new QueryParamsBuilder()
+                            .setTypes("lyric")
+                            .setIncludeData(true)
+                            .setCount(100)
+                            .build();
+
+                    client.query(params, new ResultHandler<QueryResponse>() {
+                        @Override
+                        public void handle(Result<QueryResponse> r) {
+                            if (!r.isError()) {
+                                label.setText("Records currently set: " + r.asValue().records().size());
+
+                            } else {
+                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
+
+                            }
+                        }
+                    });
                 }
             }
         });

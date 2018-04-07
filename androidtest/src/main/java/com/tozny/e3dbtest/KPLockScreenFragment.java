@@ -7,6 +7,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.crypto.KeyStoreManagerInterface;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -28,4 +30,18 @@ public class KPLockScreenFragment extends BaseFragment {
         return super.onCreateView(inflater, container, savedInstanceState);
     }
 
+    @Override
+    public String configName() {
+        return "config-lock-screen";
+    }
+
+    @Override
+    public KeyProtection keyProtection() {
+        return KeyProtection.withLockScreen();
+    }
+
+    @Override
+    public KeyStoreManagerInterface.KeyAuthenticationHandler keyAuthenticationHandler() {
+        return null;
+    }
 }

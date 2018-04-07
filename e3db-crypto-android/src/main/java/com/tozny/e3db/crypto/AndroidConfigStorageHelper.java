@@ -19,16 +19,16 @@ import com.tozny.e3db.ConfigStorageHelper;
 
 public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private Context context;
-
     private String identifier;
-
     private KeyProtection protection;
+    private KeyStoreManagerInterface.KeyAuthenticationHandler handler;
 
-    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection) {
+    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyStoreManagerInterface.KeyAuthenticationHandler handler) {
         // TODO: Lilli, null checks
         this.context = context;
         this.identifier = identifier;
         this.protection = protection;
+        this.handler    = handler;
     }
 
     @Override

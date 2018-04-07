@@ -240,7 +240,11 @@ public class Config {
   public static Config loadConfigSecurely(ConfigStorageHelper helper) throws Exception {
     if (Platform.isAndroid()) {
       // TODO: Lilli, maybe return null if not there? Currently throwing exception...
-      return Config.fromJson(helper.loadConfigSecurely());
+      String configString = helper.loadConfigSecurely();
+
+      if (configString == null) return null;
+
+      return Config.fromJson(configString);
     } else {
       throw new IllegalStateException("Method is only available for Android.");
     }

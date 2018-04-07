@@ -6,6 +6,8 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.crypto.KeyStoreManagerInterface;
 
 
 /**
@@ -24,5 +26,20 @@ public class KPNoneFragment extends BaseFragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         return super.onCreateView(inflater, container, savedInstanceState);
+    }
+
+    @Override
+    public String configName() {
+        return "config-none";
+    }
+
+    @Override
+    public KeyProtection keyProtection() {
+        return KeyProtection.withNone();
+    }
+
+    @Override
+    public KeyStoreManagerInterface.KeyAuthenticationHandler keyAuthenticationHandler() {
+        return null;
     }
 }

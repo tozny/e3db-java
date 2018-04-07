@@ -7,6 +7,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.crypto.KeyStoreManagerInterface;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -28,4 +30,18 @@ public class KPFingerPrintFragment extends BaseFragment {
         return super.onCreateView(inflater, container, savedInstanceState);
     }
 
+    @Override
+    public String configName() {
+        return "config-fingerprint";
+    }
+
+    @Override
+    public KeyProtection keyProtection() {
+        return KeyProtection.withFingerprint();
+    }
+
+    @Override
+    public KeyStoreManagerInterface.KeyAuthenticationHandler keyAuthenticationHandler() {
+        return null;
+    }
 }

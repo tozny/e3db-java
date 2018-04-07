@@ -73,7 +73,7 @@ public class FSKSWrapper {
     }
 
     private static KeyStore getFSKS(Context context) throws Exception {
-        if(fsKS == null) {
+        if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
                 if(result == null) {
@@ -112,7 +112,7 @@ public class FSKSWrapper {
     }
 
     private static void saveFSKS(Context context) throws Exception {
-        if(fsKS != null) {
+        if (fsKS != null) {
             synchronized(keyStoreWriteLock) {
                 try {
                     OutputStream output = context.openFileOutput(MOBILE_AUTH_DB_KSTORE, Context.MODE_PRIVATE);
@@ -151,7 +151,6 @@ public class FSKSWrapper {
     private static void createKeyPairIfNeeded(Context context, String alias, KeyProtection protection) throws Exception {
 
         KeyStore keyStore = getFSKS(context);
-        keyStore.load(null);
 
         if (!keyStore.containsAlias(alias)) {
 
@@ -160,6 +159,8 @@ public class FSKSWrapper {
             SecureRandom random = new SecureRandom();
             keyGen.init(random);
             SecretKey secretKey = keyGen.generateKey();
+
+            //keyStore.setKeyEntry(alias, secretKey, null, null);
 
             keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection));
 
@@ -173,8 +174,16 @@ public class FSKSWrapper {
         createKeyPairIfNeeded(context, alias, protection);
 
         KeyStore keyStore = getFSKS(context);
-        keyStore.load(null);
 
         return (SecretKey) keyStore.getKey(alias, null); // TODO: Lilli, w password...
+    }
+
+    static void removeSecretKey(Context context, String alias) throws Exception {
+        KeyStore keyStore = getFSKS(context);
+
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias);
+            saveFSKS(context);
+        }
     }
 }

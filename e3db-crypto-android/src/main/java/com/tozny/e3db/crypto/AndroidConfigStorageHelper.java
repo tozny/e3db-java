@@ -1,7 +1,6 @@
 package com.tozny.e3db.crypto;
 
 import android.content.Context;
-import android.os.Build;
 import com.tozny.e3db.ConfigStorageHelper;
 
 
@@ -45,6 +44,8 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     @Override
     public void removeConfigSecurely() throws Exception {
         // TODO: Lilli, maybe delete the keys too?
+        KeyStoreManager.removeSecretKey(context, identifier);
+
         SecureStringManager.deleteStringFromSecureStorage(context, identifier);
     }
 }

@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 
-            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone());
+            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone(), null);
             //Config.removeConfigSecurely(configStorageHelper);
             Config config = Config.loadConfigSecurely(configStorageHelper);
 
@@ -76,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                         public void handle(Result<Config> r) {
                             if (!r.isError()) {
                                 try {
-                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone());
+                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone(), null);
                                     Config.saveConfigSecurely(configStorageHelper, r.asValue());
 
                                     client = new ClientBuilder()

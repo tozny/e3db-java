@@ -32,5 +32,9 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.0'
     compileOnly project(':e3db-crypto-interface')
     compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
+    compile 'com.android.support:support-annotations:27.1.0'
+    implementation 'com.android.support:support-compat:26.0.1'
+    implementation 'com.android.support:support-core-utils:26.0.1'
+
 }
 

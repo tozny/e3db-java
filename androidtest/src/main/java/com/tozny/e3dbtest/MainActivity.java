@@ -18,6 +18,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import com.tozny.e3db.*;
 import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
+import com.tozny.e3db.crypto.KeyProtection;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -48,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 
-            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config");
+            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone());
             //Config.removeConfigSecurely(configStorageHelper);
             Config config = Config.loadConfigSecurely(configStorageHelper);
 
@@ -57,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
                     .build();
 
             button.setText("Send data");
-            label.setText("Config loaded."); // TODO: Lilli, fedex andrea grimshaw
+            label.setText("Config loaded.");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -75,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
                         public void handle(Result<Config> r) {
                             if (!r.isError()) {
                                 try {
-                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config");
+                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone());
                                     Config.saveConfigSecurely(configStorageHelper, r.asValue());
 
                                     client = new ClientBuilder()

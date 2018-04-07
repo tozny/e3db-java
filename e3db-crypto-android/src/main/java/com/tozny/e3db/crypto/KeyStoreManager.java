@@ -22,13 +22,13 @@ public class KeyStoreManager {
     private final static String KEYSTORE_ALIAS = "com.tozny.e3db.crypto-";
 
     private static String getKeystoreAlias(String identifier, KeyProtection protection) {
-        switch (protection.protectionType()) {
-            // TODO: Lilli, do we want to do this? Make deleting keys harder? Simply just use identifier and not PT?
-            case NONE:        return KEYSTORE_ALIAS + identifier + "-NONE";
-            case FINGERPRINT: return KEYSTORE_ALIAS + identifier + "-FINGERPRINT";
-            case LOCK_SCREEN: return KEYSTORE_ALIAS + identifier + "-LOCK_SCREEN";
-            case PASSWORD:    return KEYSTORE_ALIAS + identifier + "-PASSWORD";
-        }
+//        switch (protection.protectionType()) {
+//            // TODO: Lilli, do we want to do this? Make deleting keys harder? Simply just use identifier and not PT?
+//            case NONE:        return KEYSTORE_ALIAS + identifier + "-NONE";
+//            case FINGERPRINT: return KEYSTORE_ALIAS + identifier + "-FINGERPRINT";
+//            case LOCK_SCREEN: return KEYSTORE_ALIAS + identifier + "-LOCK_SCREEN";
+//            case PASSWORD:    return KEYSTORE_ALIAS + identifier + "-PASSWORD"; // TODO: Lilli, if you uncomment this, the delete method will need to be changed
+//        }
 
         return KEYSTORE_ALIAS + identifier;
     }
@@ -37,10 +37,10 @@ public class KeyStoreManager {
 
         switch(protection.protectionType()) {
             case NONE:
-                if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+                //if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
                     return FSKSWrapper.getSecretKey(context, getKeystoreAlias(identifier, protection), protection);
-                else
-                    return AKSWrapper.getSecretKey(getKeystoreAlias(identifier, protection), protection);
+                //else
+                //    return AKSWrapper.getSecretKey(getKeystoreAlias(identifier, protection), protection);
 
             case FINGERPRINT:
             case LOCK_SCREEN:
@@ -55,6 +55,11 @@ public class KeyStoreManager {
             default:
                 throw new IllegalStateException("Unhandled key protection: " + protection.protectionType().toString());
         }
+    }
+
+    static void removeSecretKey(Context context, String identifier) throws Exception {
+        FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
+        AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
     }
 
     // TODO: Lilli, combine this method w above...

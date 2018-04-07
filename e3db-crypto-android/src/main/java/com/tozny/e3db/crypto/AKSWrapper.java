@@ -13,6 +13,7 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
+import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -75,5 +76,13 @@ public class AKSWrapper {
         keyStore.load(null);
 
         return (SecretKey) keyStore.getKey(alias, null);
+    }
+
+    static void removeSecretKey(String alias) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+        keyStore.load(null);
+
+        if (keyStore.containsAlias(alias))
+            keyStore.deleteEntry(alias);
     }
 }

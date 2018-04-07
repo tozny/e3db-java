@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">E3DBTest</string>
+    <string name="title_activity_main2">Main2Activity</string>
+    <string name="title_kp_none">None</string>
+    <string name="title_kp_password">Password</string>
+    <string name="title_kp_lock_screen">Lock Screen</string>
+    <string name="title_kp_fingerprint">Fingerprint</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="title_activity_main4">Main4Activity</string>
 </resources>

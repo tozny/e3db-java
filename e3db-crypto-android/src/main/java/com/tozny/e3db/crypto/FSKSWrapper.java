@@ -46,13 +46,6 @@ public class FSKSWrapper {
     private static final Object keyStoreCreateLock = new Object();
     private final static Object keyStoreWriteLock = new Object();
 
-    private static void checkMinSDK(KeyProtection protection) {
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            if(protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
-                throw new IllegalArgumentException("info: SDK Version must be at least " + Build.VERSION_CODES.M);
-        }
-    }
-
     private static boolean fileExists(Context context, String privateFile) {
         File filesDir = context.getFilesDir();
         return new File(filesDir, privateFile).exists();
@@ -169,8 +162,6 @@ public class FSKSWrapper {
     }
 
     static SecretKey getSecretKey(Context context, String alias, KeyProtection protection) throws Exception {
-        checkMinSDK(protection);
-
         createKeyPairIfNeeded(context, alias, protection);
 
         KeyStore keyStore = getFSKS(context);
@@ -185,5 +176,9 @@ public class FSKSWrapper {
             keyStore.deleteEntry(alias);
             saveFSKS(context);
         }
+    }
+
+    static KeyStore getKeyStore(Context context) throws Exception {
+        return getFSKS(context);
     }
 }

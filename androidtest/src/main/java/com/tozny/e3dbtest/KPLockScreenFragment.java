@@ -6,9 +6,8 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import com.tozny.e3db.crypto.IBanana;
 import com.tozny.e3db.crypto.KeyProtection;
-import com.tozny.e3db.crypto.KeyStoreManagerInterface;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -41,7 +40,7 @@ public class KPLockScreenFragment extends BaseFragment {
     }
 
     @Override
-    public KeyStoreManagerInterface.KeyAuthenticationHandler keyAuthenticationHandler() {
+    public IBanana keyAuthenticationHandler() {
         return null;
     }
 }

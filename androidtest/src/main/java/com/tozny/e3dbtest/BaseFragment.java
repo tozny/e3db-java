@@ -10,9 +10,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import com.tozny.e3db.*;
 import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
+import com.tozny.e3db.crypto.IBanana;
 import com.tozny.e3db.crypto.KeyProtection;
-import com.tozny.e3db.crypto.KeyStoreManagerInterface;
-import org.w3c.dom.Text;
 
 import java.util.UUID;
 
@@ -165,7 +164,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 Config.removeConfigSecurely(configStorageHelper());
 
                 mConfig = null;
-                
+
                 mState = State.CONFIG_DELETED;
 
                 updateLabels("", "Config Deleted", "");
@@ -272,7 +271,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     }
 
     @Override
-    public KeyStoreManagerInterface.KeyAuthenticationHandler keyAuthenticationHandler() {
+    public IBanana keyAuthenticationHandler() {
         throw new IllegalStateException("Method should be overridden by subclass.");
     }
 }

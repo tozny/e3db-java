@@ -13,17 +13,13 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import javax.crypto.Mac;
-import java.security.KeyStoreException;
-import java.security.Signature;
-
-public interface KeyStoreManagerInterface {
+public interface ICarrot {
     /**
      * Allows key provider to delegate key authentication &amp; program exeuction to the caller,
      * without exposing implementation details about how keys are stored and managed.
      * @param <A>
      */
-    interface KeyAuthenticationHandler<A> {
+    interface ICabin<A> {
         /**
          * Called when authentication succeeds (or was unnecessary).
          * @param a
@@ -42,19 +38,17 @@ public interface KeyStoreManagerInterface {
         void handleError(Throwable t);
 
         /**
-         * Called when the key provider needs to ask external caller for a {@link KeyAuthenticator}
+         * Called when the key provider needs to ask external caller for a {@link IBanana}
          * instance.
          * @param callback
          */
-        void handleAuthenticationRequired(KeyAuthenticatorCallback callback);
+        void handleAuthenticationRequired(ICanary callback);
     }
 
     /**
      * Used to retrieve a KeyAuthenticator from the caller.
      */
-    interface KeyAuthenticatorCallback {
-        void callback(KeyAuthenticator authenticator);
+    interface ICanary {
+        void callback(IBanana authenticator);
     }
-
-
 }

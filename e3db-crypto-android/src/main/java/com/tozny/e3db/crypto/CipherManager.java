@@ -49,6 +49,13 @@ public class CipherManager {
         return bytes;
     }
 
+    static void deleteInitializationVector(Context context, String fileName) throws Exception {
+        if (new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)).exists()) {
+            File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
+            file.delete();
+        }
+    }
+
     static class SaveCipherGetter implements GetCipher {
 
         @Override

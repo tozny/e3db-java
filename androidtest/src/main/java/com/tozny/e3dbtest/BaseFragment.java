@@ -30,7 +30,8 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     protected enum State {
         UNKNOWN,
         CONFIG_LOADED,
-        CONFIG_DELETED
+        CONFIG_DELETED,
+        ERROR_FOUND
     }
 
     protected State mState;
@@ -114,25 +115,16 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
             Config.loadConfigSecurely(configStorageHelper(), new ConfigStorageHelper.LoadConfigHandler() {
                 @Override
                 public void onLoadConfigDidSucceed(String config) {
-
-                    if (config == null) {
-                        mState = State.CONFIG_DELETED;
-
-                        updateLabels("", "No Config Found", "");
-                        updateInterface();
-
-                    } else {
-                        try {
-                            mConfig = Config.fromJson(config);
-                        } catch (IOException e) {
-                            onLoadConfigDidFail(e);
-                        }
-
-                        mState = State.CONFIG_LOADED;
-
-                        updateLabels("", "Config Loaded", mConfig.json());
-                        updateInterface();
+                    try {
+                        mConfig = Config.fromJson(config);
+                    } catch (IOException e) {
+                        onLoadConfigDidFail(e);
                     }
+
+                    mState = State.CONFIG_LOADED;
+
+                    updateLabels("", "Config Loaded", mConfig.json());
+                    updateInterface();
                 }
 
                 @Override
@@ -141,10 +133,21 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
+                public void onLoadConfigNotFound() {
+                    mState = State.CONFIG_DELETED;
+
+                    updateLabels("", "No Config Found", "");
+                    updateInterface();
+                }
+
+                @Override
                 public void onLoadConfigDidFail(Exception e) {
                     e.printStackTrace();
+
+                    mState = State.ERROR_FOUND;
+
                     updateLabels(e.getLocalizedMessage(), "Load Config Failed", "");
-                    // TODO: Set state? New state? Delete things?
+                    updateInterface();
                 }
             });
         }
@@ -194,8 +197,11 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 @Override
                 public void onRemoveConfigDidFail(Exception e) {
                     e.printStackTrace();
+
+                    mState = State.ERROR_FOUND;
+
                     updateLabels(e.getLocalizedMessage(), "Delete Config Failed", "");
-                    // TODO: Set state? New state?
+                    updateInterface();
                 }
             });
         }
@@ -231,14 +237,20 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                             @Override
                             public void onSaveConfigDidFail(Exception e) {
                                 e.printStackTrace();
+
+                                mState = State.ERROR_FOUND;
+
                                 updateLabels(e.getLocalizedMessage(), "Create Config Failed", "");
-                                // TODO: Set state? New state?
+                                updateInterface();
                             }
                         });
 
                     } else {
+                        mState = State.ERROR_FOUND;
+
                         updateLabels((r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()),"Create Config Failed", "");
-                        // TODO: Set state? New state?
+                        updateInterface();
+
                     }
                 }
             });
@@ -283,6 +295,10 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 mNewConfigButton.setVisibility(View.VISIBLE);
 
                 break;
+
+            case ERROR_FOUND:
+                mDeleteConfigButton.setVisibility(View.VISIBLE);
+
         }
     }
 

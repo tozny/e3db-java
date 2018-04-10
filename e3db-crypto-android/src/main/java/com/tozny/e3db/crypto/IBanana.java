@@ -21,7 +21,9 @@ import java.security.UnrecoverableKeyException;
 
 public interface IBanana {
     public interface IBoston {
-        void handlePassword(String password) throws Exception;
+        void handlePassword(String password) throws UnrecoverableKeyException;
+        void handleCancel();
+        void handleError(Throwable e);
     }
 
     void getPassword(/*ToznyUser user, */IBoston handler);

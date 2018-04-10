@@ -155,8 +155,23 @@ public class KeyStoreManager {
                         try {
                             authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, password)));
                         } catch (Exception e) {
-                            authenticatedCipherHandler.onError(e);
+
+                            if (e instanceof UnrecoverableKeyException) {
+                                throw (UnrecoverableKeyException) e;
+                            } else {
+                                authenticatedCipherHandler.onError(e);
+                            }
                         }
+                    }
+
+                    @Override
+                    public void handleCancel() {
+                        authenticatedCipherHandler.onCancel();
+                    }
+
+                    @Override
+                    public void handleError(Throwable e) {
+                        authenticatedCipherHandler.onError(e);
                     }
                 });
 

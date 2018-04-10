@@ -126,7 +126,7 @@ public class FSKSWrapper {
         }
     }
 
-    private static void createKeyPairIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Exception {
+    private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Exception {
 
         KeyStore keyStore = getFSKS(context);
 
@@ -145,7 +145,7 @@ public class FSKSWrapper {
     }
 
     static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Exception {
-        createKeyPairIfNeeded(context, alias, protection, password);
+        createSecretKeyIfNeeded(context, alias, protection, password);
 
         KeyStore keyStore = getFSKS(context);
 

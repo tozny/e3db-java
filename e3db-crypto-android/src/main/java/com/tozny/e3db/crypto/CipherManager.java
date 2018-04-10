@@ -32,19 +32,32 @@ class CipherManager {
     }
 
     private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws Exception {
-        FileOutputStream fos = new FileOutputStream(new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)));
-        fos.write(bytes);
-        fos.flush();
-        fos.close();
+        FileOutputStream fos = null;
+
+        try {
+            fos = new FileOutputStream(new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)));
+            fos.write(bytes);
+            fos.flush();
+
+        } finally {
+            if (fos != null) fos.close();
+        }
     }
 
     private static byte[] loadInitializationVector(Context context, String fileName) throws Exception {
-        File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
-        int fileSize = (int)file.length();
-        byte[] bytes = new byte[fileSize];
-        FileInputStream fis = new FileInputStream(file);
-        fis.read(bytes, 0, fileSize);
-        fis.close();
+        FileInputStream fis = null;
+        byte[] bytes;
+
+        try {
+            File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
+            int fileSize = (int) file.length();
+            bytes = new byte[fileSize];
+            fis = new FileInputStream(file);
+            fis.read(bytes, 0, fileSize);
+
+        } finally {
+            if (fis != null) fis.close();
+        }
 
         return bytes;
     }

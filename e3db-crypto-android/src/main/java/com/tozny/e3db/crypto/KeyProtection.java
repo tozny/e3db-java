@@ -164,7 +164,7 @@ public abstract class KeyProtection {
         };
     }
 
-    public static KeyProtection withPIN(String rawPassword) {
+    public static KeyProtection withPassword(String rawPassword) {
         if(rawPassword == null || rawPassword.trim().length() < 4)
             throw new IllegalArgumentException("password must not be empty or less than 4 characters.");
 

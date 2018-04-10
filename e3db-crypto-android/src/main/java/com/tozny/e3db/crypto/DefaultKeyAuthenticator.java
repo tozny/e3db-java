@@ -31,7 +31,6 @@ import android.os.Bundle;
 import android.support.annotation.RequiresApi;
 import android.support.v4.content.PermissionChecker;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
-//import android.support.v4.content.PermissionChecker;
 import android.support.v4.os.CancellationSignal;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -60,13 +59,15 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
     /**
      * Create an instance that will display over the given activity.
      *
-     * @param activity Activity that will host the dialog
-     * @param title Title of the fingerprint dialog.
+     * @param activity
+     *         Activity that will host the dialog
+     * @param title
+     *         Title of the fingerprint dialog.
      */
     public DefaultKeyAuthenticator(Activity activity, String title) {
-        if(activity == null)
+        if (activity == null)
             throw new IllegalArgumentException("activity");
-        if(title == null)
+        if (title == null)
             throw new IllegalArgumentException("title");
 
         this.activity = activity;
@@ -89,6 +90,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
 
         public interface Callback {
             void onFingerprintAuthenticated(FingerprintManagerCompat.CryptoObject cryptoObject);
+
             void onFingerprintCancel();
         }
 
@@ -118,35 +120,34 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         }
 
         @Override
-        public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                                 Bundle savedInstanceState) {
-//            if (mTitle != null) {
-//                getDialog().setTitle(mTitle);
-//            } else {
-//                getDialog().setTitle(getString(R.string.sign_in));
-//            }
-//            View v = inflater.inflate(R.layout.fingerprint_dialog_container, container, false);
-//            Button mCancelButton = v.findViewById(R.id.cancel_button);
-//            mCancelButton.setOnClickListener(new View.OnClickListener() {
-//                @Override
-//                public void onClick(View view) {
-//                    if (mCallback != null) {
-//                        mCallback.onFingerprintCancel();
-//                    }
-//                    dismiss();
-//                }
-//            });
-//
-//            mFingerprintUiHelper = new FingerprintUiHelper(FingerprintManagerCompat.from(this.getActivity()),
-//                    (ImageView) v.findViewById(R.id.fingerprint_icon),
-//                    (TextView) v.findViewById(R.id.fingerprint_status), this);
-//
-//            return v;
-            return null;
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+            if (mTitle != null) {
+                getDialog().setTitle(mTitle);
+            } else {
+                getDialog().setTitle(getString(R.string.sign_in));
+            }
+            View v = inflater.inflate(R.layout.fingerprint_dialog_container, container, false);
+            Button mCancelButton = v.findViewById(R.id.cancel_button);
+            mCancelButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (mCallback != null) {
+                        mCallback.onFingerprintCancel();
+                    }
+                    dismiss();
+                }
+            });
+
+            mFingerprintUiHelper = new FingerprintUiHelper(FingerprintManagerCompat.from(this.getActivity()),
+                    (ImageView) v.findViewById(R.id.fingerprint_icon),
+                    (TextView) v.findViewById(R.id.fingerprint_status), this);
+
+            return v;
         }
 
         @Override
-        public void onError(String errString) {}
+        public void onError(String errString) {
+        }
 
         @Override
         public void onPause() {
@@ -196,9 +197,9 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         private Runnable mResetErrorTextRunnable = new Runnable() {
             @Override
             public void run() {
-//                mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.hint_color, null));
-//                mErrorTextView.setText(mErrorTextView.getResources().getString(R.string.fingerprint_hint));
-//                mIcon.setImageResource(R.drawable.ic_fp_40px);
+                mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.hint_color, null));
+                mErrorTextView.setText(mErrorTextView.getResources().getString(R.string.fingerprint_hint));
+                mIcon.setImageResource(R.drawable.ic_fp_40px);
             }
         };
         private boolean mSelfCancelled;
@@ -215,15 +216,16 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         }
 
         private void showError(CharSequence error) {
-//            mIcon.setImageResource(R.drawable.ic_fingerprint_error);
+            mIcon.setImageResource(R.drawable.ic_fingerprint_error);
             mErrorTextView.setText(error);
-//            mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.warning_color, null));
+            mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.warning_color, null));
             mErrorTextView.removeCallbacks(mResetErrorTextRunnable);
             mErrorTextView.postDelayed(mResetErrorTextRunnable, ERROR_TIMEOUT_MILLIS);
         }
 
         public interface Callback {
             void onAuthenticated(FingerprintManagerCompat.CryptoObject cryptoObject);
+
             void onError(String errString);
         }
 
@@ -247,8 +249,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
 
         @Override
         public void onAuthenticationFailed() {
-            showError("Fingerprint Not Recognized.");//mIcon.getResources().getString("Fingerprint Not Recognized."
-//                    R.string.fingerprint_not_recognized));
+            showError(mIcon.getResources().getString(R.string.fingerprint_not_recognized));
         }
 
         @Override
@@ -259,9 +260,9 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         @Override
         public void onAuthenticationSucceeded(final FingerprintManagerCompat.AuthenticationResult result) {
             mErrorTextView.removeCallbacks(mResetErrorTextRunnable);
-//            mIcon.setImageResource(R.drawable.ic_fingerprint_success);
-//            mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.success_color, null));
-//            mErrorTextView.setText(mErrorTextView.getResources().getString(R.string.fingerprint_success));
+            mIcon.setImageResource(R.drawable.ic_fingerprint_success);
+            mErrorTextView.setTextColor(mErrorTextView.getResources().getColor(R.color.success_color, null));
+            mErrorTextView.setText(mErrorTextView.getResources().getString(R.string.fingerprint_success));
             mIcon.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -279,7 +280,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
             mSelfCancelled = false;
             mFingerprintManager
                     .authenticate(cryptoObject, 0 /* flags */, mCancellationSignal, this, null);
-//            mIcon.setImageResource(R.drawable.ic_fp_40px);
+            mIcon.setImageResource(R.drawable.ic_fp_40px);
         }
 
         public void stopListening() {
@@ -293,6 +294,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
 
     /**
      * Whether the device supports fingerprint authentication or not.
+     *
      * @return
      */
     @SuppressLint("MissingPermission")
@@ -302,8 +304,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
             return PermissionChecker.checkSelfPermission(this.activity, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
                     fm.isHardwareDetected() &&
                     fm.hasEnrolledFingerprints();
-        }
-        else
+        } else
             return false;
     }
 
@@ -312,7 +313,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
      */
     @RequiresApi(Build.VERSION_CODES.M)
     public static final class DeviceCredentialsFragment extends Fragment {
-        private final /*Tozny.*/KeyAuthenticatedHandler cont;
+        private final DeviceLockAuthenticatorCallbackHandler cont;
         private final String title;
         private final KeyguardManager mgr;
 
@@ -323,13 +324,14 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         }
 
 
-        @SuppressLint("ValidFragment") // Only used internally
-        DeviceCredentialsFragment(/*Tozny.*/KeyAuthenticatedHandler cont, String title, KeyguardManager mgr) {
-            if(mgr == null)
+        @SuppressLint("ValidFragment")
+            // Only used internally
+        DeviceCredentialsFragment(DeviceLockAuthenticatorCallbackHandler cont, String title, KeyguardManager mgr) {
+            if (mgr == null)
                 throw new IllegalArgumentException("mgr");
-            if(cont == null)
+            if (cont == null)
                 throw new IllegalArgumentException("cont");
-            if(title == null)
+            if (title == null)
                 throw new IllegalArgumentException("title");
 
             this.title = title;
@@ -340,7 +342,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         @Override
         public void onAttach(Context context) {
             super.onAttach(context);
-            if(mgr != null && cont != null && title != null) {
+            if (mgr != null && cont != null && title != null) {
                 Intent confirmDeviceCredentialIntent = mgr.createConfirmDeviceCredentialIntent(title, "");
                 if (confirmDeviceCredentialIntent != null)
                     startActivityForResult(confirmDeviceCredentialIntent, 1);
@@ -364,7 +366,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
-    public void authenticateWithLockScreen(/*ToznyUser user, Tozny.*/KeyAuthenticatedHandler cont) {
+    public void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler cont) {
         DeviceCredentialsFragment f = new DeviceCredentialsFragment(cont, title, (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE));
         FragmentManager fragmentManager = activity.getFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
@@ -372,8 +374,10 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
         fragmentTransaction.commit();
     }
 
+    final int[] wrongPasswordCount = {0};
+
     @Override
-    public void getPassword(/*ToznyUser user, */final PasswordHandler handler) {
+    public void getPassword(final PasswordAuthenticatorCallbackHandler handler) {
         this.activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -381,24 +385,31 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
 
                 final EditText input = new EditText(ctx);
                 input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+
                 new AlertDialog.Builder(DefaultKeyAuthenticator.this.activity)
-                        .setMessage(/*ctx.getString(R.string.key_provider_please_enter_pin)*/"Please Enter Pin")
-                        .setPositiveButton(/*ctx.getString(R.string.key_provider_ok)*/"OK", new DialogInterface.OnClickListener() {
+                        .setMessage(ctx.getString(R.string.key_provider_please_enter_pin))
+                        .setPositiveButton(ctx.getString(R.string.key_provider_ok), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
                                 try {
                                     handler.handlePassword(input.getText().toString());
-                                }
-                                catch(UnrecoverableKeyException e) {
-                                    Toast.makeText(DefaultKeyAuthenticator.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
-                                    getPassword(/*null, */handler);
+
+                                } catch (UnrecoverableKeyException e) {
+                                    wrongPasswordCount[0]++;
+
+                                    if (wrongPasswordCount[0] >= 3) {
+                                        handler.handleError(new RuntimeException("Too many password tries."));
+                                    } else {
+                                        Toast.makeText(DefaultKeyAuthenticator.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        getPassword(handler);
+                                    }
                                 }
                             }
                         })
-                        .setNegativeButton(/*ctx.getString(R.string.key_provider_cancel)*/"Cancel", new DialogInterface.OnClickListener() {
+                        .setNegativeButton(ctx.getString(R.string.key_provider_cancel), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
-
+                                handler.handleCancel();
                             }
                         })
                         .setView(input)
@@ -412,7 +423,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
                                 @Override
                                 public void run() {
                                     final InputMethodManager imm = (InputMethodManager) DefaultKeyAuthenticator.this.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-                                    imm.showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);
+                                    imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
                                 }
                             });
                         }
@@ -423,7 +434,7 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
     }
 
     @Override
-    public void authenticateWithFingerprint(/*ToznyUser user, */FingerprintManagerCompat.CryptoObject cryptoObject, final /*Tozny.*/KeyAuthenticatedHandler handler) {
+    public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, final DeviceLockAuthenticatorCallbackHandler handler) {
         try {
             FingerprintAuthDialogFragment fragment = new FingerprintAuthDialogFragment();
             fragment.setCryptoObject(cryptoObject);
@@ -440,28 +451,8 @@ public final class DefaultKeyAuthenticator implements KeyAuthenticator {
             });
 
             fragment.show(activity.getFragmentManager(), "fingerprintUI");
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
             handler.handleError(e);
         }
     }
-
-//    @SuppressLint("MissingPermission")
-//    void reportError(EnrollmentHandler handler) {
-//        if(PermissionChecker.checkSelfPermission(this.activity, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintPermissionMissing));
-//            return;
-//        }
-//
-//        FingerprintManagerCompat fm = FingerprintManagerCompat.from(this.activity);
-//        if (!fm.isHardwareDetected()) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintHardwareNotPresent));
-//            return;
-//        }
-//
-//        if (!fm.hasEnrolledFingerprints()) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintsNotEnrolled));
-//            return;
-//        }
-//    }
 }

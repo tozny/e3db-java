@@ -13,9 +13,17 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Build;
-import javax.crypto.SecretKey;
+import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+
+import javax.crypto.Cipher;
+import java.security.*;
+
+import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.FINGERPRINT;
+import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.LOCK_SCREEN;
 
 public class KeyStoreManager {
 
@@ -33,24 +41,134 @@ public class KeyStoreManager {
         return KEYSTORE_ALIAS + identifier;
     }
 
-    static SecretKey getSecretKey(Context context, String identifier, KeyProtection protection) throws Exception {
+    private static void checkMinSDK(KeyProtection protection) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            if (protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
+                throw new IllegalArgumentException("info: SDK Version must be at least " + Build.VERSION_CODES.M);
+        }
+    }
+
+    interface AuthenticatedCipherHandler {
+        void onAuthenticated(Cipher cipher) throws Exception;
+        void onCancel();
+        void onError(Throwable e);
+    }
+
+    @SuppressLint("NewApi")
+    static void getCipher(final Context context, final String identifier, final KeyProtection protection, final KeyAuthenticator banana, final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Exception {
+        checkMinSDK(protection);
+
+        final Cipher cipher;
+        final String alias = getKeystoreAlias(identifier, protection);
 
         switch(protection.protectionType()) {
             case NONE:
-                //if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-                    return FSKSWrapper.getSecretKey(context, getKeystoreAlias(identifier, protection), protection);
-                //else
-                //    return AKSWrapper.getSecretKey(getKeystoreAlias(identifier, protection), protection);
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, null)));
+                else
+                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection)));
+
+                break;
 
             case FINGERPRINT:
-            case LOCK_SCREEN:
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                    return AKSWrapper.getSecretKey(getKeystoreAlias(identifier, protection), protection);
-                else
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
                     throw new IllegalStateException(protection.protectionType().toString() + " not supported below API 23.");
 
+                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
+
+                    banana.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+                        @Override
+                        public void handleAuthenticated() {
+                            try {
+                                authenticatedCipherHandler.onAuthenticated(cipher);
+                            } catch (Exception e) {
+                                authenticatedCipherHandler.onError(e);
+                            }
+                        }
+
+                        @Override
+                        public void handleCancel() {
+                            authenticatedCipherHandler.onCancel();
+                        }
+
+                        @Override
+                        public void handleError(Throwable e) {
+                            authenticatedCipherHandler.onError(e);
+                        }
+                    });
+
+                break;
+
+            case LOCK_SCREEN:
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
+                    throw new IllegalStateException(protection.protectionType().toString() + " not supported below API 23.");
+
+                try {
+                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
+                    authenticatedCipherHandler.onAuthenticated(cipher); // If the user unlocked the screen within the timeout limit, then this is already authenticated
+
+                } catch (InvalidKeyException e) {
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && e instanceof KeyPermanentlyInvalidatedException) {
+                        authenticatedCipherHandler.onError(e);
+
+                    } else {
+
+                        banana.authenticateWithLockScreen(new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+                            @Override
+                            public void handleAuthenticated() {
+                                try {
+                                    getCipher(context, identifier, protection, banana, cipherGetter, authenticatedCipherHandler);
+
+                                } catch (Exception e) {
+                                    authenticatedCipherHandler.onError(e);
+                                }
+                            }
+
+                            @Override
+                            public void handleCancel() {
+                                authenticatedCipherHandler.onCancel();
+                            }
+
+                            @Override
+                            public void handleError(Throwable e) {
+                                authenticatedCipherHandler.onError(e);
+                            }
+                        });
+                    }
+                }
+
+                break;
+
             case PASSWORD:
-                return FSKSWrapper.getSecretKey(context, getKeystoreAlias(identifier, protection), protection);
+                banana.getPassword(/*user, */new KeyAuthenticator.PasswordAuthenticatorCallbackHandler() {
+
+                    @Override
+                    public void handlePassword(String password) throws UnrecoverableKeyException {
+                        try {
+                            authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, password)));
+                        } catch (Exception e) {
+
+                            if (e instanceof UnrecoverableKeyException) {
+                                throw (UnrecoverableKeyException) e;
+                            } else {
+                                authenticatedCipherHandler.onError(e);
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void handleCancel() {
+                        authenticatedCipherHandler.onCancel();
+                    }
+
+                    @Override
+                    public void handleError(Throwable e) {
+                        authenticatedCipherHandler.onError(e);
+                    }
+                });
+
+                break;
 
             default:
                 throw new IllegalStateException("Unhandled key protection: " + protection.protectionType().toString());
@@ -61,133 +179,4 @@ public class KeyStoreManager {
         FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
         AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
     }
-
-    // TODO: Lilli, combine this method w above...
-//    public void getSigner(final ToznyUser user, final KeyAuthenticationHandler<Signature> handler) throws KeyNotFoundException {
-//        KeyStorageInfo info = KeyStorageInfo.forUser(user);
-//        checkMinSDK(info);
-//
-//        switch(info.getKeyProtection().protectionType()) {
-//            case NONE:
-//                try {
-//                    if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-//                        handler.handle(KeyStoreUtils.getSignatureFromKeyStore(info, getFSKS(), null));
-//                    else
-//                        handler.handle(AndroidKeyStore.INSTANCE.getSigner(info));
-//                } catch (UnrecoverableKeyException | InvalidKeyException e) {
-//                    handler.handleError(e);
-//                }
-//                break;
-//            case FINGERPRINT:
-//                try {
-//                    final Signature signature = AndroidKeyStore.INSTANCE.getSigner(info);
-//                    handler.handleAuthenticationRequired(new KeyAuthenticatorCallback() {
-//                        @SuppressLint("NewApi")
-//                        @Override
-//                        public void callback(KeyAuthenticator authenticator) {
-//                            authenticator.authenticatWithFingerprint(user, new FingerprintManagerCompat.CryptoObject(signature), new Tozny.KeyAuthenticatedHandler() {
-//                                @Override
-//                                public void handleAuthenticated() {
-//                                    handler.handle(signature);
-//                                }
-//
-//                                @Override
-//                                public void handleCancel() {
-//                                    handler.handleCancel();
-//                                }
-//
-//                                @Override
-//                                public void handleError(Throwable e) {
-//                                    handler.handleError(e);
-//                                }
-//                            });
-//                        }
-//                    });
-//                } catch (UnrecoverableKeyException | InvalidKeyException e) {
-//                    handler.handleError(e);
-//                }
-//                break;
-//            case LOCK_SCREEN:
-//                try {
-//                    handler.handle(AndroidKeyStore.INSTANCE.getSigner(info));
-//                } catch (UnrecoverableKeyException e) {
-//                    handler.handleError(e);
-//                } catch (InvalidKeyException e) {
-//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && e instanceof KeyPermanentlyInvalidatedException)
-//                        handler.handleError(e);
-//                    else
-//                        handler.handleAuthenticationRequired(new KeyAuthenticatorCallback() {
-//                            @SuppressLint("NewApi")
-//                            @Override
-//                            public void callback(KeyAuthenticator authenticator) {
-//                                authenticator.authenticateWithLockScreen(user, new Tozny.KeyAuthenticatedHandler() {
-//                                    @Override
-//                                    public void handleAuthenticated() {
-//                                        try {
-//                                            getSigner(user, handler);
-//                                        } catch (KeyNotFoundException e1) {
-//                                            handler.handleError(e1);
-//                                        }
-//                                    }
-//
-//                                    @Override
-//                                    public void handleCancel() {
-//                                        handler.handleCancel();
-//                                    }
-//
-//                                    @Override
-//                                    public void handleError(Throwable e) {
-//                                        handler.handleError(e);
-//                                    }
-//                                });
-//                            }
-//                        });
-//                }
-//                break;
-//            case PASSWORD:
-//                handler.handleAuthenticationRequired(new KeyAuthenticatorCallback() {
-//                    @Override
-//                    public void callback(KeyAuthenticator authenticator) {
-//                        authenticator.getPassword(user, new KeyAuthenticator.PasswordHandler() {
-//                            @Override
-//                            public void handlePassword(String password) throws UnrecoverableKeyException {
-//                                try {
-//                                    handler.handle(KeyStoreUtils.getSignatureFromKeyStore(KeyStorageInfo.forUser(user), getFSKS(), password));
-//                                } catch (InvalidKeyException | KeyNotFoundException e) {
-//                                    handler.handleError(e);
-//                                }
-//                            }
-//                        });
-//                    }
-//                });
-//                break;
-//            default:
-//                throw new IllegalStateException("Unhandled protection type: " + info.getKeyProtection().protectionType());
-//        }
-//    }
-//
-//    public void removeKey(KeyStorageInfo info, TOTPConfig config) throws KeyStoreException {
-//        checkMinSDK(info);
-//
-//        switch(info.getKeyProtection().protectionType()) {
-//            case NONE:
-//                if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-//                    KeyStoreUtils.removeKeyFromStore(info, config, getFSKS());
-//                    saveFSKS();
-//                }
-//                else
-//                    AndroidKeyStore.INSTANCE.removeKey(info, config);
-//                break;
-//            case FINGERPRINT:
-//            case LOCK_SCREEN:
-//                AndroidKeyStore.INSTANCE.removeKey(info, config);
-//                break;
-//            case PASSWORD:
-//                KeyStoreUtils.removeKeyFromStore(info, config, getFSKS());
-//                saveFSKS();
-//                break;
-//            default:
-//                throw new IllegalStateException("Unhandled key protection: " + info.getKeyProtection());
-//        }
-//    }
 }

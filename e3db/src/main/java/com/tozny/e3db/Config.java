@@ -223,9 +223,9 @@ public class Config {
    * @param helper
    * @param config
    */
-  public static void saveConfigSecurely(ConfigStorageHelper helper, Config config) throws Exception {
+  public static void saveConfigSecurely(ConfigStorageHelper helper, String config, ConfigStorageHelper.SaveConfigHandler handler) {
     if (Platform.isAndroid()) {
-      helper.saveConfigSecurely(config.json());
+      helper.saveConfigSecurely(config, handler);
     } else {
       throw new IllegalStateException("Method is only available for Android.");
     }
@@ -237,10 +237,9 @@ public class Config {
    * @return
    * @throws IOException
    */
-  public static Config loadConfigSecurely(ConfigStorageHelper helper) throws Exception {
+  public static void loadConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.LoadConfigHandler handler) {
     if (Platform.isAndroid()) {
-      // TODO: Lilli, maybe return null if not there? Currently throwing exception...
-      return Config.fromJson(helper.loadConfigSecurely());
+      helper.loadConfigSecurely(handler);
     } else {
       throw new IllegalStateException("Method is only available for Android.");
     }
@@ -251,9 +250,9 @@ public class Config {
    * @param helper
    * @param config
    */
-  public static void removeConfigSecurely(ConfigStorageHelper helper) throws Exception {
+  public static void removeConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.RemoveConfigHandler handler) {
     if (Platform.isAndroid()) {
-      helper.removeConfigSecurely();
+      helper.removeConfigSecurely(handler);
     } else {
       throw new IllegalStateException("Method is only available for Android.");
     }

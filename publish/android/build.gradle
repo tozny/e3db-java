@@ -91,6 +91,5 @@ dependencies {
     compile 'com.android.support:support-annotations:27.1.0'
     implementation 'com.android.support:support-compat:26.0.1'
     implementation 'com.android.support:support-core-utils:26.0.1'
-
-
+    compile 'org.jetbrains:annotations-java5:15.0'
 }

@@ -13,18 +13,17 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import java.security.KeyStore;
+import java.security.*;
 
-public class AKSWrapper {
+class AKSWrapper {
     @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
-    private static void createKeyPairIfNeeded(String alias, KeyProtection protection) throws Exception {
+    private static void createSecretKeyIfNeeded(String alias, KeyProtection protection) throws Exception {
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
@@ -39,13 +38,13 @@ public class AKSWrapper {
             }
 
             switch(protection.protectionType()) {
-                case FINGERPRINT:
-                    builder.setUserAuthenticationRequired(true);
+                case FINGERPRINT: // TODO: "In API 24 and higher, you want to call setInvalidatedByBiometricEnrollment(true) so keys aren't erased if more fingerprints get added to the phone."
+                    builder.setUserAuthenticationRequired(true); // TODO: Right now adding a new fingerprint isn't causing any problems...
                     break;
 
                 case LOCK_SCREEN:
                     builder.setUserAuthenticationRequired(true)
-                            .setUserAuthenticationValidityDurationSeconds(60);
+                            .setUserAuthenticationValidityDurationSeconds(protection.validUntilSecondsSinceUnlock());
                     break;
 
                 case PASSWORD:
@@ -70,7 +69,7 @@ public class AKSWrapper {
     @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
     static SecretKey getSecretKey(String alias, KeyProtection protection) throws Exception {
 
-        createKeyPairIfNeeded(alias, protection);
+        createSecretKeyIfNeeded(alias, protection);
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);

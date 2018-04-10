@@ -3,6 +3,8 @@ package com.tozny.e3db.crypto;
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
 
+import javax.crypto.Cipher;
+
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * 
@@ -19,33 +21,89 @@ import com.tozny.e3db.ConfigStorageHelper;
 
 public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private Context context;
-
     private String identifier;
-
     private KeyProtection protection;
+    private KeyAuthenticator handler;
 
-    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection) {
-        // TODO: Lilli, null checks
+    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator handler) {
+        // TODO: Lilli, null checks, param validation
         this.context = context;
         this.identifier = identifier;
         this.protection = protection;
+        this.handler    = handler;
     }
 
     @Override
-    public void saveConfigSecurely(String config) throws Exception {
-        SecureStringManager.saveStringToSecureStorage(context, identifier, config, KeyStoreManager.getSecretKey(context, identifier, protection));
+    public void saveConfigSecurely(final String config, final SaveConfigHandler saveConfigHandler) {
+        try {
+            KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+                @Override
+                public void onAuthenticated(Cipher cipher) throws Exception {
+                    SecureStringManager.saveStringToSecureStorage(context, identifier, config, cipher);
+
+                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidSucceed();
+                }
+
+                @Override
+                public void onCancel() {
+                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidCancel();
+                }
+
+                @Override
+                public void onError(Throwable e) {
+                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(new RuntimeException(e));
+                }
+            });
+
+        } catch (Exception e) {
+            if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(e);
+
+        }
     }
 
     @Override
-    public String loadConfigSecurely() throws Exception {
-        return SecureStringManager.loadStringFromSecureStorage(context, identifier, KeyStoreManager.getSecretKey(context, identifier, protection));
+    public void loadConfigSecurely(final LoadConfigHandler loadConfigHandler) {
+        try {
+            if (!SecureStringManager.secureStringExists(context, identifier)) {
+                if (loadConfigHandler != null) loadConfigHandler.onLoadConfigNotFound();
+
+            } else {
+                KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+                    @Override
+                    public void onAuthenticated(Cipher cipher) throws Exception {
+                        String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
+
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidSucceed(configString);
+                    }
+
+                    @Override
+                    public void onCancel() {
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidCancel();
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(new RuntimeException(e));
+                    }
+                });
+
+            }
+        } catch (Exception e) {
+            if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
+        }
     }
 
     @Override
-    public void removeConfigSecurely() throws Exception {
-        // TODO: Lilli, maybe delete the keys too?
-        KeyStoreManager.removeSecretKey(context, identifier);
+    public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
+        try { // TODO: Lilli, separate try/catches for better clean-up
+            KeyStoreManager.removeSecretKey(context, identifier);
+            SecureStringManager.deleteStringFromSecureStorage(context, identifier);
+            CipherManager.deleteInitializationVector(context, identifier);
 
-        SecureStringManager.deleteStringFromSecureStorage(context, identifier);
+            if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidSucceed();
+
+        } catch (Exception e) {
+            if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidFail(e);
+        }
     }
 }

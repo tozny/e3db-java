@@ -13,30 +13,15 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Build;
-import android.provider.AlarmClock;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyPermanentlyInvalidatedException;
-import android.security.keystore.KeyProperties;
 import android.util.Log;
 
 import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.FINGERPRINT;
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.LOCK_SCREEN;
 
 public class FSKSWrapper {
     private static final String MOBILE_AUTH_DB_KSTORE = "MobileAuthDb.kstore";
@@ -45,13 +30,6 @@ public class FSKSWrapper {
     private static volatile KeyStore fsKS;
     private static final Object keyStoreCreateLock = new Object();
     private final static Object keyStoreWriteLock = new Object();
-
-    private static void checkMinSDK(KeyProtection protection) {
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            if(protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
-                throw new IllegalArgumentException("info: SDK Version must be at least " + Build.VERSION_CODES.M);
-        }
-    }
 
     private static boolean fileExists(Context context, String privateFile) {
         File filesDir = context.getFilesDir();
@@ -76,7 +54,7 @@ public class FSKSWrapper {
         if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
-                if(result == null) {
+                if (result == null) {
                     try {
                         result = KeyStore.getInstance("BKS");
                         Log.d(TAG, "Keystore: " + result.getClass().getCanonicalName());
@@ -117,7 +95,7 @@ public class FSKSWrapper {
                 try {
                     OutputStream output = context.openFileOutput(MOBILE_AUTH_DB_KSTORE, Context.MODE_PRIVATE);
                     try {
-                        fsKS.store(output, /* should be getPasssword */ getPerf(context).toCharArray());
+                        fsKS.store(output, getPerf(context).toCharArray());
                         Log.d(TAG, "Saved keystore.");
                     } finally {
                         output.close();
@@ -130,12 +108,12 @@ public class FSKSWrapper {
         }
     }
 
-    private static KeyStore.ProtectionParameter getProtectionParameter(KeyProtection protection) {
+    private static KeyStore.ProtectionParameter getProtectionParameter(KeyProtection protection, String password) {
         if (protection.protectionType() == KeyProtection.KeyProtectionType.PASSWORD) {
-            if (protection.password() == null || protection.password().trim().length() == 0)
+            if (password == null || password.trim().length() == 0)
                 throw new IllegalArgumentException("password cannot be blank.");
 
-            return new KeyStore.PasswordProtection(protection.password().toCharArray()); // TODO: Lilli look here
+            return new KeyStore.PasswordProtection(password.toCharArray());
 
         } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.JELLY_BEAN && protection.protectionType() == KeyProtection.KeyProtectionType.NONE) {
             // On API 16, the KeyStore will throw when `setEntry` is called with a null ProtectionParam.
@@ -148,7 +126,7 @@ public class FSKSWrapper {
         }
     }
 
-    private static void createKeyPairIfNeeded(Context context, String alias, KeyProtection protection) throws Exception {
+    private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Exception {
 
         KeyStore keyStore = getFSKS(context);
 
@@ -160,22 +138,18 @@ public class FSKSWrapper {
             keyGen.init(random);
             SecretKey secretKey = keyGen.generateKey();
 
-            //keyStore.setKeyEntry(alias, secretKey, null, null);
-
-            keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection));
+            keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
             saveFSKS(context);
         }
     }
 
-    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection) throws Exception {
-        checkMinSDK(protection);
-
-        createKeyPairIfNeeded(context, alias, protection);
+    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Exception {
+        createSecretKeyIfNeeded(context, alias, protection, password);
 
         KeyStore keyStore = getFSKS(context);
 
-        return (SecretKey) keyStore.getKey(alias, null); // TODO: Lilli, w password...
+        return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
     }
 
     static void removeSecretKey(Context context, String alias) throws Exception {

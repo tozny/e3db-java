@@ -13,6 +13,7 @@ import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
 import com.tozny.e3db.crypto.IBanana;
 import com.tozny.e3db.crypto.KeyProtection;
 
+import java.io.IOException;
 import java.util.UUID;
 
 
@@ -107,33 +108,45 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     private View.OnClickListener loadConfigButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            try {
 
-                updateLabels("", "Loading Config...", "");
+            updateLabels("", "Loading Config...", "");
 
-                mConfig = Config.loadConfigSecurely(configStorageHelper());
+            Config.loadConfigSecurely(configStorageHelper(), new ConfigStorageHelper.LoadConfigHandler() {
+                @Override
+                public void onLoadConfigDidSucceed(String config) {
 
-                if (mConfig == null) {
-                    mState = State.CONFIG_DELETED;
+                    if (config == null) {
+                        mState = State.CONFIG_DELETED;
 
-                    updateLabels("", "No Config Found", "");
-                    updateInterface();
+                        updateLabels("", "No Config Found", "");
+                        updateInterface();
 
-                } else {
+                    } else {
+                        try {
+                            mConfig = Config.fromJson(config);
+                        } catch (IOException e) {
+                            onLoadConfigDidFail(e);
+                        }
 
-                    mState = State.CONFIG_LOADED;
+                        mState = State.CONFIG_LOADED;
 
-                    updateLabels("", "Config Loaded", mConfig.json());
-                    updateInterface();
+                        updateLabels("", "Config Loaded", mConfig.json());
+                        updateInterface();
+                    }
                 }
 
-            } catch (Exception e) {
-                e.printStackTrace();
+                @Override
+                public void onLoadConfigDidCancel() {
+                    updateLabels("", "Config Load Canceled", "");
+                }
 
-                updateLabels(e.getLocalizedMessage(), "Load Config Failed", "");
-
-                // TODO: Set state? New state? Delete things?
-            }
+                @Override
+                public void onLoadConfigDidFail(Exception e) {
+                    e.printStackTrace();
+                    updateLabels(e.getLocalizedMessage(), "Load Config Failed", "");
+                    // TODO: Set state? New state? Delete things?
+                }
+            });
         }
     };
 
@@ -142,16 +155,23 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         public void onClick(View v) {
             updateLabels("", "Saving Config...", "");
 
-            try {
-                Config.saveConfigSecurely(configStorageHelper(), mConfig);
+            Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
+                @Override
+                public void onSaveConfigDidSucceed() {
+                    updateLabels("", "Config Saved", mConfig.json());
+                }
 
-                updateLabels("", "Config Saved", mConfig.json());
+                @Override
+                public void onSaveConfigDidCancel() {
+                    updateLabels("", "Config Save Canceled", "");
+                }
 
-            } catch (Exception e) {
-                e.printStackTrace();
-
-                updateLabels(e.getLocalizedMessage(), "Save Config Failed", "");
-            }
+                @Override
+                public void onSaveConfigDidFail(Exception e) {
+                    e.printStackTrace();
+                    updateLabels(e.getLocalizedMessage(), "Save Config Failed", "");
+                }
+            });
         }
     };
 
@@ -160,24 +180,24 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         public void onClick(View v) {
             updateLabels("", "Deleting Config...", "");
 
-            try {
-                Config.removeConfigSecurely(configStorageHelper());
+            Config.removeConfigSecurely(configStorageHelper(), new ConfigStorageHelper.RemoveConfigHandler() {
+                @Override
+                public void onRemoveConfigDidSucceed() {
+                    mConfig = null;
 
-                mConfig = null;
+                    mState = State.CONFIG_DELETED;
 
-                mState = State.CONFIG_DELETED;
+                    updateLabels("", "Config Deleted", "");
+                    updateInterface();
+                }
 
-                updateLabels("", "Config Deleted", "");
-                updateInterface();
-
-            } catch (Exception e) {
-                e.printStackTrace();
-
-                updateLabels(e.getLocalizedMessage(), "Delete Config Failed", "");
-
-                // TODO: Set state? New state?
-
-            }
+                @Override
+                public void onRemoveConfigDidFail(Exception e) {
+                    e.printStackTrace();
+                    updateLabels(e.getLocalizedMessage(), "Delete Config Failed", "");
+                    // TODO: Set state? New state?
+                }
+            });
         }
     };
 
@@ -191,27 +211,33 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 @Override
                 public void handle(Result<Config> r) {
                     if (!r.isError()) {
-                        try {
-                            mConfig = r.asValue();
-                            Config.saveConfigSecurely(configStorageHelper(), mConfig);
 
-                            mState = State.CONFIG_LOADED;
+                        mConfig = r.asValue();
+                        Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
+                            @Override
+                            public void onSaveConfigDidSucceed() {
+                                mState = State.CONFIG_LOADED;
 
-                            updateLabels("", "New Config Created and Saved", mConfig.json());
-                            updateInterface();
+                                updateLabels("", "New Config Created and Saved", mConfig.json());
+                                updateInterface();
+                            }
 
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                            @Override
+                            public void onSaveConfigDidCancel() {
+                                updateLabels("", "Config Create Canceled", "");
 
-                            updateLabels(e.getLocalizedMessage(), "Create Config Failed", "");
+                            }
 
-                            // TODO: Set state? New state?
-                        }
+                            @Override
+                            public void onSaveConfigDidFail(Exception e) {
+                                e.printStackTrace();
+                                updateLabels(e.getLocalizedMessage(), "Create Config Failed", "");
+                                // TODO: Set state? New state?
+                            }
+                        });
 
                     } else {
-
                         updateLabels((r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()),"Create Config Failed", "");
-
                         // TODO: Set state? New state?
                     }
                 }

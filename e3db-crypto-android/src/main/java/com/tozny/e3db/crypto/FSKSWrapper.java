@@ -123,12 +123,12 @@ public class FSKSWrapper {
         }
     }
 
-    private static KeyStore.ProtectionParameter getProtectionParameter(KeyProtection protection) {
+    private static KeyStore.ProtectionParameter getProtectionParameter(KeyProtection protection, String password) {
         if (protection.protectionType() == KeyProtection.KeyProtectionType.PASSWORD) {
-            if (protection.password() == null || protection.password().trim().length() == 0)
+            if (password == null || password.trim().length() == 0)
                 throw new IllegalArgumentException("password cannot be blank.");
 
-            return new KeyStore.PasswordProtection(protection.password().toCharArray()); // TODO: Lilli look here
+            return new KeyStore.PasswordProtection(password.toCharArray());
 
         } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.JELLY_BEAN && protection.protectionType() == KeyProtection.KeyProtectionType.NONE) {
             // On API 16, the KeyStore will throw when `setEntry` is called with a null ProtectionParam.
@@ -141,7 +141,7 @@ public class FSKSWrapper {
         }
     }
 
-    private static void createKeyPairIfNeeded(Context context, String alias, KeyProtection protection) throws Exception {
+    private static void createKeyPairIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Exception {
 
         KeyStore keyStore = getFSKS(context);
 
@@ -155,18 +155,18 @@ public class FSKSWrapper {
 
             //keyStore.setKeyEntry(alias, secretKey, null, null);
 
-            keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection));
+            keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
             saveFSKS(context);
         }
     }
 
-    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection) throws Exception {
-        createKeyPairIfNeeded(context, alias, protection);
+    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Exception {
+        createKeyPairIfNeeded(context, alias, protection, password);
 
         KeyStore keyStore = getFSKS(context);
 
-        return (SecretKey) keyStore.getKey(alias, null); // TODO: Lilli, w password...
+        return (SecretKey) keyStore.getKey(alias, password.toCharArray());
     }
 
     static void removeSecretKey(Context context, String alias) throws Exception {

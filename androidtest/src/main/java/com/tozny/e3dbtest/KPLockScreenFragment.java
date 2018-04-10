@@ -6,6 +6,7 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import com.tozny.e3db.crypto.DefaultIBanana;
 import com.tozny.e3db.crypto.IBanana;
 import com.tozny.e3db.crypto.KeyProtection;
 
@@ -41,6 +42,6 @@ public class KPLockScreenFragment extends BaseFragment {
 
     @Override
     public IBanana keyAuthenticationHandler() {
-        return null;
+        return new DefaultIBanana(this.getActivity(), "Lock Screen");
     }
 }

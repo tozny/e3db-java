@@ -369,6 +369,8 @@ public final class DefaultIBanana implements IBanana {
         fragmentTransaction.commit();
     }
 
+    final int[] wrongPasswordCount = {0};
+
     @Override
     public void getPassword(/*ToznyUser user, */final IBoston handler) {
         this.activity.runOnUiThread(new Runnable() {
@@ -378,6 +380,7 @@ public final class DefaultIBanana implements IBanana {
 
                 final EditText input = new EditText(ctx);
                 input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+
                 new AlertDialog.Builder(DefaultIBanana.this.activity)
                         .setMessage(ctx.getString(R.string.key_provider_please_enter_pin))
                         .setPositiveButton(ctx.getString(R.string.key_provider_ok), new DialogInterface.OnClickListener() {
@@ -385,17 +388,23 @@ public final class DefaultIBanana implements IBanana {
                             public void onClick(DialogInterface dialogInterface, int i) {
                                 try {
                                     handler.handlePassword(input.getText().toString());
-                                }
-                                catch(Exception e) {
-                                    Toast.makeText(DefaultIBanana.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
-                                    getPassword(/*null, */handler);
+
+                                } catch (UnrecoverableKeyException e) {
+                                    wrongPasswordCount[0]++;
+
+                                    if (wrongPasswordCount[0] >= 3) {
+                                        handler.handleError(new RuntimeException("Too many password tries."));
+                                    } else {
+                                        Toast.makeText(DefaultIBanana.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        getPassword(/*null, */handler);
+                                    }
                                 }
                             }
                         })
                         .setNegativeButton(ctx.getString(R.string.key_provider_cancel), new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialogInterface, int i) {
-
+                                handler.handleCancel();
                             }
                         })
                         .setView(input)

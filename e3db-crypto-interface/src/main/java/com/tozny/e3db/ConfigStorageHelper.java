@@ -23,6 +23,7 @@ public interface ConfigStorageHelper {
     interface LoadConfigHandler {
         void onLoadConfigDidSucceed(String config);
         void onLoadConfigDidCancel();
+        void onLoadConfigNotFound();
         void onLoadConfigDidFail(Exception e);
     }
 

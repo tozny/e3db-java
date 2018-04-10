@@ -30,7 +30,7 @@ import java.security.KeyStore;
 
 public class SecureStringManager {
 
-    private static void checkArgs(Context context, String fileName, String string) throws Exception {
+    private static void checkArgs(Context context, String fileName, String string) throws Exception { // TODO: Lilli, move higher
         if (context == null) {
             throw new IllegalArgumentException("Method parameter 'context' cannot be null.");
         }
@@ -44,22 +44,21 @@ public class SecureStringManager {
         }
     }
 
+    static boolean secureStringExists(Context context, String fileName) throws Exception {
+        return new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists();
+    }
+
     /**
      * Deletes the encrypted string from the file system.
      * @param context The application context.
      * @param fileName The fileName under which the the encrypted string is stored.
      * @throws Exception
      */
-    public static void deleteStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+    static void deleteStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
         checkArgs(context, fileName, "");
 
         if (new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {
             File file = new File(FileSystemManager.getEncryptedDataFilePath(context, fileName));
-            file.delete();
-        }
-
-        if (new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)).exists()) {
-            File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
             file.delete();
         }
     }
@@ -72,7 +71,7 @@ public class SecureStringManager {
      * @throws Exception
      */
     @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
-    public static void saveStringToSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*@NotNull*/ String string, /*SecretKey key*/ Cipher cipher) throws Exception {
+    static void saveStringToSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*@NotNull*/ String string, /*SecretKey key*/ Cipher cipher) throws Exception {
         checkArgs(context, fileName, string);
 
 //        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -99,7 +98,7 @@ public class SecureStringManager {
      * @throws Exception
      */
     @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
-    public static String loadStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*SecretKey key*/ Cipher cipher) throws Exception {
+    static String loadStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*SecretKey key*/ Cipher cipher) throws Exception {
         checkArgs(context, fileName, "");
 
         if (!new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {// || !new File(getInitializationVectorFilePath(context, fileName)).exists()) { // TODO: Lilli, if doesn't exist, where error?

@@ -26,7 +26,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private IBanana handler;
 
     public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, IBanana handler) {
-        // TODO: Lilli, null checks
+        // TODO: Lilli, null checks, param validation
         this.context = context;
         this.identifier = identifier;
         this.protection = protection;
@@ -51,7 +51,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
                 @Override
                 public void onError(Throwable e) {
-                    throw new RuntimeException(e);
+                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(new RuntimeException(e));
                 }
             });
 
@@ -64,25 +64,30 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     @Override
     public void loadConfigSecurely(final LoadConfigHandler loadConfigHandler) {
         try {
-            KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
-                @Override
-                public void onAuthenticated(Cipher cipher) throws Exception {
-                    String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
+            if (!SecureStringManager.secureStringExists(context, identifier)) {
+                if (loadConfigHandler != null) loadConfigHandler.onLoadConfigNotFound();
 
-                    if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidSucceed(configString);
-                }
+            } else {
+                KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+                    @Override
+                    public void onAuthenticated(Cipher cipher) throws Exception {
+                        String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
 
-                @Override
-                public void onCancel() {
-                    if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidCancel();
-                }
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidSucceed(configString);
+                    }
 
-                @Override
-                public void onError(Throwable e) {
-                    throw new RuntimeException(e);
-                }
-            });
+                    @Override
+                    public void onCancel() {
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidCancel();
+                    }
 
+                    @Override
+                    public void onError(Throwable e) {
+                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(new RuntimeException(e));
+                    }
+                });
+
+            }
         } catch (Exception e) {
             if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
         }
@@ -90,10 +95,10 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
     @Override
     public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
-        try {
+        try { // TODO: Lilli, separate try/catches for better clean-up
             KeyStoreManager.removeSecretKey(context, identifier);
             SecureStringManager.deleteStringFromSecureStorage(context, identifier);
-            // TODO: Lilli, maybe delete the ciphers too?
+            CipherManager.deleteInitializationVector(context, identifier);
 
             if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidSucceed();
 

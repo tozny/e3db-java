@@ -16,6 +16,7 @@ package com.tozny.e3db.crypto;
 import android.content.Context;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
+import android.util.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -76,11 +77,7 @@ class CipherManager {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, key);
 
-            IvParameterSpec ivParams = cipher.getParameters().getParameterSpec(IvParameterSpec.class);
-
-            saveInitializationVector(context, identifier, ivParams.getIV());
-
-            // TODO: Log b64 IV to make sure is new every time
+            saveInitializationVector(context, identifier, cipher.getIV());
 
             return cipher;
         }

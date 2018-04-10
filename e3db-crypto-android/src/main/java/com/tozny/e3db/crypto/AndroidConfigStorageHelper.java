@@ -88,7 +88,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 });
 
             }
-        } catch (Exception e) {
+        } catch (Exception e) { // TODO: Catch throwables instead
             if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
         }
     }

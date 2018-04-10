@@ -13,7 +13,7 @@ package com.tozny.e3db;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-public interface ConfigStorageHelper {
+public interface ConfigStorageHelper { // TODO: Look at resultHandler interface for renaming these
     interface SaveConfigHandler {
         void onSaveConfigDidSucceed();
         void onSaveConfigDidCancel();

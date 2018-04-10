@@ -6,7 +6,7 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import com.tozny.e3db.crypto.IBanana;
+import com.tozny.e3db.crypto.KeyAuthenticator;
 import com.tozny.e3db.crypto.KeyProtection;
 
 
@@ -39,7 +39,7 @@ public class KPNoneFragment extends BaseFragment {
     }
 
     @Override
-    public IBanana keyAuthenticationHandler() {
+    public KeyAuthenticator keyAuthenticationHandler() {
         return null;
     }
 }

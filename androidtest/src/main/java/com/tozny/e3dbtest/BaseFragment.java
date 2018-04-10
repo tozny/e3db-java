@@ -10,7 +10,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import com.tozny.e3db.*;
 import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
-import com.tozny.e3db.crypto.IBanana;
+import com.tozny.e3db.crypto.KeyAuthenticator;
 import com.tozny.e3db.crypto.KeyProtection;
 
 import java.io.IOException;
@@ -313,7 +313,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     }
 
     @Override
-    public IBanana keyAuthenticationHandler() {
+    public KeyAuthenticator keyAuthenticationHandler() {
         throw new IllegalStateException("Method should be overridden by subclass.");
     }
 }

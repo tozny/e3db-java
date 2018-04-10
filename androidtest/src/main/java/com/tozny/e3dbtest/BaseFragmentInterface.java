@@ -13,11 +13,12 @@ package com.tozny.e3dbtest;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import com.tozny.e3db.crypto.IBanana;
+
+import com.tozny.e3db.crypto.KeyAuthenticator;
 import com.tozny.e3db.crypto.KeyProtection;
 
 public interface BaseFragmentInterface {
     String configName();
     KeyProtection keyProtection();
-    IBanana keyAuthenticationHandler();
+    KeyAuthenticator keyAuthenticationHandler();
 }

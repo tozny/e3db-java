@@ -13,30 +13,15 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Build;
-import android.provider.AlarmClock;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyPermanentlyInvalidatedException;
-import android.security.keystore.KeyProperties;
 import android.util.Log;
 
 import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.FINGERPRINT;
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.LOCK_SCREEN;
 
 public class FSKSWrapper {
     private static final String MOBILE_AUTH_DB_KSTORE = "MobileAuthDb.kstore";
@@ -69,7 +54,7 @@ public class FSKSWrapper {
         if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
-                if(result == null) {
+                if (result == null) {
                     try {
                         result = KeyStore.getInstance("BKS");
                         Log.d(TAG, "Keystore: " + result.getClass().getCanonicalName());
@@ -110,7 +95,7 @@ public class FSKSWrapper {
                 try {
                     OutputStream output = context.openFileOutput(MOBILE_AUTH_DB_KSTORE, Context.MODE_PRIVATE);
                     try {
-                        fsKS.store(output, /* should be getPasssword */ getPerf(context).toCharArray());
+                        fsKS.store(output, getPerf(context).toCharArray());
                         Log.d(TAG, "Saved keystore.");
                     } finally {
                         output.close();
@@ -153,8 +138,6 @@ public class FSKSWrapper {
             keyGen.init(random);
             SecretKey secretKey = keyGen.generateKey();
 
-            //keyStore.setKeyEntry(alias, secretKey, null, null);
-
             keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
             saveFSKS(context);
@@ -166,7 +149,7 @@ public class FSKSWrapper {
 
         KeyStore keyStore = getFSKS(context);
 
-        return (SecretKey) keyStore.getKey(alias, password.toCharArray());
+        return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
     }
 
     static void removeSecretKey(Context context, String alias) throws Exception {
@@ -176,9 +159,5 @@ public class FSKSWrapper {
             keyStore.deleteEntry(alias);
             saveFSKS(context);
         }
-    }
-
-    static KeyStore getKeyStore(Context context) throws Exception {
-        return getFSKS(context);
     }
 }

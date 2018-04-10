@@ -52,20 +52,22 @@ import static android.app.Activity.RESULT_OK;
 /**
  * Performs fingerprint authentication to unlock protected keys.
  */
-public final class DefaultIBanana implements IBanana {
+public final class DefaultKeyAuthenticator implements KeyAuthenticator {
     private final Activity activity;
     private final String title;
 
     /**
      * Create an instance that will display over the given activity.
      *
-     * @param activity Activity that will host the dialog
-     * @param title Title of the fingerprint dialog.
+     * @param activity
+     *         Activity that will host the dialog
+     * @param title
+     *         Title of the fingerprint dialog.
      */
-    public DefaultIBanana(Activity activity, String title) {
-        if(activity == null)
+    public DefaultKeyAuthenticator(Activity activity, String title) {
+        if (activity == null)
             throw new IllegalArgumentException("activity");
-        if(title == null)
+        if (title == null)
             throw new IllegalArgumentException("title");
 
         this.activity = activity;
@@ -88,6 +90,7 @@ public final class DefaultIBanana implements IBanana {
 
         public interface Callback {
             void onFingerprintAuthenticated(FingerprintManagerCompat.CryptoObject cryptoObject);
+
             void onFingerprintCancel();
         }
 
@@ -117,8 +120,7 @@ public final class DefaultIBanana implements IBanana {
         }
 
         @Override
-        public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                                 Bundle savedInstanceState) {
+        public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
             if (mTitle != null) {
                 getDialog().setTitle(mTitle);
             } else {
@@ -144,7 +146,8 @@ public final class DefaultIBanana implements IBanana {
         }
 
         @Override
-        public void onError(String errString) {}
+        public void onError(String errString) {
+        }
 
         @Override
         public void onPause() {
@@ -222,6 +225,7 @@ public final class DefaultIBanana implements IBanana {
 
         public interface Callback {
             void onAuthenticated(FingerprintManagerCompat.CryptoObject cryptoObject);
+
             void onError(String errString);
         }
 
@@ -290,6 +294,7 @@ public final class DefaultIBanana implements IBanana {
 
     /**
      * Whether the device supports fingerprint authentication or not.
+     *
      * @return
      */
     @SuppressLint("MissingPermission")
@@ -299,8 +304,7 @@ public final class DefaultIBanana implements IBanana {
             return PermissionChecker.checkSelfPermission(this.activity, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
                     fm.isHardwareDetected() &&
                     fm.hasEnrolledFingerprints();
-        }
-        else
+        } else
             return false;
     }
 
@@ -309,7 +313,7 @@ public final class DefaultIBanana implements IBanana {
      */
     @RequiresApi(Build.VERSION_CODES.M)
     public static final class DeviceCredentialsFragment extends Fragment {
-        private final /*Tozny.*/IApple.IAardvark cont;
+        private final DeviceLockAuthenticatorCallbackHandler cont;
         private final String title;
         private final KeyguardManager mgr;
 
@@ -320,13 +324,14 @@ public final class DefaultIBanana implements IBanana {
         }
 
 
-        @SuppressLint("ValidFragment") // Only used internally
-        DeviceCredentialsFragment(/*Tozny.*/IApple.IAardvark cont, String title, KeyguardManager mgr) {
-            if(mgr == null)
+        @SuppressLint("ValidFragment")
+            // Only used internally
+        DeviceCredentialsFragment(DeviceLockAuthenticatorCallbackHandler cont, String title, KeyguardManager mgr) {
+            if (mgr == null)
                 throw new IllegalArgumentException("mgr");
-            if(cont == null)
+            if (cont == null)
                 throw new IllegalArgumentException("cont");
-            if(title == null)
+            if (title == null)
                 throw new IllegalArgumentException("title");
 
             this.title = title;
@@ -337,7 +342,7 @@ public final class DefaultIBanana implements IBanana {
         @Override
         public void onAttach(Context context) {
             super.onAttach(context);
-            if(mgr != null && cont != null && title != null) {
+            if (mgr != null && cont != null && title != null) {
                 Intent confirmDeviceCredentialIntent = mgr.createConfirmDeviceCredentialIntent(title, "");
                 if (confirmDeviceCredentialIntent != null)
                     startActivityForResult(confirmDeviceCredentialIntent, 1);
@@ -361,7 +366,7 @@ public final class DefaultIBanana implements IBanana {
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
-    public void authenticateWithLockScreen(/*ToznyUser user, Tozny.*/IApple.IAardvark cont) {
+    public void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler cont) {
         DeviceCredentialsFragment f = new DeviceCredentialsFragment(cont, title, (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE));
         FragmentManager fragmentManager = activity.getFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
@@ -372,16 +377,16 @@ public final class DefaultIBanana implements IBanana {
     final int[] wrongPasswordCount = {0};
 
     @Override
-    public void getPassword(/*ToznyUser user, */final IBoston handler) {
+    public void getPassword(final PasswordAuthenticatorCallbackHandler handler) {
         this.activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Context ctx = DefaultIBanana.this.activity;
+                Context ctx = DefaultKeyAuthenticator.this.activity;
 
                 final EditText input = new EditText(ctx);
                 input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
 
-                new AlertDialog.Builder(DefaultIBanana.this.activity)
+                new AlertDialog.Builder(DefaultKeyAuthenticator.this.activity)
                         .setMessage(ctx.getString(R.string.key_provider_please_enter_pin))
                         .setPositiveButton(ctx.getString(R.string.key_provider_ok), new DialogInterface.OnClickListener() {
                             @Override
@@ -395,8 +400,8 @@ public final class DefaultIBanana implements IBanana {
                                     if (wrongPasswordCount[0] >= 3) {
                                         handler.handleError(new RuntimeException("Too many password tries."));
                                     } else {
-                                        Toast.makeText(DefaultIBanana.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
-                                        getPassword(/*null, */handler);
+                                        Toast.makeText(DefaultKeyAuthenticator.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        getPassword(handler);
                                     }
                                 }
                             }
@@ -417,8 +422,8 @@ public final class DefaultIBanana implements IBanana {
                             input.post(new Runnable() {
                                 @Override
                                 public void run() {
-                                    final InputMethodManager imm = (InputMethodManager) DefaultIBanana.this.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-                                    imm.showSoftInput(input,InputMethodManager.SHOW_IMPLICIT);
+                                    final InputMethodManager imm = (InputMethodManager) DefaultKeyAuthenticator.this.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+                                    imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
                                 }
                             });
                         }
@@ -429,7 +434,7 @@ public final class DefaultIBanana implements IBanana {
     }
 
     @Override
-    public void authenticateWithFingerprint(/*ToznyUser user, */FingerprintManagerCompat.CryptoObject cryptoObject, final /*Tozny.*/IApple.IAardvark handler) {
+    public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, final DeviceLockAuthenticatorCallbackHandler handler) {
         try {
             FingerprintAuthDialogFragment fragment = new FingerprintAuthDialogFragment();
             fragment.setCryptoObject(cryptoObject);
@@ -446,28 +451,8 @@ public final class DefaultIBanana implements IBanana {
             });
 
             fragment.show(activity.getFragmentManager(), "fingerprintUI");
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
             handler.handleError(e);
         }
     }
-
-//    @SuppressLint("MissingPermission")
-//    void reportError(EnrollmentHandler handler) {
-//        if(PermissionChecker.checkSelfPermission(this.activity, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintPermissionMissing));
-//            return;
-//        }
-//
-//        FingerprintManagerCompat fm = FingerprintManagerCompat.from(this.activity);
-//        if (!fm.isHardwareDetected()) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintHardwareNotPresent));
-//            return;
-//        }
-//
-//        if (!fm.hasEnrolledFingerprints()) {
-//            handler.failToCreateAccount(new ToznyException(ToznyException.Code.FingerprintsNotEnrolled));
-//            return;
-//        }
-//    }
 }

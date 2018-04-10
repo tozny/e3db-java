@@ -25,7 +25,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
-public class CipherManager {
+class CipherManager {
 
     interface GetCipher {
         Cipher getCipher(Context context, String identifier, SecretKey key) throws Exception;
@@ -66,6 +66,8 @@ public class CipherManager {
             IvParameterSpec ivParams = cipher.getParameters().getParameterSpec(IvParameterSpec.class);
 
             saveInitializationVector(context, identifier, ivParams.getIV());
+
+            // TODO: Log b64 IV to make sure is new every time
 
             return cipher;
         }

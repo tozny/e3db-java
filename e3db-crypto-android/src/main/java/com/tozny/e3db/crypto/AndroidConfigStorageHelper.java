@@ -23,9 +23,9 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private Context context;
     private String identifier;
     private KeyProtection protection;
-    private IBanana handler;
+    private KeyAuthenticator handler;
 
-    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, IBanana handler) {
+    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator handler) {
         // TODO: Lilli, null checks, param validation
         this.context = context;
         this.identifier = identifier;

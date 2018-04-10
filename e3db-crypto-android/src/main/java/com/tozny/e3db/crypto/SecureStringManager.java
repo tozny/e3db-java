@@ -13,22 +13,16 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
-import android.annotation.SuppressLint;
+
 import android.content.Context;
-import android.os.Build;
-import android.security.keystore.KeyGenParameterSpec;
-import android.security.keystore.KeyProperties;
-import android.support.annotation.RequiresApi;
+import org.jetbrains.annotations.NotNull;
 
 import javax.crypto.*;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.IvParameterSpec;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.security.KeyStore;
 
-public class SecureStringManager {
+class SecureStringManager {
 
     private static void checkArgs(Context context, String fileName, String string) throws Exception { // TODO: Lilli, move higher
         if (context == null) {
@@ -48,13 +42,7 @@ public class SecureStringManager {
         return new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists();
     }
 
-    /**
-     * Deletes the encrypted string from the file system.
-     * @param context The application context.
-     * @param fileName The fileName under which the the encrypted string is stored.
-     * @throws Exception
-     */
-    static void deleteStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName) throws Exception {
+    static void deleteStringFromSecureStorage(@NotNull Context context, @NotNull String fileName) throws Exception {
         checkArgs(context, fileName, "");
 
         if (new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {
@@ -63,52 +51,15 @@ public class SecureStringManager {
         }
     }
 
-    /**
-     * Generates a keypair, and uses it to encrypt the string. Saves the encrypted string to the file system.
-     * @param context The application context.
-     * @param fileName The fileName under which the encrypted string is stored.
-     * @param string The string to be encrypted.
-     * @throws Exception
-     */
-    @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
-    static void saveStringToSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*@NotNull*/ String string, /*SecretKey key*/ Cipher cipher) throws Exception {
-        checkArgs(context, fileName, string);
-
-//        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-//        cipher.init(Cipher.ENCRYPT_MODE, key);
-//
-//        IvParameterSpec ivParams = cipher.getParameters().getParameterSpec(IvParameterSpec.class);
-//
-//        saveInitializationVector(context, fileName, ivParams.getIV());
-
-        // TODO: Log b64 IV to make sure is new every time
-
-        CipherOutputStream cipherOutputStream =
+    static void saveStringToSecureStorage(@NotNull Context context, @NotNull String fileName, @NotNull String string, Cipher cipher) throws Exception {
+       CipherOutputStream cipherOutputStream =
                 new CipherOutputStream(new FileOutputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
 
         cipherOutputStream.write(string.getBytes("UTF-8"));
         cipherOutputStream.close();
     }
 
-    /**
-     * Loads and decrypts the encrypted string from the file system.
-     * @param context The application context.
-     * @param fileName The fileName under which the encrypted string is stored.
-     * @return The decrypted string. If the key/file doesn't exist, returns `null`.
-     * @throws Exception
-     */
-    @SuppressLint("NewApi") // TODO: Lilli, replace w annotations later
-    static String loadStringFromSecureStorage(/*@NotNull*/ Context context, /*@NotNull*/ String fileName, /*SecretKey key*/ Cipher cipher) throws Exception {
-        checkArgs(context, fileName, "");
-
-        if (!new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {// || !new File(getInitializationVectorFilePath(context, fileName)).exists()) { // TODO: Lilli, if doesn't exist, where error?
-            return null;
-        }
-
-//        GCMParameterSpec params = new GCMParameterSpec(128, loadInitializationVector(context, fileName)); // TODO: Lilli, do we know that it's always 128?
-//
-//        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-//        cipher.init(Cipher.DECRYPT_MODE, key, params);
+    static String loadStringFromSecureStorage(@NotNull Context context, @NotNull String fileName, Cipher cipher) throws Exception {
 
         CipherInputStream cipherInputStream =
                 new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);

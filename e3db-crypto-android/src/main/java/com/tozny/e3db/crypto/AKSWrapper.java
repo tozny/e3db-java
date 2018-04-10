@@ -17,15 +17,12 @@ import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import android.util.Log;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.*;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
 
-public class AKSWrapper {
+class AKSWrapper {
     @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
     private static void createKeyPairIfNeeded(String alias, KeyProtection protection) throws Exception {
 
@@ -87,12 +84,5 @@ public class AKSWrapper {
 
         if (keyStore.containsAlias(alias))
             keyStore.deleteEntry(alias);
-    }
-
-    static KeyStore getKeyStore(Context context) throws Exception { // TODO: Lilli, save in static variable?
-        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
-        keyStore.load(null);
-
-        return keyStore;
     }
 }

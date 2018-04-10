@@ -6,8 +6,8 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import com.tozny.e3db.crypto.DefaultIBanana;
-import com.tozny.e3db.crypto.IBanana;
+import com.tozny.e3db.crypto.DefaultKeyAuthenticator;
+import com.tozny.e3db.crypto.KeyAuthenticator;
 import com.tozny.e3db.crypto.KeyProtection;
 
 /**
@@ -41,7 +41,7 @@ public class KPFingerPrintFragment extends BaseFragment {
     }
 
     @Override
-    public IBanana keyAuthenticationHandler() {
-        return new DefaultIBanana(this.getActivity(), "Fingerprint");
+    public KeyAuthenticator keyAuthenticationHandler() {
+        return new DefaultKeyAuthenticator(this.getActivity(), "Fingerprint");
     }
 }

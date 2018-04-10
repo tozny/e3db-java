@@ -110,9 +110,8 @@ public class KeyStoreManager {
                 if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
                     throw new IllegalStateException(protection.protectionType().toString() + " not supported below API 23.");
 
-                cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
-
                 try {
+                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
                     authenticatedCipherHandler.onAuthenticated(cipher); // If the user unlocked the screen within the timeout limit, then this is already authenticated
 
                 } catch (InvalidKeyException e) {
@@ -126,7 +125,8 @@ public class KeyStoreManager {
                             @Override
                             public void handleAuthenticated() {
                                 try {
-                                    authenticatedCipherHandler.onAuthenticated(cipher);
+                                    getCipher(context, identifier, protection, banana, cipherGetter, authenticatedCipherHandler);
+
                                 } catch (Exception e) {
                                     authenticatedCipherHandler.onError(e);
                                 }

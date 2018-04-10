@@ -48,7 +48,7 @@ public class AKSWrapper {
 
                 case LOCK_SCREEN:
                     builder.setUserAuthenticationRequired(true)
-                            .setUserAuthenticationValidityDurationSeconds(60);
+                            .setUserAuthenticationValidityDurationSeconds(protection.validUntilSecondsSinceUnlock());
                     break;
 
                 case PASSWORD:

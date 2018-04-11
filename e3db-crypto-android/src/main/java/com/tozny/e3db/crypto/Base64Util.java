@@ -16,7 +16,7 @@ package com.tozny.e3db.crypto;
 
 import android.util.Base64;
 
-public class Base64Impl  {
+public class Base64Util {
 
     static String encode(byte[] s) {
         String result = Base64.encodeToString(s, Base64.NO_WRAP);

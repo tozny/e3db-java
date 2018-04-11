@@ -55,9 +55,8 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 }
             });
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(e);
-
         }
     }
 
@@ -88,7 +87,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 });
 
             }
-        } catch (Exception e) { // TODO: Catch throwables instead
+        } catch (Throwable e) { // TODO: Catch throwables instead
             if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
         }
     }
@@ -102,7 +101,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
             if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidSucceed();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidFail(e);
         }
     }

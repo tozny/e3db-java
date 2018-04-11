@@ -15,8 +15,6 @@ package com.tozny.e3db.crypto;
 
 import android.content.Context;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
-import android.util.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -25,17 +23,16 @@ import javax.crypto.spec.IvParameterSpec;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.security.AlgorithmParameters;
 import java.security.spec.AlgorithmParameterSpec;
 
 
 class CipherManager {
 
     interface GetCipher {
-        Cipher getCipher(Context context, String identifier, SecretKey key) throws Exception;
+        Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable;
     }
 
-    private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws Exception {
+    private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws Throwable {
         FileOutputStream fos = null;
 
         try {
@@ -48,7 +45,7 @@ class CipherManager {
         }
     }
 
-    private static byte[] loadInitializationVector(Context context, String fileName) throws Exception {
+    private static byte[] loadInitializationVector(Context context, String fileName) throws Throwable {
         FileInputStream fis = null;
         byte[] bytes;
 
@@ -66,7 +63,7 @@ class CipherManager {
         return bytes;
     }
 
-    static void deleteInitializationVector(Context context, String fileName) throws Exception {
+    static void deleteInitializationVector(Context context, String fileName) throws Throwable {
         if (new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)).exists()) {
             File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
             file.delete();
@@ -76,7 +73,7 @@ class CipherManager {
     static class SaveCipherGetter implements GetCipher {
 
         @Override
-        public Cipher getCipher(Context context, String identifier, SecretKey key) throws Exception {
+        public Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, key);
 
@@ -90,7 +87,7 @@ class CipherManager {
         private static int RECC_AUTH_TAG_LEN = 128;
 
         @Override
-        public Cipher getCipher(Context context, String identifier, SecretKey key) throws Exception {
+        public Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable {
             AlgorithmParameterSpec params;
 
             if (key.getClass().getSimpleName().equals("AndroidKeyStoreSecretKey") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)

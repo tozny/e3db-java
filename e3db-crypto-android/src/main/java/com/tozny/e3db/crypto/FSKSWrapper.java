@@ -44,8 +44,6 @@ class FSKSWrapper {
         return bytes;
     }
 
-    // See https://toznysecurity.atlassian.net/browse/AUTH-2519 for
-    // security considerations.
     private synchronized static String getPerf(Context context) throws Throwable {
        return "TODO";
     }

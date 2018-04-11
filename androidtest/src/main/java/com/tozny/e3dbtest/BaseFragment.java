@@ -38,8 +38,8 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     protected Button mDeleteConfigButton;
     protected Button mNewConfigButton;
 
-    protected TextView mErrorTextView;
     protected TextView mStatusTextView;
+    protected TextView mErrorTextView;
     protected TextView mConfigTextView;
 
     protected static String TOKEN       = "ce4ed7a4cf50ac5bf231938da4f4b9b5466768e602529eeb57ad1dabb2c66f90";
@@ -72,15 +72,12 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_base, container, false);
 
-        TextView nameLabel = view.findViewById(R.id.name_label);
-        nameLabel.setText(mName);
-
         mLoadConfigButton   = view.findViewById(R.id.load_config_button);
         mSaveConfigButton   = view.findViewById(R.id.save_config_button);
         mDeleteConfigButton = view.findViewById(R.id.delete_config_button);
         mNewConfigButton    = view.findViewById(R.id.new_config_button);
-        mErrorTextView      = view.findViewById(R.id.error_text_view);
         mStatusTextView     = view.findViewById(R.id.status_text_view);
+        mErrorTextView      = view.findViewById(R.id.error_text_view);
         mConfigTextView     = view.findViewById(R.id.config_text_view);
 
         mLoadConfigButton.setOnClickListener(loadConfigButtonOnClickListener);
@@ -91,7 +88,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         mState = State.UNKNOWN;
 
         clearLabels();
-        updateLabels("", "Unknown State", "");
+        updateLabels("Unknown State", "", "");
         updateInterface();
 
         return view;
@@ -105,7 +102,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         @Override
         public void onClick(View v) {
 
-            updateLabels("", "Loading Config...", "");
+            updateLabels("Loading Config...", "", "");
 
             Config.loadConfigSecurely(configStorageHelper(), new ConfigStorageHelper.LoadConfigHandler() {
                 @Override
@@ -118,20 +115,20 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                     mState = State.CONFIG_LOADED;
 
-                    updateLabels("", "Config Loaded", mConfig.json());
+                    updateLabels("Config Loaded", "", mConfig.json());
                     updateInterface();
                 }
 
                 @Override
                 public void loadConfigDidCancel() {
-                    updateLabels("", "Config Load Canceled", "");
+                    updateLabels("Config Load Canceled", "", "");
                 }
 
                 @Override
                 public void loadConfigNotFound() {
                     mState = State.CONFIG_DELETED;
 
-                    updateLabels("", "No Config Found", "");
+                    updateLabels("No Config Found", "", "");
                     updateInterface();
                 }
 
@@ -141,7 +138,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                     mState = State.ERROR_FOUND;
 
-                    updateLabels(e.getLocalizedMessage(), "Load Config Failed", "");
+                    updateLabels("Load Config Failed", e.getLocalizedMessage(), "");
                     updateInterface();
                 }
             });
@@ -151,23 +148,23 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     private View.OnClickListener saveConfigButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            updateLabels("", "Saving Config...", "");
+            updateLabels("Saving Config...", "", "");
 
             Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
                 @Override
                 public void saveConfigDidSucceed() {
-                    updateLabels("", "Config Saved", mConfig.json());
+                    updateLabels("Config Saved", "", mConfig.json());
                 }
 
                 @Override
                 public void saveConfigDidCancel() {
-                    updateLabels("", "Config Save Canceled", "");
+                    updateLabels("Config Save Canceled", "", "");
                 }
 
                 @Override
                 public void saveConfigDidFail(Throwable e) {
                     e.printStackTrace();
-                    updateLabels(e.getLocalizedMessage(), "Save Config Failed", "");
+                    updateLabels("Save Config Failed", e.getLocalizedMessage(), "");
                 }
             });
         }
@@ -176,7 +173,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     private View.OnClickListener deleteConfigButtonOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            updateLabels("", "Deleting Config...", "");
+            updateLabels("Deleting Config...", "", "");
 
             Config.removeConfigSecurely(configStorageHelper(), new ConfigStorageHelper.RemoveConfigHandler() {
                 @Override
@@ -185,7 +182,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                     mState = State.CONFIG_DELETED;
 
-                    updateLabels("", "Config Deleted", "");
+                    updateLabels("Config Deleted", "", "");
                     updateInterface();
                 }
 
@@ -195,7 +192,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                     mState = State.ERROR_FOUND;
 
-                    updateLabels(e.getLocalizedMessage(), "Delete Config Failed", "");
+                    updateLabels("Delete Config Failed", e.getLocalizedMessage(), "");
                     updateInterface();
                 }
             });
@@ -206,7 +203,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         @Override
         public void onClick(View v) {
 
-            updateLabels("", "Registering new client...", "");
+            updateLabels("Registering new client...", "", "");
 
             Client.register(TOKEN, CLIENT_NAME + UUID.randomUUID().toString(), HOST, new ResultHandler<Config>() {
                 @Override
@@ -219,13 +216,13 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                             public void saveConfigDidSucceed() {
                                 mState = State.CONFIG_LOADED;
 
-                                updateLabels("", "New Config Created and Saved", mConfig.json());
+                                updateLabels("New Config Created and Saved", "", mConfig.json());
                                 updateInterface();
                             }
 
                             @Override
                             public void saveConfigDidCancel() {
-                                updateLabels("", "Config Create Canceled", "");
+                                updateLabels("Config Create Canceled", "", "");
 
                             }
 
@@ -235,7 +232,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                                 mState = State.ERROR_FOUND;
 
-                                updateLabels(e.getLocalizedMessage(), "Create Config Failed", "");
+                                updateLabels("Create Config Failed", e.getLocalizedMessage(), "");
                                 updateInterface();
                             }
                         });
@@ -243,7 +240,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                     } else {
                         mState = State.ERROR_FOUND;
 
-                        updateLabels((r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()),"Create Config Failed", "");
+                        updateLabels("Create Config Failed", (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()), "");
                         updateInterface();
 
                     }
@@ -253,14 +250,14 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     };
 
     protected void clearLabels() {
-        mErrorTextView.setText("");
         mStatusTextView.setText("");
+        mErrorTextView.setText("");
         mConfigTextView.setText("");
     }
 
-    protected void updateLabels(String errorText, String statusText, String configText) {
-        mErrorTextView.setText(errorText);
+    protected void updateLabels(String statusText, String errorText, String configText) {
         mStatusTextView.setText(statusText);
+        mErrorTextView.setText(errorText);
         mConfigTextView.setText(configText);
     }
 

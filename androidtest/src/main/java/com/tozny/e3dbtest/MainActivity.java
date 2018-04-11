@@ -1,141 +1,74 @@
 package com.tozny.e3dbtest;
 
-import android.content.Context;
-import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
-
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import android.view.View;
-import android.widget.Button;
+import android.support.annotation.NonNull;
+import android.support.design.widget.BottomNavigationView;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+import android.support.v4.view.ViewPager;
+import android.support.v7.app.AppCompatActivity;
+import android.view.MenuItem;
 import android.widget.TextView;
-import com.tozny.e3db.*;
-import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
-import com.tozny.e3db.crypto.KeyProtection;
 
 public class MainActivity extends AppCompatActivity {
-
-    private static String token = "ce4ed7a4cf50ac5bf231938da4f4b9b5466768e602529eeb57ad1dabb2c66f90";
-    private static String clientName = "LilliTest-";
-    private static String host = "https://api.e3db.com";
-
-    private static Client client = null;
-
-    private Button button = null;
-    private TextView label = null;
+    private KPNoneFragment        mNoneFragment;
+    private KPPasswordFragment    mPasswordFragment;
+    private KPLockScreenFragment  mLockScreenFragment;
+    private KPFingerPrintFragment mFingerPrintFragment;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        button = findViewById(R.id.register_client_button);
-        label = findViewById(R.id.hello_label);
-//
-//        try {
-//
-//            AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone(), null);
-//            //Config.removeConfigSecurely(configStorageHelper);
-//            Config config = Config.loadConfigSecurely(configStorageHelper);
-//
-//            client = new ClientBuilder()
-//                    .fromConfig(config)
-//                    .build();
-//
-//            button.setText("Send data");
-//            label.setText("Config loaded.");
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//
-//            label.setText(e.getLocalizedMessage());
-//        }
-//
-//        button.setOnClickListener(new View.OnClickListener() {
-//            public void onClick(View v) {
-//
-//                if (MainActivity.client == null) {
-//
-//                    Client.register(token, clientName + UUID.randomUUID().toString(), host, new ResultHandler<Config>() {
-//                        @Override
-//                        public void handle(Result<Config> r) {
-//                            if (!r.isError()) {
-//                                try {
-//                                    AndroidConfigStorageHelper configStorageHelper = new AndroidConfigStorageHelper(MainActivity.this, "config", KeyProtection.withNone(), null);
-//                                    Config.saveConfigSecurely(configStorageHelper, r.asValue());
-//
-//                                    client = new ClientBuilder()
-//                                            .fromConfig(r.asValue())
-//                                            .build();
-//
-//                                    button.setText("Send data");
-//                                    label.setText("Client registered and config saved");
-//
-//                                } catch (Exception e) {
-//                                    e.printStackTrace();
-//                                    label.setText(e.getLocalizedMessage());
-//                                }
-//
-//                            } else {
-//                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
-//
-//                            }
-//                        }
-//                    });
-//
-//                } else {
-//                    Map<String, String> lyric = new HashMap<>();
-//                    lyric.put("line", "Say I'm the only bee in your bonnet");
-//                    lyric.put("song", "Birdhouse in Your Soul");
-//                    lyric.put("artist", "They Might Be Giants");
-//
-//                    String recordType = "lyric";
-//
-//                    client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>() {
-//                        @Override
-//                        public void handle(Result<Record> r) {
-//                            if (!r.isError()) {
-//                                label.setText("Record updated...");
-//
-//                            } else {
-//                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
-//
-//                            }
-//                        }
-//                    });
-//
-//                    QueryParams params = new QueryParamsBuilder()
-//                            .setTypes("lyric")
-//                            .setIncludeData(true)
-//                            .setCount(100)
-//                            .build();
-//
-//                    client.query(params, new ResultHandler<QueryResponse>() {
-//                        @Override
-//                        public void handle(Result<QueryResponse> r) {
-//                            if (!r.isError()) {
-//                                label.setText("Records currently set: " + r.asValue().records().size());
-//
-//                            } else {
-//                                label.setText("ERROR: " + (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()));
-//
-//                            }
-//                        }
-//                    });
-//                }
-//            }
-//        });
+        mNoneFragment        = KPNoneFragment.newInstance(0, getString(R.string.title_kp_none));
+        mPasswordFragment    = KPPasswordFragment.newInstance(1, getString(R.string.title_kp_password));
+        mLockScreenFragment  = KPLockScreenFragment.newInstance(2, getString(R.string.title_kp_lock_screen));
+        mFingerPrintFragment = KPFingerPrintFragment.newInstance(3, getString(R.string.title_kp_fingerprint));
+
+        switchFragment(mNoneFragment, getString(R.string.title_kp_none));
+
+        BottomNavigationView navigation = findViewById(R.id.navigation);
+        navigation.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
+    private BottomNavigationView.OnNavigationItemSelectedListener mOnNavigationItemSelectedListener = new BottomNavigationView.OnNavigationItemSelectedListener() {
+        @Override
+        public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+            switch (item.getItemId()) {
+                case R.id.navigation_kp_none:
+                    switchFragment(mNoneFragment, getString(R.string.title_kp_none));
+
+                    return true;
+
+                case R.id.navigation_kp_password:
+                    switchFragment(mPasswordFragment, getString(R.string.title_kp_password));
+
+                    return true;
+
+                case R.id.navigation_kp_lock_screen:
+                    switchFragment(mLockScreenFragment, getString(R.string.title_kp_lock_screen));
+
+                    return true;
+
+                case R.id.navigation_kp_fingerprint:
+                    switchFragment(mFingerPrintFragment, getString(R.string.title_kp_fingerprint));
+
+                    return true;
+
+            }
+
+            return false;
+        }
+    };
+
+    private void switchFragment(BaseFragment fragment, String text) {
+        if (getActionBar() != null) getActionBar().setTitle(text);
+        if (getSupportActionBar() != null) getSupportActionBar().setTitle(text);
+
+        FragmentManager manager = getSupportFragmentManager();
+        FragmentTransaction transaction = manager.beginTransaction();
+        transaction.replace(R.id.content_fragment, fragment);
+        transaction.commit();
     }
 }

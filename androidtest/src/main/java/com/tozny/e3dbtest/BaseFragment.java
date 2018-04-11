@@ -17,9 +17,6 @@ import java.io.IOException;
 import java.util.UUID;
 
 
-/**
- * A simple {@link Fragment} subclass.
- */
 public class BaseFragment extends Fragment implements BaseFragmentInterface {
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
@@ -50,8 +47,6 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     protected static String HOST        = "https://api.e3db.com";
 
     private Config mConfig = null;
-
-    //protected static Client client = null;
 
     public BaseFragment() {
         // Required empty public constructor

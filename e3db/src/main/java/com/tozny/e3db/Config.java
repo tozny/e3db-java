@@ -224,11 +224,7 @@ public class Config {
    * @param config
    */
   public static void saveConfigSecurely(ConfigStorageHelper helper, String config, ConfigStorageHelper.SaveConfigHandler handler) {
-    if (Platform.isAndroid()) {
-      helper.saveConfigSecurely(config, handler);
-    } else {
-      throw new IllegalStateException("Method is only available for Android.");
-    }
+    helper.saveConfigSecurely(config, handler);
   }
 
   /**
@@ -238,11 +234,7 @@ public class Config {
    * @throws IOException
    */
   public static void loadConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.LoadConfigHandler handler) {
-    if (Platform.isAndroid()) {
-      helper.loadConfigSecurely(handler);
-    } else {
-      throw new IllegalStateException("Method is only available for Android.");
-    }
+    helper.loadConfigSecurely(handler);
   }
 
   /**
@@ -251,10 +243,6 @@ public class Config {
    * @param config
    */
   public static void removeConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.RemoveConfigHandler handler) {
-    if (Platform.isAndroid()) {
-      helper.removeConfigSecurely(handler);
-    } else {
-      throw new IllegalStateException("Method is only available for Android.");
-    }
+    helper.removeConfigSecurely(handler);
   }
 }

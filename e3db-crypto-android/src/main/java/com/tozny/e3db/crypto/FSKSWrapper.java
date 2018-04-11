@@ -14,14 +14,18 @@ package com.tozny.e3db.crypto;
 
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.security.spec.InvalidKeySpecException;
 
 class FSKSWrapper {
     private static final String MOBILE_AUTH_DB_KSTORE = "MobileAuthDb.kstore";
@@ -45,7 +49,64 @@ class FSKSWrapper {
     }
 
     private synchronized static String getPerf(Context context) throws Throwable {
-       return "TODO";
+        final int count = 65, bytes = 20;
+        final String perf = "1I7K7S1N7A8R0F0A8Z5S";
+        int r;
+        byte[] s, buf;
+
+        if (!fileExists(context, perf)) {
+            // should only run once, the first time the keystore is accessed.
+            buf = getRandomBytes(count);
+
+            for (int i = 0; i + 1 < buf.length; i += 2) {
+                byte a = buf[i];
+                buf[i] = buf[i + (i % 2 == 1 ? 1 : i - (i - 1))];
+                buf[i + (i % 2 == 1 ? i - (i - 1) : 1)] = a;
+            }
+
+            OutputStream output = context.openFileOutput(perf, Context.MODE_PRIVATE);
+            try {
+                output.write(buf);
+            } finally {
+                output.close();
+            }
+
+            r = SecureRandom.getInstance("SHA1PRNG").nextInt(1000) + 10000;
+            s = getRandomBytes(bytes);
+
+            SharedPreferences sharedPreferences = context.getSharedPreferences(perf, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putInt("r", r);
+            editor.putString("s", Base64Util.encode(s));
+            editor.apply();
+
+        } else {
+            buf = new byte[count];
+            InputStream input = context.openFileInput(perf);
+
+            try {
+                if (input.read(buf) != count)
+                    throw new RuntimeException("Invalid perf log");
+            } finally {
+                input.close();
+            }
+
+            SharedPreferences sharedPreferences = context.getSharedPreferences(perf, Context.MODE_PRIVATE);
+            r = sharedPreferences.getInt("r", -1);
+            s = Base64Util.decode(sharedPreferences.getString("s", null));
+        }
+
+        for (int i = 0; i + 1 < buf.length; i += 2) {
+            byte a = buf[i];
+            buf[i] = buf[i + (i % 2 == 1 ? 1 : i - (i - 1))];
+            buf[i + (i % 2 == 1 ? i - (i - 1) : 1)] = a;
+        }
+
+        return Base64Util.encode(
+                SecretKeyFactory.getInstance("PBKDF2WITHHMACSHA1").generateSecret(
+                        new PBEKeySpec(Base64Util.encode(buf).toCharArray(), s, r, bytes * 8)
+                ).getEncoded()
+        );
     }
 
     private static KeyStore getFSKS(Context context) throws Throwable {
@@ -76,8 +137,7 @@ class FSKSWrapper {
                         }
 
                         fsKS = result;
-                    }
-                    catch (KeyStoreException | IOException | NoSuchAlgorithmException| CertificateException e) {
+                    } catch (KeyStoreException | IOException | NoSuchAlgorithmException| CertificateException e) {
                         throw new RuntimeException(e);
                     }
                 }

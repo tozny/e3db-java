@@ -125,12 +125,21 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
     @Override
     public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
-        try { // TODO: Lilli, separate try/catches for better clean-up
+        try {
             checkArgs(context, identifier);
 
-            KeyStoreManager.removeSecretKey(context, identifier);
-            SecureStringManager.deleteStringFromSecureStorage(context, identifier);
-            CipherManager.deleteInitializationVector(context, identifier);
+            Throwable throwable = null;
+            
+            try { KeyStoreManager.removeSecretKey(context, identifier); }
+            catch (Throwable e) { throwable = e; }
+
+            try { SecureStringManager.deleteStringFromSecureStorage(context, identifier); }
+            catch (Throwable e) { throwable = e; }
+
+            try { CipherManager.deleteInitializationVector(context, identifier); }
+            catch (Throwable e) { throwable = e; }
+
+            if (throwable != null) throw throwable;
 
             if (removeConfigHandler != null) removeConfigHandler.removeConfigDidSucceed();
 

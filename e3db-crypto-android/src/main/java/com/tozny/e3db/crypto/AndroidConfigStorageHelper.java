@@ -70,22 +70,22 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 public void onAuthenticated(Cipher cipher) throws Throwable {
                     SecureStringManager.saveStringToSecureStorage(context, identifier, config, cipher);
 
-                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidSucceed();
+                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidSucceed();
                 }
 
                 @Override
                 public void onCancel() {
-                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidCancel();
+                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidCancel();
                 }
 
                 @Override
                 public void onError(Throwable e) {
-                    if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(new RuntimeException(e));
+                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidFail(new RuntimeException(e));
                 }
             });
 
         } catch (Throwable e) {
-            if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(e);
+            if (saveConfigHandler != null) saveConfigHandler.saveConfigDidFail(e);
         }
     }
 
@@ -95,7 +95,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             checkArgs(context, identifier);
 
             if (!SecureStringManager.secureStringExists(context, identifier)) {
-                if (loadConfigHandler != null) loadConfigHandler.onLoadConfigNotFound();
+                if (loadConfigHandler != null) loadConfigHandler.loadConfigNotFound();
 
             } else {
                 KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
@@ -103,23 +103,23 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                     public void onAuthenticated(Cipher cipher) throws Throwable {
                         String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
 
-                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidSucceed(configString);
+                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidSucceed(configString);
                     }
 
                     @Override
                     public void onCancel() {
-                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidCancel();
+                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidCancel();
                     }
 
                     @Override
                     public void onError(Throwable e) {
-                        if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(new RuntimeException(e));
+                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidFail(new RuntimeException(e));
                     }
                 });
 
             }
         } catch (Throwable e) {
-            if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
+            if (loadConfigHandler != null) loadConfigHandler.loadConfigDidFail(e);
         }
     }
 
@@ -132,10 +132,10 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             SecureStringManager.deleteStringFromSecureStorage(context, identifier);
             CipherManager.deleteInitializationVector(context, identifier);
 
-            if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidSucceed();
+            if (removeConfigHandler != null) removeConfigHandler.removeConfigDidSucceed();
 
         } catch (Throwable e) {
-            if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidFail(e);
+            if (removeConfigHandler != null) removeConfigHandler.removeConfigDidFail(e);
         }
     }
 }

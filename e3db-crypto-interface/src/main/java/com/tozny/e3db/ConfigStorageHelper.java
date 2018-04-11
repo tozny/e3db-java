@@ -15,21 +15,21 @@ package com.tozny.e3db;
 
 public interface ConfigStorageHelper { // TODO: Look at resultHandler interface for renaming these
     interface SaveConfigHandler {
-        void onSaveConfigDidSucceed();
-        void onSaveConfigDidCancel();
-        void onSaveConfigDidFail(Throwable e);
+        void saveConfigDidSucceed();
+        void saveConfigDidCancel();
+        void saveConfigDidFail(Throwable e);
     }
 
     interface LoadConfigHandler {
-        void onLoadConfigDidSucceed(String config);
-        void onLoadConfigDidCancel();
-        void onLoadConfigNotFound();
-        void onLoadConfigDidFail(Throwable e);
+        void loadConfigDidSucceed(String config);
+        void loadConfigDidCancel();
+        void loadConfigNotFound();
+        void loadConfigDidFail(Throwable e);
     }
 
     interface RemoveConfigHandler {
-        void onRemoveConfigDidSucceed();
-        void onRemoveConfigDidFail(Throwable e);
+        void removeConfigDidSucceed();
+        void removeConfigDidFail(Throwable e);
     }
 
     void saveConfigSecurely(String config, SaveConfigHandler handler);

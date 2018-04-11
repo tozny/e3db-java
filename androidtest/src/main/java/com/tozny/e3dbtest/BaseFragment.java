@@ -114,11 +114,11 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             Config.loadConfigSecurely(configStorageHelper(), new ConfigStorageHelper.LoadConfigHandler() {
                 @Override
-                public void onLoadConfigDidSucceed(String config) {
+                public void loadConfigDidSucceed(String config) {
                     try {
                         mConfig = Config.fromJson(config);
                     } catch (IOException e) {
-                        onLoadConfigDidFail(e);
+                        loadConfigDidFail(e);
                     }
 
                     mState = State.CONFIG_LOADED;
@@ -128,12 +128,12 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onLoadConfigDidCancel() {
+                public void loadConfigDidCancel() {
                     updateLabels("", "Config Load Canceled", "");
                 }
 
                 @Override
-                public void onLoadConfigNotFound() {
+                public void loadConfigNotFound() {
                     mState = State.CONFIG_DELETED;
 
                     updateLabels("", "No Config Found", "");
@@ -141,7 +141,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onLoadConfigDidFail(Throwable e) {
+                public void loadConfigDidFail(Throwable e) {
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;
@@ -160,17 +160,17 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
                 @Override
-                public void onSaveConfigDidSucceed() {
+                public void saveConfigDidSucceed() {
                     updateLabels("", "Config Saved", mConfig.json());
                 }
 
                 @Override
-                public void onSaveConfigDidCancel() {
+                public void saveConfigDidCancel() {
                     updateLabels("", "Config Save Canceled", "");
                 }
 
                 @Override
-                public void onSaveConfigDidFail(Throwable e) {
+                public void saveConfigDidFail(Throwable e) {
                     e.printStackTrace();
                     updateLabels(e.getLocalizedMessage(), "Save Config Failed", "");
                 }
@@ -185,7 +185,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             Config.removeConfigSecurely(configStorageHelper(), new ConfigStorageHelper.RemoveConfigHandler() {
                 @Override
-                public void onRemoveConfigDidSucceed() {
+                public void removeConfigDidSucceed() {
                     mConfig = null;
 
                     mState = State.CONFIG_DELETED;
@@ -195,7 +195,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onRemoveConfigDidFail(Throwable e) {
+                public void removeConfigDidFail(Throwable e) {
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;
@@ -221,7 +221,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                         mConfig = r.asValue();
                         Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
                             @Override
-                            public void onSaveConfigDidSucceed() {
+                            public void saveConfigDidSucceed() {
                                 mState = State.CONFIG_LOADED;
 
                                 updateLabels("", "New Config Created and Saved", mConfig.json());
@@ -229,13 +229,13 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                             }
 
                             @Override
-                            public void onSaveConfigDidCancel() {
+                            public void saveConfigDidCancel() {
                                 updateLabels("", "Config Create Canceled", "");
 
                             }
 
                             @Override
-                            public void onSaveConfigDidFail(Throwable e) {
+                            public void saveConfigDidFail(Throwable e) {
                                 e.printStackTrace();
 
                                 mState = State.ERROR_FOUND;

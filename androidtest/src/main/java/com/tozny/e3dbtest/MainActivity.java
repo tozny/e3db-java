@@ -28,6 +28,7 @@ public class MainActivity extends AppCompatActivity implements BaseFragment.Frag
         mPager.setAdapter(mPagerAdapter);
 
         mPager.addOnPageChangeListener(mOnPageChangeListener);
+        mPager.setOffscreenPageLimit(3);
 
         mNavigationView = findViewById(R.id.navigation);
         mNavigationView.setOnNavigationItemSelectedListener(mOnNavigationItemSelectedListener);

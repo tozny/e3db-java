@@ -5,6 +5,7 @@ import com.tozny.e3db.ConfigStorageHelper;
 import org.jetbrains.annotations.NotNull;
 
 import javax.crypto.Cipher;
+import java.util.regex.Pattern;
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -26,24 +27,33 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private KeyProtection protection;
     private KeyAuthenticator keyAuthenticator;
 
+    private static final String pattern = "^[a-zA-Z0-9-_\\s]+$";
+
     private static void checkArgs(Context context, String identifier) {
         if (context == null)
-            throw new IllegalArgumentException("Method parameter 'context' cannot be null.");
+            throw new IllegalArgumentException("Context cannot be null.");
 
         if (identifier == null)
-            throw new IllegalArgumentException("Method parameter 'identifier' cannot be null.");
+            throw new IllegalArgumentException("Identifier cannot be null.");
 
-        // TODO: Lilli, verify valid filename
+        if (!identifier.matches(pattern))
+            throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, hyphens, and spaces.");
+
+        if (identifier.length() > 127)
+            throw new IllegalArgumentException("Identifier string cannot be more than 127 characters in length.");
+
+        if (identifier.trim().length() == 0)
+            throw new IllegalArgumentException("Identifier string cannot be empty.");
     }
 
-    private static void checkArgs(String config) {
+    private static void checkArgs(Context context, String identifier, String config) {
+        checkArgs(context, identifier);
+
         if (config == null)
-            throw new IllegalArgumentException("Method parameter 'config' cannot be null.");
+            throw new IllegalArgumentException("Config string cannot be null.");
     }
 
     public AndroidConfigStorageHelper(@NotNull Context context, @NotNull String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
-        checkArgs(context, identifier);
-
         this.context    = context;
         this.identifier = identifier;
         this.protection = protection == null ? KeyProtection.withNone() : protection;
@@ -52,9 +62,9 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
     @Override
     public void saveConfigSecurely(@NotNull final String config, final SaveConfigHandler saveConfigHandler) {
-        checkArgs(config);
-
         try {
+            checkArgs(context, identifier, config);
+
             KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
                 @Override
                 public void onAuthenticated(Cipher cipher) throws Throwable {
@@ -82,6 +92,8 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     @Override
     public void loadConfigSecurely(final LoadConfigHandler loadConfigHandler) {
         try {
+            checkArgs(context, identifier);
+
             if (!SecureStringManager.secureStringExists(context, identifier)) {
                 if (loadConfigHandler != null) loadConfigHandler.onLoadConfigNotFound();
 
@@ -114,6 +126,8 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     @Override
     public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
         try { // TODO: Lilli, separate try/catches for better clean-up
+            checkArgs(context, identifier);
+
             KeyStoreManager.removeSecretKey(context, identifier);
             SecureStringManager.deleteStringFromSecureStorage(context, identifier);
             CipherManager.deleteInitializationVector(context, identifier);

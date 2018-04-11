@@ -8,11 +8,17 @@
         android:layout_height="match_parent"
         tools:context="com.tozny.e3dbtest.MainActivity">
 
-    <FrameLayout
-            android:id="@+id/content_fragment"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:layout_weight="1" />
+    <android.support.v4.view.ViewPager
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:id="@+id/pager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    <!--<FrameLayout-->
+            <!--android:id="@+id/content_fragment"-->
+            <!--android:layout_width="fill_parent"-->
+            <!--android:layout_height="fill_parent"-->
+            <!--android:layout_weight="1" />-->
 
     <android.support.design.widget.BottomNavigationView
             android:id="@+id/navigation"

@@ -1,6 +1,8 @@
 package com.tozny.e3dbtest;
 
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
@@ -20,6 +22,8 @@ import java.util.UUID;
 public class BaseFragment extends Fragment implements BaseFragmentInterface {
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
+
+    private FragmentInteractionListener mListener;
 
     protected Integer mIndex;
     protected String mName;
@@ -92,6 +96,36 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         updateInterface();
 
         return view;
+    }
+
+    @Override
+    public void setMenuVisibility(final boolean visible) { /* Hack to know if this is the visible fragment. */
+        super.setMenuVisibility(visible);
+
+        if (visible) {
+            if (mListener != null) mListener.setActionBarTitle(mName);
+        }
+    }
+
+    @SuppressLint("RestrictedApi")
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+        try {
+            mListener = (FragmentInteractionListener) activity;
+
+            if (isMenuVisible() && getArguments() != null)
+                mListener.setActionBarTitle(getArguments().getString(ARG_PARAM2));
+
+        } catch (ClassCastException e) {
+            throw new ClassCastException(activity.toString() + " must implement OnFragmentInteractionListener");
+        }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        mListener = null;
     }
 
     private AndroidConfigStorageHelper configStorageHelper() { // TODO: Maybe make this the interface instead of the individual methods?
@@ -307,5 +341,9 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
         throw new IllegalStateException("Method should be overridden by subclass.");
+    }
+
+    public interface FragmentInteractionListener {
+        void setActionBarTitle(String title);
     }
 }

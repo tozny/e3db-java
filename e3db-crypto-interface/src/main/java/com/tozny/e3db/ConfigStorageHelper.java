@@ -17,19 +17,19 @@ public interface ConfigStorageHelper { // TODO: Look at resultHandler interface 
     interface SaveConfigHandler {
         void onSaveConfigDidSucceed();
         void onSaveConfigDidCancel();
-        void onSaveConfigDidFail(Exception e);
+        void onSaveConfigDidFail(Throwable e);
     }
 
     interface LoadConfigHandler {
         void onLoadConfigDidSucceed(String config);
         void onLoadConfigDidCancel();
         void onLoadConfigNotFound();
-        void onLoadConfigDidFail(Exception e);
+        void onLoadConfigDidFail(Throwable e);
     }
 
     interface RemoveConfigHandler {
         void onRemoveConfigDidSucceed();
-        void onRemoveConfigDidFail(Exception e);
+        void onRemoveConfigDidFail(Throwable e);
     }
 
     void saveConfigSecurely(String config, SaveConfigHandler handler);

@@ -141,7 +141,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onLoadConfigDidFail(Exception e) {
+                public void onLoadConfigDidFail(Throwable e) {
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;
@@ -170,7 +170,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onSaveConfigDidFail(Exception e) {
+                public void onSaveConfigDidFail(Throwable e) {
                     e.printStackTrace();
                     updateLabels(e.getLocalizedMessage(), "Save Config Failed", "");
                 }
@@ -195,7 +195,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 }
 
                 @Override
-                public void onRemoveConfigDidFail(Exception e) {
+                public void onRemoveConfigDidFail(Throwable e) {
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;
@@ -235,7 +235,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                             }
 
                             @Override
-                            public void onSaveConfigDidFail(Exception e) {
+                            public void onSaveConfigDidFail(Throwable e) {
                                 e.printStackTrace();
 
                                 mState = State.ERROR_FOUND;

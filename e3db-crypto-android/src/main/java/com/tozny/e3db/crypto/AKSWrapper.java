@@ -24,7 +24,7 @@ import java.security.*;
 
 class AKSWrapper {
     @RequiresApi(api = Build.VERSION_CODES.M)
-    private static void createSecretKeyIfNeeded(String alias, KeyProtection protection) throws Exception {
+    private static void createSecretKeyIfNeeded(String alias, KeyProtection protection) throws Throwable {
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
@@ -56,7 +56,7 @@ class AKSWrapper {
                     throw new IllegalArgumentException("info: Password protection not supported.");
 
                 case NONE:
-                    break; // TODO: Throw
+                    break;
 
                 default:
                     throw new IllegalStateException("Unhandled protection type: " + protection.protectionType());
@@ -72,7 +72,7 @@ class AKSWrapper {
     }
 
     @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
-    static SecretKey getSecretKey(String alias, KeyProtection protection) throws Exception {
+    static SecretKey getSecretKey(String alias, KeyProtection protection) throws Throwable {
 
         createSecretKeyIfNeeded(alias, protection);
 
@@ -82,7 +82,7 @@ class AKSWrapper {
         return (SecretKey) keyStore.getKey(alias, null);
     }
 
-    static void removeSecretKey(String alias) throws Exception {
+    static void removeSecretKey(String alias) throws Throwable {
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
         keyStore.load(null);
 

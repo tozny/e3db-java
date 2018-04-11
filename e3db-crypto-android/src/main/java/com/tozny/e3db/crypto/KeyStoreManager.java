@@ -18,12 +18,14 @@ import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import org.jetbrains.annotations.NotNull;
 
 import javax.crypto.Cipher;
 import java.security.*;
 
 import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.FINGERPRINT;
 import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.LOCK_SCREEN;
+import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.PASSWORD;
 
 public class KeyStoreManager {
 
@@ -41,22 +43,30 @@ public class KeyStoreManager {
         return KEYSTORE_ALIAS + identifier;
     }
 
-    private static void checkMinSDK(KeyProtection protection) {
+    private static void checkArgs(KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             if (protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
-                throw new IllegalArgumentException("info: SDK Version must be at least " + Build.VERSION_CODES.M);
+                throw new IllegalArgumentException(protection.protectionType().toString() + " not supported below API 23.");
+        }
+
+        if (protection.protectionType() == PASSWORD || protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN) {
+            if (keyAuthenticator == null) {
+                throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.protectionType().toString());
+            }
         }
     }
 
     interface AuthenticatedCipherHandler {
-        void onAuthenticated(Cipher cipher) throws Exception;
+        void onAuthenticated(Cipher cipher) throws Throwable;
         void onCancel();
         void onError(Throwable e);
     }
 
     @SuppressLint("NewApi")
-    static void getCipher(final Context context, final String identifier, final KeyProtection protection, final KeyAuthenticator banana, final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Exception {
-        checkMinSDK(protection);
+    static void getCipher(@NotNull final Context context, @NotNull final String identifier, @NotNull final KeyProtection protection, final KeyAuthenticator keyAuthenticator,
+                          @NotNull final CipherManager.GetCipher cipherGetter, @NotNull final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
+
+        checkArgs(protection, keyAuthenticator);
 
         final Cipher cipher;
         final String alias = getKeystoreAlias(identifier, protection);
@@ -71,41 +81,35 @@ public class KeyStoreManager {
                 break;
 
             case FINGERPRINT:
-                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
-                    throw new IllegalStateException(protection.protectionType().toString() + " not supported below API 23.");
+                cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
 
-                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
-
-                    banana.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
-                        @Override
-                        public void handleAuthenticated() {
-                            try {
-                                authenticatedCipherHandler.onAuthenticated(cipher);
-                            } catch (Exception e) {
-                                authenticatedCipherHandler.onError(e);
-                            }
-                        }
-
-                        @Override
-                        public void handleCancel() {
-                            authenticatedCipherHandler.onCancel();
-                        }
-
-                        @Override
-                        public void handleError(Throwable e) {
+                keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+                    @Override
+                    public void handleAuthenticated() {
+                        try {
+                            authenticatedCipherHandler.onAuthenticated(cipher);
+                        } catch (Throwable e) {
                             authenticatedCipherHandler.onError(e);
                         }
-                    });
+                    }
+
+                    @Override
+                    public void handleCancel() {
+                        authenticatedCipherHandler.onCancel();
+                    }
+
+                    @Override
+                    public void handleError(Throwable e) {
+                        authenticatedCipherHandler.onError(e);
+                    }
+                });
 
                 break;
 
             case LOCK_SCREEN:
-                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M)
-                    throw new IllegalStateException(protection.protectionType().toString() + " not supported below API 23.");
-
                 try {
                     cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
-                    authenticatedCipherHandler.onAuthenticated(cipher); // If the user unlocked the screen within the timeout limit, then this is already authenticated
+                    authenticatedCipherHandler.onAuthenticated(cipher); /* If the user unlocked the screen within the timeout limit, then this is already authenticated. */
 
                 } catch (InvalidKeyException e) {
 
@@ -114,13 +118,13 @@ public class KeyStoreManager {
 
                     } else {
 
-                        banana.authenticateWithLockScreen(new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+                        keyAuthenticator.authenticateWithLockScreen(new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
                             @Override
                             public void handleAuthenticated() {
                                 try {
-                                    getCipher(context, identifier, protection, banana, cipherGetter, authenticatedCipherHandler);
+                                    getCipher(context, identifier, protection, keyAuthenticator, cipherGetter, authenticatedCipherHandler);
 
-                                } catch (Exception e) {
+                                } catch (Throwable e) {
                                     authenticatedCipherHandler.onError(e);
                                 }
                             }
@@ -141,13 +145,13 @@ public class KeyStoreManager {
                 break;
 
             case PASSWORD:
-                banana.getPassword(/*user, */new KeyAuthenticator.PasswordAuthenticatorCallbackHandler() {
+                keyAuthenticator.getPassword(new KeyAuthenticator.PasswordAuthenticatorCallbackHandler() {
 
                     @Override
                     public void handlePassword(String password) throws UnrecoverableKeyException {
                         try {
                             authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, password)));
-                        } catch (Exception e) {
+                        } catch (Throwable e) {
 
                             if (e instanceof UnrecoverableKeyException) {
                                 throw (UnrecoverableKeyException) e;
@@ -175,7 +179,7 @@ public class KeyStoreManager {
         }
     }
 
-    static void removeSecretKey(Context context, String identifier) throws Exception {
+    static void removeSecretKey(@NotNull Context context, @NotNull String identifier) throws Throwable {
         FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
         AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
     }

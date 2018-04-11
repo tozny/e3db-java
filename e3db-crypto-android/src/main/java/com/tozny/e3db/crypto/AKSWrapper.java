@@ -16,13 +16,14 @@ package com.tozny.e3db.crypto;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
+import android.support.annotation.RequiresApi;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.*;
 
 class AKSWrapper {
-    @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
+    @RequiresApi(api = Build.VERSION_CODES.M)
     private static void createSecretKeyIfNeeded(String alias, KeyProtection protection) throws Exception {
 
         KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
@@ -38,8 +39,12 @@ class AKSWrapper {
             }
 
             switch(protection.protectionType()) {
-                case FINGERPRINT: // TODO: "In API 24 and higher, you want to call setInvalidatedByBiometricEnrollment(true) so keys aren't erased if more fingerprints get added to the phone."
-                    builder.setUserAuthenticationRequired(true); // TODO: Right now adding a new fingerprint isn't causing any problems...
+                case FINGERPRINT:
+                    builder.setUserAuthenticationRequired(true);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        builder.setInvalidatedByBiometricEnrollment(false);
+                    }
+
                     break;
 
                 case LOCK_SCREEN:
@@ -51,7 +56,7 @@ class AKSWrapper {
                     throw new IllegalArgumentException("info: Password protection not supported.");
 
                 case NONE:
-                    break;
+                    break; // TODO: Throw
 
                 default:
                     throw new IllegalStateException("Unhandled protection type: " + protection.protectionType());

@@ -36,21 +36,33 @@ class SecureStringManager {
     }
 
     static void saveStringToSecureStorage(@NotNull Context context, @NotNull String fileName, @NotNull String string, @NotNull Cipher cipher) throws Throwable {
-       CipherOutputStream cipherOutputStream =
-                new CipherOutputStream(new FileOutputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+        CipherOutputStream cipherOutputStream = null;
 
-        cipherOutputStream.write(string.getBytes("UTF-8"));
-        cipherOutputStream.close();
+        try {
+            cipherOutputStream =
+                    new CipherOutputStream(new FileOutputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+
+            cipherOutputStream.write(string.getBytes("UTF-8"));
+
+        } finally {
+             if (cipherOutputStream != null) cipherOutputStream.close();
+        }
     }
 
     static String loadStringFromSecureStorage(@NotNull Context context, @NotNull String fileName, @NotNull Cipher cipher) throws Throwable {
-        CipherInputStream cipherInputStream =
-                new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
-
+        CipherInputStream cipherInputStream = null;
         StringBuilder stringBuffer = new StringBuilder();
-        int nextByte;
-        while ((nextByte = cipherInputStream.read()) != -1) {
-            stringBuffer.append((char)nextByte);
+
+        try {
+            cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+
+            int nextByte;
+            while ((nextByte = cipherInputStream.read()) != -1) {
+                stringBuffer.append((char) nextByte);
+            }
+
+        } finally {
+            if (cipherInputStream != null) cipherInputStream.close();
         }
 
         return stringBuffer.toString();

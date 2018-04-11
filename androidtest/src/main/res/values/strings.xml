@@ -13,4 +13,7 @@
     <string name="delete_config">Delete Config</string>
     <string name="new_config">New Config</string>
     <string name="save_config">Save Config</string>
+    <string name="status">Status</string>
+    <string name="errors">Errors</string>
+    <string name="config">Config</string>
 </resources>

@@ -1,20 +1,16 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-             xmlns:tools="http://schemas.android.com/tools"
-             android:layout_width="match_parent"
-             android:layout_height="match_parent"
+              xmlns:tools="http://schemas.android.com/tools"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
               android:orientation="vertical"
-             tools:context="com.tozny.e3dbtest.BaseFragment">
-
-    <TextView
-            android:id="@+id/name_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/hello_blank_fragment"/>
+              android:padding="20dp"
+              tools:context="com.tozny.e3dbtest.BaseFragment">
 
     <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:gravity="center">
 
         <Button
                 android:id="@+id/load_config_button"
@@ -42,20 +38,62 @@
 
     </LinearLayout>
 
-        <TextView
-                android:id="@+id/error_text_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+    <View
+            android:layout_height="1dp"
+            android:layout_width="match_parent"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:background="@color/darkGray"/>
 
-        <TextView
-                android:id="@+id/status_text_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/status"/>
 
-        <TextView
-                android:id="@+id/config_text_view"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"/>
+    <TextView
+            android:id="@+id/status_text_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"/>
+
+    <View
+            android:layout_height="1dp"
+            android:layout_width="match_parent"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:background="@color/darkGray"/>
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/errors"/>
+
+    <TextView
+            android:id="@+id/error_text_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/error"
+            android:textSize="16sp"/>
+
+    <View
+            android:layout_height="1dp"
+            android:layout_width="match_parent"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:background="@color/darkGray"/>
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/config"/>
+
+    <TextView
+            android:id="@+id/config_text_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
 
 </LinearLayout>

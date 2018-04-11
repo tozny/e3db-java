@@ -23,7 +23,7 @@ import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
 
-public class FSKSWrapper {
+class FSKSWrapper {
     private static final String MOBILE_AUTH_DB_KSTORE = "MobileAuthDb.kstore";
     private static final String TAG = "KeyProvider";
 
@@ -36,7 +36,7 @@ public class FSKSWrapper {
         return new File(filesDir, privateFile).exists();
     }
 
-    public static byte[] getRandomBytes(int numberOfBytes) throws Exception {
+    private static byte[] getRandomBytes(int numberOfBytes) throws Throwable {
         byte[] bytes = new byte[numberOfBytes];
 
         SecureRandom r = SecureRandom.getInstance("SHA1PRNG");
@@ -46,11 +46,11 @@ public class FSKSWrapper {
 
     // See https://toznysecurity.atlassian.net/browse/AUTH-2519 for
     // security considerations.
-    private synchronized static String getPerf(Context context) throws Exception {
+    private synchronized static String getPerf(Context context) throws Throwable {
        return "TODO";
     }
 
-    private static KeyStore getFSKS(Context context) throws Exception {
+    private static KeyStore getFSKS(Context context) throws Throwable {
         if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
@@ -89,7 +89,7 @@ public class FSKSWrapper {
         return fsKS;
     }
 
-    private static void saveFSKS(Context context) throws Exception {
+    private static void saveFSKS(Context context) throws Throwable {
         if (fsKS != null) {
             synchronized(keyStoreWriteLock) {
                 try {
@@ -126,13 +126,12 @@ public class FSKSWrapper {
         }
     }
 
-    private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Exception {
+    private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Throwable {
 
         KeyStore keyStore = getFSKS(context);
 
         if (!keyStore.containsAlias(alias)) {
 
-            // TODO: Lilli, is this right?
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             SecureRandom random = new SecureRandom();
             keyGen.init(random);
@@ -144,7 +143,7 @@ public class FSKSWrapper {
         }
     }
 
-    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Exception {
+    static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Throwable {
         createSecretKeyIfNeeded(context, alias, protection, password);
 
         KeyStore keyStore = getFSKS(context);
@@ -152,7 +151,7 @@ public class FSKSWrapper {
         return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
     }
 
-    static void removeSecretKey(Context context, String alias) throws Exception {
+    static void removeSecretKey(Context context, String alias) throws Throwable {
         KeyStore keyStore = getFSKS(context);
 
         if (keyStore.containsAlias(alias)) {

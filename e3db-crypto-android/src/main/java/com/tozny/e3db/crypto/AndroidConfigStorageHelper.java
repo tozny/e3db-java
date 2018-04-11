@@ -2,6 +2,7 @@ package com.tozny.e3db.crypto;
 
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
+import org.jetbrains.annotations.NotNull;
 
 import javax.crypto.Cipher;
 
@@ -23,22 +24,40 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private Context context;
     private String identifier;
     private KeyProtection protection;
-    private KeyAuthenticator handler;
+    private KeyAuthenticator keyAuthenticator;
 
-    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator handler) {
-        // TODO: Lilli, null checks, param validation
-        this.context = context;
+    private static void checkArgs(Context context, String identifier) {
+        if (context == null)
+            throw new IllegalArgumentException("Method parameter 'context' cannot be null.");
+
+        if (identifier == null)
+            throw new IllegalArgumentException("Method parameter 'identifier' cannot be null.");
+
+        // TODO: Lilli, verify valid filename
+    }
+
+    private static void checkArgs(String config) {
+        if (config == null)
+            throw new IllegalArgumentException("Method parameter 'config' cannot be null.");
+    }
+
+    public AndroidConfigStorageHelper(@NotNull Context context, @NotNull String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+        checkArgs(context, identifier);
+
+        this.context    = context;
         this.identifier = identifier;
-        this.protection = protection;
-        this.handler    = handler;
+        this.protection = protection == null ? KeyProtection.withNone() : protection;
+        this.keyAuthenticator = keyAuthenticator;
     }
 
     @Override
-    public void saveConfigSecurely(final String config, final SaveConfigHandler saveConfigHandler) {
+    public void saveConfigSecurely(@NotNull final String config, final SaveConfigHandler saveConfigHandler) {
+        checkArgs(config);
+
         try {
-            KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+            KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
                 @Override
-                public void onAuthenticated(Cipher cipher) throws Exception {
+                public void onAuthenticated(Cipher cipher) throws Throwable {
                     SecureStringManager.saveStringToSecureStorage(context, identifier, config, cipher);
 
                     if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidSucceed();
@@ -55,9 +74,8 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 }
             });
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (saveConfigHandler != null) saveConfigHandler.onSaveConfigDidFail(e);
-
         }
     }
 
@@ -68,9 +86,9 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 if (loadConfigHandler != null) loadConfigHandler.onLoadConfigNotFound();
 
             } else {
-                KeyStoreManager.getCipher(context, identifier, protection, handler, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+                KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
                     @Override
-                    public void onAuthenticated(Cipher cipher) throws Exception {
+                    public void onAuthenticated(Cipher cipher) throws Throwable {
                         String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
 
                         if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidSucceed(configString);
@@ -88,7 +106,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
                 });
 
             }
-        } catch (Exception e) { // TODO: Catch throwables instead
+        } catch (Throwable e) {
             if (loadConfigHandler != null) loadConfigHandler.onLoadConfigDidFail(e);
         }
     }
@@ -102,7 +120,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
             if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidSucceed();
 
-        } catch (Exception e) {
+        } catch (Throwable e) {
             if (removeConfigHandler != null) removeConfigHandler.onRemoveConfigDidFail(e);
         }
     }

@@ -25,6 +25,9 @@ import javax.crypto.spec.IvParameterSpec;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.security.AlgorithmParameters;
+import java.security.spec.AlgorithmParameterSpec;
+
 
 class CipherManager {
 
@@ -84,11 +87,16 @@ class CipherManager {
     }
 
     static class LoadCipherGetter implements GetCipher {
+        private static int RECC_AUTH_TAG_LEN = 128;
 
-        @RequiresApi(api = Build.VERSION_CODES.KITKAT)
         @Override
         public Cipher getCipher(Context context, String identifier, SecretKey key) throws Exception {
-            GCMParameterSpec params = new GCMParameterSpec(128, loadInitializationVector(context, identifier)); // TODO: Lilli, do we know that it's always 128?
+            AlgorithmParameterSpec params;
+
+            if (key.getClass().getSimpleName().equals("AndroidKeyStoreSecretKey") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+                params = new GCMParameterSpec(RECC_AUTH_TAG_LEN, loadInitializationVector(context, identifier));
+            else
+                params = new IvParameterSpec(loadInitializationVector(context, identifier));
 
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, key, params);

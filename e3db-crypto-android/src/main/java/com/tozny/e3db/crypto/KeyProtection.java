@@ -72,7 +72,7 @@ public abstract class KeyProtection {
                 return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
             case FINGERPRINT:
                 return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                        PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED &&
+                        PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
                         FingerprintManagerCompat.from(ctx).isHardwareDetected();
             default:
                 throw new IllegalStateException("Unhandled protection type: " + protection);

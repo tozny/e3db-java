@@ -13,10 +13,12 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
+import android.support.v4.content.PermissionChecker;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
 
 
@@ -53,14 +55,16 @@ public class KeyStoreManager {
                 throw new IllegalArgumentException(protection.protectionType().toString() + " not supported below API 23.");
         }
 
-        if (!KeyProtection.protectionTypeSupported(context, protection.protectionType())) { /* Extra fingerprint checks. */
-            throw new IllegalArgumentException(protection.protectionType().toString() + " not enabled on this device.");
-        }
-
         if (protection.protectionType() == PASSWORD || protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN) {
             if (keyAuthenticator == null) {
                 throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.protectionType().toString());
             }
+        }
+
+        if (protection.protectionType() == FINGERPRINT) {
+            if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED ||
+                    !FingerprintManagerCompat.from(context).isHardwareDetected())
+                throw new IllegalArgumentException(protection.protectionType().toString() + " not currently supported.");
         }
 
         if (protection.protectionType() == LOCK_SCREEN) {

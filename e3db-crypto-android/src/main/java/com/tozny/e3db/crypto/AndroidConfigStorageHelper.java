@@ -1,11 +1,11 @@
 package com.tozny.e3db.crypto;
 
+
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
 
 
 import javax.crypto.Cipher;
-import java.util.regex.Pattern;
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -55,6 +55,24 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
         if (config == null)
             throw new IllegalArgumentException("Config string cannot be null.");
     }
+
+//    private final static String COM_TOZNY_E3DB_CRYPTO = "com.tozny.e3db.crypto-";
+//
+//    private static String build(String identifier, KeyProtection protection) {
+//        return COM_TOZNY_E3DB_CRYPTO + identifier;
+//
+////        if (protection == null)
+////            return COM_TOZNY_E3DB_CRYPTO + identifier + "-NONE";
+////
+////        switch (protection.protectionType()) {
+////            case NONE:        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NONE";
+////            case FINGERPRINT: return COM_TOZNY_E3DB_CRYPTO + identifier + "-FINGERPRINT";
+////            case LOCK_SCREEN: return COM_TOZNY_E3DB_CRYPTO + identifier + "-LOCK_SCREEN";
+////            case PASSWORD:    return COM_TOZNY_E3DB_CRYPTO + identifier + "-PASSWORD";
+////        }
+////
+////        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NONE";
+//    }
 
     public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         this.context    = context;

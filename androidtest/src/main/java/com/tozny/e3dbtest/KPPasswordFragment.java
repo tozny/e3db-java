@@ -37,7 +37,7 @@ public class KPPasswordFragment extends BaseFragment {
 
     @Override
     public KeyProtection keyProtection() {
-        return KeyProtection.withPassword("password");
+        return KeyProtection.withPassword();
     }
 
     @Override

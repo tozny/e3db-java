@@ -33,18 +33,39 @@ public class KeyStoreManager {
 
     private static String getKeystoreAlias(String identifier, KeyProtection protection) {
         return KEYSTORE_ALIAS + identifier;
+
+//        if (protection == null)
+//            return KEYSTORE_ALIAS + identifier + "-NONE";
+//
+//        switch (protection.protectionType()) {
+//            case NONE:        return KEYSTORE_ALIAS + identifier + "-NONE";
+//            case FINGERPRINT: return KEYSTORE_ALIAS + identifier + "-FINGERPRINT";
+//            case LOCK_SCREEN: return KEYSTORE_ALIAS + identifier + "-LOCK_SCREEN";
+//            case PASSWORD:    return KEYSTORE_ALIAS + identifier + "-PASSWORD";
+//        }
+//
+//        return KEYSTORE_ALIAS + identifier + "-NONE";
     }
 
-    private static void checkArgs(KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+    private static void checkArgs(Context context, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             if (protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
                 throw new IllegalArgumentException(protection.protectionType().toString() + " not supported below API 23.");
+        }
+
+        if (!KeyProtection.protectionTypeSupported(context, protection.protectionType())) { /* Extra fingerprint checks. */
+            throw new IllegalArgumentException(protection.protectionType().toString() + " not enabled on this device.");
         }
 
         if (protection.protectionType() == PASSWORD || protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN) {
             if (keyAuthenticator == null) {
                 throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.protectionType().toString());
             }
+        }
+
+        if (protection.protectionType() == LOCK_SCREEN) {
+            if (protection.validUntilSecondsSinceUnlock() < 1)
+                throw new IllegalArgumentException("secondsSinceUnlock must be greater than 0.");
         }
     }
 
@@ -58,7 +79,7 @@ public class KeyStoreManager {
     static void getCipher(final Context context, final String identifier, final KeyProtection protection, final KeyAuthenticator keyAuthenticator,
                           final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
 
-        checkArgs(protection, keyAuthenticator);
+        checkArgs(context, protection, keyAuthenticator);
 
         final Cipher cipher;
         final String alias = getKeystoreAlias(identifier, protection);
@@ -173,6 +194,7 @@ public class KeyStoreManager {
 
     static void removeSecretKey(Context context, String identifier) throws Throwable {
         FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
-        AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+            AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
     }
 }

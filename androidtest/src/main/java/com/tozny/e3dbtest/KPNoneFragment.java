@@ -30,7 +30,7 @@ public class KPNoneFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-none";
+        return "config";
     }
 
     @Override

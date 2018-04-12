@@ -21,6 +21,7 @@ import javax.crypto.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 
 class SecureStringManager {
 
@@ -50,22 +51,21 @@ class SecureStringManager {
     }
 
     static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) throws Throwable {
-        CipherInputStream cipherInputStream = null;
-        StringBuilder stringBuffer = new StringBuilder();
+        ArrayList<Byte> values = new ArrayList<>();
 
-        try {
-            cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+        CipherInputStream cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
 
-            int nextByte;
-            while ((nextByte = cipherInputStream.read()) != -1) {
-                stringBuffer.append((char) nextByte);
-            }
-
-        } finally {
-            if (cipherInputStream != null) cipherInputStream.close();
+        int nextByte;
+        while ((nextByte = cipherInputStream.read()) != -1) {
+            values.add((byte) nextByte);
         }
 
-        return stringBuffer.toString();
+        byte[] bytes = new byte[values.size()];
+        for (int i = 0; i < values.size(); i++) {
+            bytes[i] = values.get(i);
+        }
+
+        return new String(bytes, "UTF-8");
     }
 }
 

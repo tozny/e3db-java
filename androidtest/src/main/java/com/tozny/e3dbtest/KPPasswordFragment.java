@@ -32,7 +32,7 @@ public class KPPasswordFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-password";
+        return "config-pw";
     }
 
     @Override

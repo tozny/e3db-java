@@ -32,7 +32,7 @@ public class KPFingerPrintFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-fingerprint";
+        return "config-fp";
     }
 
     @Override
@@ -42,6 +42,6 @@ public class KPFingerPrintFragment extends BaseFragment {
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return new DefaultKeyAuthenticator(this.getActivity(), "Fingerprint");
+        return new DefaultKeyAuthenticator(this.getActivity(), getString(R.string.title_kp_fingerprint));
     }
 }

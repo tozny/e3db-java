@@ -32,16 +32,16 @@ public class KPPasswordFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-password";
+        return "config-pw";
     }
 
     @Override
     public KeyProtection keyProtection() {
-        return KeyProtection.withPassword("password");
+        return KeyProtection.withPassword();
     }
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return new DefaultKeyAuthenticator(this.getActivity(), "Password");
+        return new DefaultKeyAuthenticator(this.getActivity(), getString(R.string.title_kp_password));
     }
 }

@@ -72,7 +72,7 @@ public abstract class KeyProtection {
                 return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
             case FINGERPRINT:
                 return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                        PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED &&
+                        PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
                         FingerprintManagerCompat.from(ctx).isHardwareDetected();
             default:
                 throw new IllegalStateException("Unhandled protection type: " + protection);
@@ -80,9 +80,6 @@ public abstract class KeyProtection {
     }
 
     public static KeyProtection withFingerprint() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-            throw new IllegalStateException("Fingerprint protection not supported below API " + Build.VERSION_CODES.M);
-
         return new KeyProtection() {
             @Override
             public String password() {
@@ -135,11 +132,6 @@ public abstract class KeyProtection {
     }
 
     public static KeyProtection withLockScreen(final int timeoutSeconds) {
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-            throw new IllegalStateException("Lock screen protection not supported below API " + Build.VERSION_CODES.M);
-
-        if(timeoutSeconds < 1)
-            throw new IllegalArgumentException("secondsSinceUnlock must be greater than 0.");
 
         return new KeyProtection() {
             @Override
@@ -164,11 +156,7 @@ public abstract class KeyProtection {
         };
     }
 
-    public static KeyProtection withPassword(String rawPassword) {
-        if(rawPassword == null || rawPassword.trim().length() < 4)
-            throw new IllegalArgumentException("password must not be empty or less than 4 characters.");
-
-        final String password = rawPassword.trim();
+    public static KeyProtection withPassword() {
 
         return new KeyProtection() {
 
@@ -179,7 +167,7 @@ public abstract class KeyProtection {
 
             @Override
             public String password() {
-                return password;
+                throw new IllegalStateException();
             }
 
             @Override
@@ -194,32 +182,6 @@ public abstract class KeyProtection {
         };
     }
 
-    // Used when indicating password protection is applied to a key,
-    // but without providing the actual password.
-    static KeyProtection withUnknownPassword() {
-        return new KeyProtection() {
-            @Override
-            public String password() {
-                throw new IllegalStateException();
-            }
-
-            @Override
-            public int validUntilSecondsSinceUnlock() {
-                throw new IllegalStateException();
-            }
-
-            @Override
-            public KeyProtectionType protectionType() {
-                return KeyProtectionType.PASSWORD;
-            }
-
-            @Override
-            public String toString() {
-                return "(Unknown): " + KeyProtectionType.PASSWORD.toString();
-            }
-        };
-    }
-
     public static KeyProtection fromProtection(KeyProtectionType protection) {
         switch(protection) {
             case NONE:
@@ -229,7 +191,7 @@ public abstract class KeyProtection {
             case LOCK_SCREEN:
                 return withLockScreen(DEFAULT_LOCK_SCREEN_TIMEOUT);
             case PASSWORD:
-                return withUnknownPassword();
+                return withPassword();
             default:
                 throw new IllegalStateException("protection: Unhandled KeyProtectionType value: " + protection);
         }

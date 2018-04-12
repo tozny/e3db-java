@@ -218,30 +218,14 @@ public class Config {
     }
   }
 
-  /**
-   * TODO
-   * @param helper
-   * @param config
-   */
   public static void saveConfigSecurely(ConfigStorageHelper helper, String config, ConfigStorageHelper.SaveConfigHandler handler) {
     helper.saveConfigSecurely(config, handler);
   }
 
-  /**
-   * TODO
-   * @param helper
-   * @return
-   * @throws IOException
-   */
   public static void loadConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.LoadConfigHandler handler) {
     helper.loadConfigSecurely(handler);
   }
 
-  /**
-   * TODO
-   * @param helper
-   * @param config
-   */
   public static void removeConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.RemoveConfigHandler handler) {
     helper.removeConfigSecurely(handler);
   }

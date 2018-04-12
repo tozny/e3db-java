@@ -1,11 +1,11 @@
 package com.tozny.e3db.crypto;
 
+
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
-import org.jetbrains.annotations.NotNull;
+
 
 import javax.crypto.Cipher;
-import java.util.regex.Pattern;
 
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -29,31 +29,50 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
     private static final String pattern = "^[a-zA-Z0-9-_\\s]+$";
 
-    private static void checkArgs(Context context, String identifier) {
+    private static void checkArgs(Context context, String identifier, Object handler) {
         if (context == null)
             throw new IllegalArgumentException("Context cannot be null.");
 
         if (identifier == null)
             throw new IllegalArgumentException("Identifier cannot be null.");
 
+        if (handler == null)
+            throw new IllegalArgumentException("Handler cannot be null.");
+
         if (!identifier.matches(pattern))
             throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, hyphens, and spaces.");
 
-        if (identifier.length() > 127)
+        if (identifier.length() > 100) /* In case device file system limits filenames 127 characters (and we're adding roughly 25 characters). */
             throw new IllegalArgumentException("Identifier string cannot be more than 127 characters in length.");
 
         if (identifier.trim().length() == 0)
             throw new IllegalArgumentException("Identifier string cannot be empty.");
     }
 
-    private static void checkArgs(Context context, String identifier, String config) {
-        checkArgs(context, identifier);
+    private static void checkArgs(Context context, String identifier, String config, Object handler) {
+        checkArgs(context, identifier, handler);
 
         if (config == null)
             throw new IllegalArgumentException("Config string cannot be null.");
     }
 
-    public AndroidConfigStorageHelper(@NotNull Context context, @NotNull String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+    private final static String COM_TOZNY_E3DB_CRYPTO = "com.tozny.e3db.crypto-";
+
+    private static String full(String identifier, KeyProtection protection) {
+        if (protection == null)
+            return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
+
+        switch (protection.protectionType()) {
+            case NONE:        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
+            case FINGERPRINT: return COM_TOZNY_E3DB_CRYPTO + identifier + "-FP";
+            case LOCK_SCREEN: return COM_TOZNY_E3DB_CRYPTO + identifier + "-LS";
+            case PASSWORD:    return COM_TOZNY_E3DB_CRYPTO + identifier + "-PW";
+        }
+
+        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
+    }
+
+    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         this.context    = context;
         this.identifier = identifier;
         this.protection = protection == null ? KeyProtection.withNone() : protection;
@@ -61,90 +80,96 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     }
 
     @Override
-    public void saveConfigSecurely(@NotNull final String config, final SaveConfigHandler saveConfigHandler) {
+    public void saveConfigSecurely(final String config, final SaveConfigHandler saveConfigHandler) {
         try {
-            checkArgs(context, identifier, config);
+            checkArgs(context, identifier, config, saveConfigHandler);
 
-            KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+            final String fullIdentifier = full(identifier, protection);
+
+            KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
                 @Override
                 public void onAuthenticated(Cipher cipher) throws Throwable {
-                    SecureStringManager.saveStringToSecureStorage(context, identifier, config, cipher);
+                    SecureStringManager.saveStringToSecureStorage(context, fullIdentifier, config, cipher);
 
-                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidSucceed();
+                    saveConfigHandler.saveConfigDidSucceed();
                 }
 
                 @Override
                 public void onCancel() {
-                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidCancel();
+                    saveConfigHandler.saveConfigDidCancel();
                 }
 
                 @Override
                 public void onError(Throwable e) {
-                    if (saveConfigHandler != null) saveConfigHandler.saveConfigDidFail(new RuntimeException(e));
+                    saveConfigHandler.saveConfigDidFail(new RuntimeException(e));
                 }
             });
 
         } catch (Throwable e) {
-            if (saveConfigHandler != null) saveConfigHandler.saveConfigDidFail(e);
+            saveConfigHandler.saveConfigDidFail(e);
         }
     }
 
     @Override
     public void loadConfigSecurely(final LoadConfigHandler loadConfigHandler) {
         try {
-            checkArgs(context, identifier);
+            checkArgs(context, identifier, loadConfigHandler);
 
-            if (!SecureStringManager.secureStringExists(context, identifier)) {
-                if (loadConfigHandler != null) loadConfigHandler.loadConfigNotFound();
+            final String fullIdentifier = full(identifier, protection);
+
+            if (!SecureStringManager.secureStringExists(context, fullIdentifier)) {
+                loadConfigHandler.loadConfigNotFound();
 
             } else {
-                KeyStoreManager.getCipher(context, identifier, protection, keyAuthenticator, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+                KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
                     @Override
                     public void onAuthenticated(Cipher cipher) throws Throwable {
-                        String configString = SecureStringManager.loadStringFromSecureStorage(context, identifier, cipher);
+                        String configString = SecureStringManager.loadStringFromSecureStorage(context, fullIdentifier, cipher);
 
-                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidSucceed(configString);
+                        loadConfigHandler.loadConfigDidSucceed(configString);
                     }
 
                     @Override
                     public void onCancel() {
-                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidCancel();
+                        loadConfigHandler.loadConfigDidCancel();
                     }
 
                     @Override
                     public void onError(Throwable e) {
-                        if (loadConfigHandler != null) loadConfigHandler.loadConfigDidFail(new RuntimeException(e));
+                        loadConfigHandler.loadConfigDidFail(new RuntimeException(e));
                     }
                 });
 
             }
         } catch (Throwable e) {
-            if (loadConfigHandler != null) loadConfigHandler.loadConfigDidFail(e);
+            loadConfigHandler.loadConfigDidFail(e);
         }
     }
 
     @Override
     public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
         try {
-            checkArgs(context, identifier);
+            checkArgs(context, identifier, removeConfigHandler);
+
+            String fullIdentifier = full(identifier, protection);
 
             Throwable throwable = null;
             
-            try { KeyStoreManager.removeSecretKey(context, identifier); }
+            try { KeyStoreManager.removeSecretKey(context, fullIdentifier); }
             catch (Throwable e) { throwable = e; }
 
-            try { SecureStringManager.deleteStringFromSecureStorage(context, identifier); }
+            try { SecureStringManager.deleteStringFromSecureStorage(context, fullIdentifier); }
             catch (Throwable e) { throwable = e; }
 
-            try { CipherManager.deleteInitializationVector(context, identifier); }
+            try { CipherManager.deleteInitializationVector(context, fullIdentifier); }
             catch (Throwable e) { throwable = e; }
 
             if (throwable != null) throw throwable;
 
-            if (removeConfigHandler != null) removeConfigHandler.removeConfigDidSucceed();
+            removeConfigHandler.removeConfigDidSucceed();
 
         } catch (Throwable e) {
-            if (removeConfigHandler != null) removeConfigHandler.removeConfigDidFail(e);
+            removeConfigHandler.removeConfigDidFail(new RuntimeException(e));
         }
     }
 }

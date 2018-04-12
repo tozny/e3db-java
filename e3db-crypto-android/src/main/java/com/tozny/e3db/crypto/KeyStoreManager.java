@@ -31,24 +31,6 @@ import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.PASSWORD;
 
 public class KeyStoreManager {
 
-    private final static String KEYSTORE_ALIAS = "com.tozny.e3db.crypto-";
-
-    private static String getKeystoreAlias(String identifier, KeyProtection protection) {
-        return KEYSTORE_ALIAS + identifier;
-
-//        if (protection == null)
-//            return KEYSTORE_ALIAS + identifier + "-NONE";
-//
-//        switch (protection.protectionType()) {
-//            case NONE:        return KEYSTORE_ALIAS + identifier + "-NONE";
-//            case FINGERPRINT: return KEYSTORE_ALIAS + identifier + "-FINGERPRINT";
-//            case LOCK_SCREEN: return KEYSTORE_ALIAS + identifier + "-LOCK_SCREEN";
-//            case PASSWORD:    return KEYSTORE_ALIAS + identifier + "-PASSWORD";
-//        }
-//
-//        return KEYSTORE_ALIAS + identifier + "-NONE";
-    }
-
     private static void checkArgs(Context context, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             if (protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
@@ -86,19 +68,18 @@ public class KeyStoreManager {
         checkArgs(context, protection, keyAuthenticator);
 
         final Cipher cipher;
-        final String alias = getKeystoreAlias(identifier, protection);
 
         switch(protection.protectionType()) {
             case NONE:
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, null)));
+                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, null)));
                 else
-                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection)));
+                    authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection)));
 
                 break;
 
             case FINGERPRINT:
-                cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
+                cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
 
                 keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
                     @Override
@@ -125,7 +106,7 @@ public class KeyStoreManager {
 
             case LOCK_SCREEN:
                 try {
-                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(alias, protection));
+                    cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
                     authenticatedCipherHandler.onAuthenticated(cipher); /* If the user unlocked the screen within the timeout limit, then this is already authenticated. */
 
                 } catch (InvalidKeyException e) {
@@ -167,7 +148,7 @@ public class KeyStoreManager {
                     @Override
                     public void handlePassword(String password) throws UnrecoverableKeyException {
                         try {
-                            authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, alias, protection, password)));
+                            authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, password)));
                         } catch (Throwable e) {
 
                             if (e instanceof UnrecoverableKeyException) {
@@ -197,8 +178,8 @@ public class KeyStoreManager {
     }
 
     static void removeSecretKey(Context context, String identifier) throws Throwable {
-        FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
+        FSKSWrapper.removeSecretKey(context, identifier);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-            AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
+            AKSWrapper.removeSecretKey(identifier);
     }
 }

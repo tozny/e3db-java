@@ -32,7 +32,7 @@ public class KPFingerPrintFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-fingerprint";
+        return "config-fp";
     }
 
     @Override

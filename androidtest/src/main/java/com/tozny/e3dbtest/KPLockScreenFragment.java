@@ -32,7 +32,7 @@ public class KPLockScreenFragment extends BaseFragment {
 
     @Override
     public String configName() {
-        return "config-lock-screen";
+        return "config-ls";
     }
 
     @Override

@@ -15,7 +15,7 @@ package com.tozny.e3db.crypto;
 
 
 import android.content.Context;
-import org.jetbrains.annotations.NotNull;
+
 
 import javax.crypto.*;
 import java.io.File;
@@ -24,18 +24,18 @@ import java.io.FileOutputStream;
 
 class SecureStringManager {
 
-    static boolean secureStringExists(@NotNull Context context, @NotNull String fileName) throws Throwable {
+    static boolean secureStringExists(Context context, String fileName) throws Throwable {
         return new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists();
     }
 
-    static void deleteStringFromSecureStorage(@NotNull Context context, @NotNull String fileName) throws Throwable {
+    static void deleteStringFromSecureStorage(Context context, String fileName) throws Throwable {
         if (new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {
             File file = new File(FileSystemManager.getEncryptedDataFilePath(context, fileName));
             file.delete();
         }
     }
 
-    static void saveStringToSecureStorage(@NotNull Context context, @NotNull String fileName, @NotNull String string, @NotNull Cipher cipher) throws Throwable {
+    static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) throws Throwable {
         CipherOutputStream cipherOutputStream = null;
 
         try {
@@ -49,7 +49,7 @@ class SecureStringManager {
         }
     }
 
-    static String loadStringFromSecureStorage(@NotNull Context context, @NotNull String fileName, @NotNull Cipher cipher) throws Throwable {
+    static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) throws Throwable {
         CipherInputStream cipherInputStream = null;
         StringBuilder stringBuffer = new StringBuilder();
 

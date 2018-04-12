@@ -18,7 +18,7 @@ import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
-import org.jetbrains.annotations.NotNull;
+
 
 import javax.crypto.Cipher;
 import java.security.*;
@@ -63,8 +63,8 @@ public class KeyStoreManager {
     }
 
     @SuppressLint("NewApi")
-    static void getCipher(@NotNull final Context context, @NotNull final String identifier, @NotNull final KeyProtection protection, final KeyAuthenticator keyAuthenticator,
-                          @NotNull final CipherManager.GetCipher cipherGetter, @NotNull final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
+    static void getCipher(final Context context, final String identifier, final KeyProtection protection, final KeyAuthenticator keyAuthenticator,
+                          final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
 
         checkArgs(protection, keyAuthenticator);
 
@@ -179,7 +179,7 @@ public class KeyStoreManager {
         }
     }
 
-    static void removeSecretKey(@NotNull Context context, @NotNull String identifier) throws Throwable {
+    static void removeSecretKey(Context context, String identifier) throws Throwable {
         FSKSWrapper.removeSecretKey(context, getKeystoreAlias(identifier, null));
         AKSWrapper.removeSecretKey(getKeystoreAlias(identifier, null));
     }

@@ -42,6 +42,6 @@ public class KPPasswordFragment extends BaseFragment {
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return new DefaultKeyAuthenticator(this.getActivity(), "Password");
+        return new DefaultKeyAuthenticator(this.getActivity(), getString(R.string.title_kp_password));
     }
 }

@@ -42,6 +42,6 @@ public class KPLockScreenFragment extends BaseFragment {
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return new DefaultKeyAuthenticator(this.getActivity(), "Lock Screen");
+        return new DefaultKeyAuthenticator(this.getActivity(), getString(R.string.title_kp_lock_screen));
     }
 }

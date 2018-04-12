@@ -2,7 +2,7 @@ package com.tozny.e3db.crypto;
 
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
-import org.jetbrains.annotations.NotNull;
+
 
 import javax.crypto.Cipher;
 import java.util.regex.Pattern;
@@ -53,7 +53,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             throw new IllegalArgumentException("Config string cannot be null.");
     }
 
-    public AndroidConfigStorageHelper(@NotNull Context context, @NotNull String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+    public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
         this.context    = context;
         this.identifier = identifier;
         this.protection = protection == null ? KeyProtection.withNone() : protection;
@@ -61,7 +61,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     }
 
     @Override
-    public void saveConfigSecurely(@NotNull final String config, final SaveConfigHandler saveConfigHandler) {
+    public void saveConfigSecurely(final String config, final SaveConfigHandler saveConfigHandler) {
         try {
             checkArgs(context, identifier, config);
 

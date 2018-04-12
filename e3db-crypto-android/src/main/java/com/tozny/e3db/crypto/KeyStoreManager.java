@@ -32,14 +32,6 @@ public class KeyStoreManager {
     private final static String KEYSTORE_ALIAS = "com.tozny.e3db.crypto-";
 
     private static String getKeystoreAlias(String identifier, KeyProtection protection) {
-//        switch (protection.protectionType()) {
-//            // TODO: Lilli, do we want to do this? Make deleting keys harder? Simply just use identifier and not PT?
-//            case NONE:        return KEYSTORE_ALIAS + identifier + "-NONE";
-//            case FINGERPRINT: return KEYSTORE_ALIAS + identifier + "-FINGERPRINT";
-//            case LOCK_SCREEN: return KEYSTORE_ALIAS + identifier + "-LOCK_SCREEN";
-//            case PASSWORD:    return KEYSTORE_ALIAS + identifier + "-PASSWORD"; // TODO: Lilli, if you uncomment this, the delete method will need to be changed
-//        }
-
         return KEYSTORE_ALIAS + identifier;
     }
 

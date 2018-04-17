@@ -1,21 +1,16 @@
 package com.tozny.e3db.crypto;
 
-import android.app.Application;
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;
 import android.util.Log;
 import com.tozny.e3db.Config;
 import com.tozny.e3db.ConfigStorageHelper;
-import com.tozny.e3db.Crypto;
-import com.tozny.e3db.Signature;
+import junit.framework.AssertionFailedError;
 import org.junit.Test;
-import org.libsodium.jni.crypto.Random;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
 import java.lang.reflect.Method;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -23,8 +18,6 @@ import java.security.SecureRandom;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
-import static org.libsodium.jni.Sodium.crypto_sign_bytes;
-import static org.libsodium.jni.Sodium.crypto_sign_publickeybytes;
 
 public class AndroidConfigHelperTest {
     private static final String TAG = "AndroidConfigHelperTest";
@@ -107,12 +100,12 @@ public class AndroidConfigHelperTest {
 
                     @Override
                     public void loadConfigDidCancel() {
-                        assertFalse("Unexpected loadConfigDidCancel", true);
+                        assertFalse("TestCase: Unexpected loadConfigDidCancel", true);
                     }
 
                     @Override
                     public void loadConfigNotFound() {
-                        assertFalse("Unexpected loadConfigNotFound", true);
+                        assertFalse("TestCase: Unexpected loadConfigNotFound", true);
                     }
 
                     @Override
@@ -124,7 +117,7 @@ public class AndroidConfigHelperTest {
 
             @Override
             public void saveConfigDidCancel() {
-                assertFalse("Unexpected saveConfigDidCancel", true);
+                assertFalse("TestCase: Unexpected saveConfigDidCancel", true);
             }
 
             @Override
@@ -150,26 +143,30 @@ public class AndroidConfigHelperTest {
         testStringWithKPNone(longString);
     }
 
-
     @Test
     public void testSaveLoadEmptyStringKPNone() throws InterruptedException {
         final String emptyString = "";
         testStringWithKPNone(emptyString);
     }
 
-    private ConfigStorageHelper.SaveConfigHandler nullParamSaveHandler = new ConfigStorageHelper.SaveConfigHandler() {
+    private ConfigStorageHelper.SaveConfigHandler badParamSaveHandler = new ConfigStorageHelper.SaveConfigHandler() {
         @Override
         public void saveConfigDidSucceed() {
-            assertFalse("Unexpected saveConfigDidSucceed", true);
+            assertFalse("TestCase: Unexpected saveConfigDidSucceed", true);
         }
 
         @Override
         public void saveConfigDidCancel() {
-            assertFalse("Unexpected saveConfigDidCancel", true);
+            assertFalse("TestCase: Unexpected saveConfigDidCancel", true);
         }
 
         @Override
         public void saveConfigDidFail(Throwable e) {
+            if (e.getLocalizedMessage().startsWith("TestCase: Unexpected")) {
+                throw new RuntimeException(e);
+            }
+
+            Log.d(TAG, e.getLocalizedMessage());
             assertTrue(true);
         }
     };
@@ -180,13 +177,14 @@ public class AndroidConfigHelperTest {
         String string = "string";
 
         /* Null AndroidConfigStorageHelper */
-        Config.saveConfigSecurely(null, string, nullParamSaveHandler);
+        Config.saveConfigSecurely(null, string, badParamSaveHandler);
 
         /* Null SaveConfigHandler */
         boolean expectedExceptionFound = false;
         try {
             Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), string, null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
@@ -197,45 +195,51 @@ public class AndroidConfigHelperTest {
         try {
             Config.saveConfigSecurely(null, string, null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
         }
 
         /* Null String */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null, badParamSaveHandler);
 
         /* Null Context */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), string, badParamSaveHandler);
 
         /* Null identifier */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), string, badParamSaveHandler);
 
         /* Null authenticator */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withPassword(), null), string, nullParamSaveHandler);
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withLockScreen(), null), string, nullParamSaveHandler);
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withFingerprint(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withPassword(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withLockScreen(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withFingerprint(), null), string, badParamSaveHandler);
     }
     
-    private ConfigStorageHelper.LoadConfigHandler nullParamLoadHandler = new ConfigStorageHelper.LoadConfigHandler() {
+    private ConfigStorageHelper.LoadConfigHandler badParamLoadHandler = new ConfigStorageHelper.LoadConfigHandler() {
         @Override
         public void loadConfigDidSucceed(String config) {
-            assertFalse("Unexpected loadConfigDidSucceed", true);
+            assertFalse("TestCase: Unexpected loadConfigDidSucceed", true);
         }
 
         @Override
         public void loadConfigDidCancel() {
-            assertFalse("Unexpected loadConfigDidCancel", true);
+            assertFalse("TestCase: Unexpected loadConfigDidCancel", true);
         }
 
         @Override
         public void loadConfigNotFound() {
-            assertFalse("Unexpected loadConfigNotFound", true);
+            assertFalse("TestCase: Unexpected loadConfigNotFound", true);
         }
 
         @Override
         public void loadConfigDidFail(Throwable e) {
+            if (e.getLocalizedMessage().startsWith("TestCase: Unexpected")) {
+                throw new RuntimeException(e);
+            }
 
+            Log.d(TAG, e.getLocalizedMessage());
+            assertTrue(true);
         }
     };
 
@@ -244,13 +248,14 @@ public class AndroidConfigHelperTest {
         Context context = InstrumentationRegistry.getTargetContext();
 
         /* Null AndroidConfigStorageHelper */
-        Config.loadConfigSecurely(null, nullParamLoadHandler);
+        Config.loadConfigSecurely(null, badParamLoadHandler);
 
         /* Null SaveConfigHandler */
         boolean expectedExceptionFound = false;
         try {
             Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
@@ -261,31 +266,32 @@ public class AndroidConfigHelperTest {
         try {
             Config.loadConfigSecurely(null, null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
         }
 
         /* Null Context */
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamLoadHandler);
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), badParamLoadHandler);
 
         /* Null identifier */
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), nullParamLoadHandler);
-
-        /* Null authenticator */
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withPassword(), null), nullParamLoadHandler);
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withLockScreen(), null), nullParamLoadHandler);
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withFingerprint(), null), nullParamLoadHandler);
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), badParamLoadHandler);
     }
     
-    private ConfigStorageHelper.RemoveConfigHandler nullParamRemoveHandler = new ConfigStorageHelper.RemoveConfigHandler() {
+    private ConfigStorageHelper.RemoveConfigHandler badParamRemoveHandler = new ConfigStorageHelper.RemoveConfigHandler() {
         @Override
         public void removeConfigDidSucceed() {
-            assertFalse("Unexpected removeConfigDidSucceed", true);
+            assertFalse("TestCase: Unexpected removeConfigDidSucceed", true);
         }
 
         @Override
         public void removeConfigDidFail(Throwable e) {
+            if (e.getLocalizedMessage().startsWith("TestCase: Unexpected")) {
+                throw new RuntimeException(e);
+            }
+
+            Log.d(TAG, e.getLocalizedMessage());
             assertTrue(true);
         }
     };
@@ -295,13 +301,14 @@ public class AndroidConfigHelperTest {
         Context context = InstrumentationRegistry.getTargetContext();
 
         /* Null AndroidConfigStorageHelper */
-        Config.removeConfigSecurely(null, nullParamRemoveHandler);
+        Config.removeConfigSecurely(null, badParamRemoveHandler);
 
         /* Null SaveConfigHandler */
         boolean expectedExceptionFound = false;
         try {
             Config.removeConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
@@ -312,15 +319,40 @@ public class AndroidConfigHelperTest {
         try {
             Config.removeConfigSecurely(null, null);
         } catch (Exception e) {
+            Log.d(TAG, e.getLocalizedMessage());
             expectedExceptionFound = true;
         } finally {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
         }
 
         /* Null Context */
-        Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamRemoveHandler);
+        Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), badParamRemoveHandler);
 
         /* Null identifier */
-        Config.removeConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), nullParamRemoveHandler);
+        Config.removeConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), badParamRemoveHandler);
+    }
+
+    @Test
+    public void testBadIdentifierStrings() {
+        Context context = InstrumentationRegistry.getTargetContext();
+        String string = "string";
+
+        String badIdentifier1 = "";
+        String badIdentifier2 = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec pellentesque orci eget ipsum porttitor, tincidunt luctus massa pharetra. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Pellentesque elementum nibh nec vehicula aliquam. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Quisque id lobortis ante...";
+        String badIdentifier3 = "$#!#%@#$@";
+        String badIdentifier4 = "FDSA$#@DSS)D((#@";
+        String badIdentifier5 = "   ";
+        String badIdentifier6 = "   FSDFS   ";
+        String badIdentifier7 = "FDS FS FS F SDX";
+        String badIdentifier8 = "\tdfjskfjls\rjfskjfdls";
+
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier1, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier2, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier3, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier4, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier5, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier6, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier7, KeyProtection.withNone(), null), string, badParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, badIdentifier8, KeyProtection.withNone(), null), string, badParamSaveHandler);
     }
 }

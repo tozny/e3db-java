@@ -182,9 +182,6 @@ public class AndroidConfigHelperTest {
         /* Null AndroidConfigStorageHelper */
         Config.saveConfigSecurely(null, string, nullParamSaveHandler);
 
-        /* Null String */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null, nullParamSaveHandler);
-
         /* Null SaveConfigHandler */
         boolean expectedExceptionFound = false;
         try {
@@ -195,10 +192,125 @@ public class AndroidConfigHelperTest {
             assertTrue("Didn't hit expected exception", expectedExceptionFound);
         }
 
+        /* Null AndroidConfigStorageHelper and SaveConfigHandler */
+        expectedExceptionFound = false;
+        try {
+            Config.saveConfigSecurely(null, string, null);
+        } catch (Exception e) {
+            expectedExceptionFound = true;
+        } finally {
+            assertTrue("Didn't hit expected exception", expectedExceptionFound);
+        }
+
+        /* Null String */
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null, nullParamSaveHandler);
+
         /* Null Context */
         Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), string, nullParamSaveHandler);
 
         /* Null identifier */
         Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), string, nullParamSaveHandler);
+    }
+    
+    private ConfigStorageHelper.LoadConfigHandler nullParamLoadHandler = new ConfigStorageHelper.LoadConfigHandler() {
+        @Override
+        public void loadConfigDidSucceed(String config) {
+            assertFalse("Unexpected loadConfigDidSucceed", true);
+        }
+
+        @Override
+        public void loadConfigDidCancel() {
+            assertFalse("Unexpected loadConfigDidCancel", true);
+        }
+
+        @Override
+        public void loadConfigNotFound() {
+            assertFalse("Unexpected loadConfigNotFound", true);
+        }
+
+        @Override
+        public void loadConfigDidFail(Throwable e) {
+
+        }
+    };
+
+    @Test
+    public void testLoadWithNullParams() throws InterruptedException {
+        Context context = InstrumentationRegistry.getTargetContext();
+
+        /* Null AndroidConfigStorageHelper */
+        Config.loadConfigSecurely(null, nullParamLoadHandler);
+
+        /* Null SaveConfigHandler */
+        boolean expectedExceptionFound = false;
+        try {
+            Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null);
+        } catch (Exception e) {
+            expectedExceptionFound = true;
+        } finally {
+            assertTrue("Didn't hit expected exception", expectedExceptionFound);
+        }
+
+        /* Null AndroidConfigStorageHelper and SaveConfigHandler */
+        expectedExceptionFound = false;
+        try {
+            Config.loadConfigSecurely(null, null);
+        } catch (Exception e) {
+            expectedExceptionFound = true;
+        } finally {
+            assertTrue("Didn't hit expected exception", expectedExceptionFound);
+        }
+
+        /* Null Context */
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamLoadHandler);
+
+        /* Null identifier */
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), nullParamLoadHandler);
+    }
+    
+    private ConfigStorageHelper.RemoveConfigHandler nullParamRemoveHandler = new ConfigStorageHelper.RemoveConfigHandler() {
+        @Override
+        public void removeConfigDidSucceed() {
+            assertFalse("Unexpected removeConfigDidSucceed", true);
+        }
+
+        @Override
+        public void removeConfigDidFail(Throwable e) {
+            assertTrue(true);
+        }
+    };
+
+    @Test
+    public void testRemoveWithNullParams() throws InterruptedException {
+        Context context = InstrumentationRegistry.getTargetContext();
+
+        /* Null AndroidConfigStorageHelper */
+        Config.removeConfigSecurely(null, nullParamRemoveHandler);
+
+        /* Null SaveConfigHandler */
+        boolean expectedExceptionFound = false;
+        try {
+            Config.removeConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withNone(), null), null);
+        } catch (Exception e) {
+            expectedExceptionFound = true;
+        } finally {
+            assertTrue("Didn't hit expected exception", expectedExceptionFound);
+        }
+
+        /* Null AndroidConfigStorageHelper and SaveConfigHandler */
+        expectedExceptionFound = false;
+        try {
+            Config.removeConfigSecurely(null, null);
+        } catch (Exception e) {
+            expectedExceptionFound = true;
+        } finally {
+            assertTrue("Didn't hit expected exception", expectedExceptionFound);
+        }
+
+        /* Null Context */
+        Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamRemoveHandler);
+
+        /* Null identifier */
+        Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), nullParamRemoveHandler);
     }
 }

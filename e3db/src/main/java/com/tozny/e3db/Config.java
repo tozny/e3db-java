@@ -218,15 +218,34 @@ public class Config {
     }
   }
 
+  // throws runtime exception if handler is null
   public static void saveConfigSecurely(ConfigStorageHelper helper, String config, ConfigStorageHelper.SaveConfigHandler handler) {
-    helper.saveConfigSecurely(config, handler);
+    if (helper == null) {
+      IllegalArgumentException e = new IllegalArgumentException("ConfigStorageHelper cannot be null.");
+      if (handler == null) throw new RuntimeException(e);
+      handler.saveConfigDidFail(e);
+    } else {
+      helper.saveConfigSecurely(config, handler);
+    }
   }
 
   public static void loadConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.LoadConfigHandler handler) {
-    helper.loadConfigSecurely(handler);
+    if (helper == null) {
+      IllegalArgumentException e = new IllegalArgumentException("ConfigStorageHelper cannot be null.");
+      if (handler == null) throw new RuntimeException(e);
+      handler.loadConfigDidFail(e);
+    } else {
+      helper.loadConfigSecurely(handler);
+    }
   }
 
   public static void removeConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.RemoveConfigHandler handler) {
-    helper.removeConfigSecurely(handler);
+    if (helper == null) {
+      IllegalArgumentException e = new IllegalArgumentException("ConfigStorageHelper cannot be null.");
+      if (handler == null) throw new RuntimeException(e);
+      handler.removeConfigDidFail(e);
+    } else {
+      helper.removeConfigSecurely(handler);
+    }
   }
 }

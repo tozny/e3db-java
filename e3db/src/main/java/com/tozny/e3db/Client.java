@@ -4,7 +4,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
-import android.util.Log;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -245,12 +244,10 @@ public class  Client {
       return s;
     }
   }
+
   // From https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
   private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) {
-    // Some Samsung phones don't use TL2 v1.2 by default until API 21, according to comments in the thread linked above,
-    // which is why we check API 16 - 21 (Jelly Bean to Lollipop).
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
-      //Log.d(TAG, "Using custom socket factory: " + Tls12SocketFactory.class.getCanonicalName());
       try {
         // From javadoc for okhttp3.OkHttpClient.Builder.sslSocketFactory(javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager)
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
@@ -266,18 +263,15 @@ public class  Client {
         sc.init(null, new TrustManager[] { trustManager }, null);
         client.sslSocketFactory(new Tls12SocketFactory(sc.getSocketFactory()), trustManager);
 
-        //Log.d(TAG, "Created custom socket factory.");
         ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                 .tlsVersions(TlsVersion.TLS_1_2)
                 .build();
 
-        //Log.d(TAG, "Using connection spec " + cs.toString());
         List<ConnectionSpec> specs = Arrays.asList(cs,
                 ConnectionSpec.COMPATIBLE_TLS,
                 ConnectionSpec.CLEARTEXT);
         client.connectionSpecs(specs);
       } catch (KeyStoreException | KeyManagementException | NoSuchAlgorithmException exc) {
-        //Log.e(TAG, "Error while setting TLS 1.2", exc);
         throw new RuntimeException(exc);
       }
     }

@@ -28,7 +28,6 @@ import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 
 class FSKSWrapper {
-    private static final String MOBILE_AUTH_DB_KSTORE = "MobileAuthDb.kstore";
     private static final String TAG = "KeyProvider";
 
     private static volatile KeyStore fsKS;
@@ -48,13 +47,13 @@ class FSKSWrapper {
         return bytes;
     }
 
-    private synchronized static String getPerf(Context context) throws Throwable {
+    private synchronized static String getPerf(Context context, String dir) throws Throwable {
         final int count = 65, bytes = 20;
-        final String perf = "1I7K7S1N7A8R0F0A8Z5S";
+
         int r;
         byte[] s, buf;
 
-        if (!fileExists(context, perf)) {
+        if (!fileExists(context, dir)) {
             // should only run once, the first time the keystore is accessed.
             buf = getRandomBytes(count);
 
@@ -64,7 +63,7 @@ class FSKSWrapper {
                 buf[i + (i % 2 == 1 ? i - (i - 1) : 1)] = a;
             }
 
-            OutputStream output = context.openFileOutput(perf, Context.MODE_PRIVATE);
+            OutputStream output = context.openFileOutput(dir, Context.MODE_PRIVATE);
             try {
                 output.write(buf);
             } finally {
@@ -74,7 +73,7 @@ class FSKSWrapper {
             r = SecureRandom.getInstance("SHA1PRNG").nextInt(1000) + 10000;
             s = getRandomBytes(bytes);
 
-            SharedPreferences sharedPreferences = context.getSharedPreferences(perf, Context.MODE_PRIVATE);
+            SharedPreferences sharedPreferences = context.getSharedPreferences(dir, Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = sharedPreferences.edit();
             editor.putInt("r", r);
             editor.putString("s", Base64Util.encode(s));
@@ -82,7 +81,7 @@ class FSKSWrapper {
 
         } else {
             buf = new byte[count];
-            InputStream input = context.openFileInput(perf);
+            InputStream input = context.openFileInput(dir);
 
             try {
                 if (input.read(buf) != count)
@@ -91,7 +90,7 @@ class FSKSWrapper {
                 input.close();
             }
 
-            SharedPreferences sharedPreferences = context.getSharedPreferences(perf, Context.MODE_PRIVATE);
+            SharedPreferences sharedPreferences = context.getSharedPreferences(dir, Context.MODE_PRIVATE);
             r = sharedPreferences.getInt("r", -1);
             s = Base64Util.decode(sharedPreferences.getString("s", null));
         }
@@ -109,7 +108,7 @@ class FSKSWrapper {
         );
     }
 
-    private static KeyStore getFSKS(Context context) throws Throwable {
+    private static KeyStore getFSKS(Context context, String name, String location) throws Throwable {
         if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
@@ -117,20 +116,20 @@ class FSKSWrapper {
                     try {
                         result = KeyStore.getInstance("BKS");
                         Log.d(TAG, "Keystore: " + result.getClass().getCanonicalName());
-                        if (fileExists(context, MOBILE_AUTH_DB_KSTORE)) {
+                        if (fileExists(context, name)) {
                             // load key store
-                            FileInputStream kstore = context.openFileInput(MOBILE_AUTH_DB_KSTORE);
+                            FileInputStream kstore = context.openFileInput(name);
                             try {
-                                result.load(kstore, getPerf(context).toCharArray());
+                                result.load(kstore, getPerf(context, location).toCharArray());
                             } finally {
                                 kstore.close();
                             }
                         } else {
                             // create key store
                             result.load(null, null);
-                            FileOutputStream out = context.openFileOutput(MOBILE_AUTH_DB_KSTORE, Context.MODE_PRIVATE);
+                            FileOutputStream out = context.openFileOutput(name, Context.MODE_PRIVATE);
                             try {
-                                result.store(out, getPerf(context).toCharArray());
+                                result.store(out, getPerf(context, location).toCharArray());
                             } finally {
                                 out.close();
                             }
@@ -147,13 +146,13 @@ class FSKSWrapper {
         return fsKS;
     }
 
-    private static void saveFSKS(Context context) throws Throwable {
+    private static void saveFSKS(Context context, String name, String location) throws Throwable {
         if (fsKS != null) {
             synchronized(keyStoreWriteLock) {
                 try {
-                    OutputStream output = context.openFileOutput(MOBILE_AUTH_DB_KSTORE, Context.MODE_PRIVATE);
+                    OutputStream output = context.openFileOutput(name, Context.MODE_PRIVATE);
                     try {
-                        fsKS.store(output, getPerf(context).toCharArray());
+                        fsKS.store(output, getPerf(context,location).toCharArray());
                         Log.d(TAG, "Saved keystore.");
                     } finally {
                         output.close();
@@ -186,7 +185,7 @@ class FSKSWrapper {
 
     private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Throwable {
 
-        KeyStore keyStore = getFSKS(context);
+        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
 
         if (!keyStore.containsAlias(alias)) {
 
@@ -197,24 +196,24 @@ class FSKSWrapper {
 
             keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
-            saveFSKS(context);
+            saveFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
         }
     }
 
     static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Throwable {
         createSecretKeyIfNeeded(context, alias, protection, password);
 
-        KeyStore keyStore = getFSKS(context);
+        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
 
         return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
     }
 
     static void removeSecretKey(Context context, String alias) throws Throwable {
-        KeyStore keyStore = getFSKS(context);
+        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
 
         if (keyStore.containsAlias(alias)) {
             keyStore.deleteEntry(alias);
-            saveFSKS(context);
+            saveFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
         }
     }
 }

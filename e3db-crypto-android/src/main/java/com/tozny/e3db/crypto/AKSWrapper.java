@@ -41,9 +41,6 @@ class AKSWrapper {
             switch(protection.protectionType()) {
                 case FINGERPRINT:
                     builder.setUserAuthenticationRequired(true);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        builder.setInvalidatedByBiometricEnrollment(false);
-                    }
 
                     break;
 

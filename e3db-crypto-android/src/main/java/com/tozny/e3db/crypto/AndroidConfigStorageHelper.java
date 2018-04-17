@@ -27,7 +27,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
     private KeyProtection protection;
     private KeyAuthenticator keyAuthenticator;
 
-    private static final String pattern = "^[a-zA-Z0-9-_\\s]+$";
+    private static final String pattern = "^[a-zA-Z0-9-_]+$";
 
     private static void checkArgs(Context context, String identifier, Object handler) {
         if (context == null)
@@ -40,7 +40,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             throw new IllegalArgumentException("Handler cannot be null.");
 
         if (!identifier.matches(pattern))
-            throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, hyphens, and spaces.");
+            throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, and hyphens.");
 
         if (identifier.length() > 100) /* In case device file system limits filenames 127 characters (and we're adding roughly 25 characters). */
             throw new IllegalArgumentException("Identifier string cannot be more than 127 characters in length.");

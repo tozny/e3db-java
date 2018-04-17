@@ -209,7 +209,12 @@ public class AndroidConfigHelperTest {
         Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), string, nullParamSaveHandler);
 
         /* Null identifier */
-        Config.saveConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), string, nullParamSaveHandler);
+
+        /* Null authenticator */
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withPassword(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withLockScreen(), null), string, nullParamSaveHandler);
+        Config.saveConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withFingerprint(), null), string, nullParamSaveHandler);
     }
     
     private ConfigStorageHelper.LoadConfigHandler nullParamLoadHandler = new ConfigStorageHelper.LoadConfigHandler() {
@@ -265,7 +270,12 @@ public class AndroidConfigHelperTest {
         Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamLoadHandler);
 
         /* Null identifier */
-        Config.loadConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), nullParamLoadHandler);
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), nullParamLoadHandler);
+
+        /* Null authenticator */
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withPassword(), null), nullParamLoadHandler);
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withLockScreen(), null), nullParamLoadHandler);
+        Config.loadConfigSecurely(new AndroidConfigStorageHelper(context, name, KeyProtection.withFingerprint(), null), nullParamLoadHandler);
     }
     
     private ConfigStorageHelper.RemoveConfigHandler nullParamRemoveHandler = new ConfigStorageHelper.RemoveConfigHandler() {
@@ -311,6 +321,6 @@ public class AndroidConfigHelperTest {
         Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, name, KeyProtection.withNone(), null), nullParamRemoveHandler);
 
         /* Null identifier */
-        Config.removeConfigSecurely(new AndroidConfigStorageHelper(null, null, KeyProtection.withNone(), null), nullParamRemoveHandler);
+        Config.removeConfigSecurely(new AndroidConfigStorageHelper(context, null, KeyProtection.withNone(), null), nullParamRemoveHandler);
     }
 }

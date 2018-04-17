@@ -1,26 +1,28 @@
 package com.tozny.e3db;
 
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import android.util.Log;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -30,15 +32,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import okhttp3.Interceptor;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
+import okhttp3.*;
 import okio.ByteString;
 import retrofit2.Retrofit;
+
+import javax.net.ssl.*;
 
 import static com.tozny.e3db.Base64.decodeURL;
 import static com.tozny.e3db.Base64.encodeURL;
@@ -112,6 +110,7 @@ import static com.tozny.e3db.Checks.*;
  *
  */
 public class  Client {
+  private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
@@ -173,7 +172,119 @@ public class  Client {
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    if (Platform.isAndroid()) {
+      anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
+    } else {
+      anonymousClient = new OkHttpClient.Builder().build();
+    }
   }
+
+
+
+  /**
+   * Enables TLS v1.2 when creating SSLSockets.
+   * <p/>
+   * For some reason, android supports TLS v1.2 from API 16, but enables it by
+   * default only from API 20.
+   * <p>
+   *
+   * Thanks to https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
+   *
+   * @link https://developer.android.com/reference/javax/net/ssl/SSLSocket.html
+   * @see SSLSocketFactory
+   */
+  static class Tls12SocketFactory extends SSLSocketFactory {
+    private static final String[] TLS_V12_ONLY = {TlsVersion.TLS_1_2.javaName()};
+
+    final SSLSocketFactory delegate;
+
+    public Tls12SocketFactory(SSLSocketFactory base) {
+      this.delegate = base;
+    }
+
+    @Override
+    public String[] getDefaultCipherSuites() {
+      return delegate.getDefaultCipherSuites();
+    }
+
+    @Override
+    public String[] getSupportedCipherSuites() {
+      return delegate.getSupportedCipherSuites();
+    }
+
+    @Override
+    public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+      return patch(delegate.createSocket(s, host, port, autoClose));
+    }
+
+    @Override
+    public Socket createSocket(String host, int port) throws IOException, UnknownHostException {
+      return patch(delegate.createSocket(host, port));
+    }
+
+    @Override
+    public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException, UnknownHostException {
+      return patch(delegate.createSocket(host, port, localHost, localPort));
+    }
+
+    @Override
+    public Socket createSocket(InetAddress host, int port) throws IOException {
+      return patch(delegate.createSocket(host, port));
+    }
+
+    @Override
+    public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
+      return patch(delegate.createSocket(address, port, localAddress, localPort));
+    }
+
+    private Socket patch(Socket s) {
+      if (s instanceof SSLSocket) {
+        ((SSLSocket) s).setEnabledProtocols(TLS_V12_ONLY);
+      }
+      return s;
+    }
+  }
+  // From https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
+  private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) {
+    // Some Samsung phones don't use TL2 v1.2 by default until API 21, according to comments in the thread linked above,
+    // which is why we check API 16 - 21 (Jelly Bean to Lollipop).
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
+      //Log.d(TAG, "Using custom socket factory: " + Tls12SocketFactory.class.getCanonicalName());
+      try {
+        // From javadoc for okhttp3.OkHttpClient.Builder.sslSocketFactory(javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager)
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init((KeyStore) null);
+        TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+        if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager)) {
+          throw new IllegalStateException("Unexpected default trust managers:"
+                  + Arrays.toString(trustManagers));
+        }
+        X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
+        SSLContext sc = SSLContext.getInstance(TlsVersion.TLS_1_2.javaName());
+        sc.init(null, new TrustManager[] { trustManager }, null);
+        client.sslSocketFactory(new Tls12SocketFactory(sc.getSocketFactory()), trustManager);
+
+        //Log.d(TAG, "Created custom socket factory.");
+        ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                .tlsVersions(TlsVersion.TLS_1_2)
+                .build();
+
+        //Log.d(TAG, "Using connection spec " + cs.toString());
+        List<ConnectionSpec> specs = Arrays.asList(cs,
+                ConnectionSpec.COMPATIBLE_TLS,
+                ConnectionSpec.CLEARTEXT);
+        client.connectionSpecs(specs);
+      } catch (KeyStoreException | KeyManagementException | NoSuchAlgorithmException exc) {
+        //Log.e(TAG, "Error while setting TLS 1.2", exc);
+        throw new RuntimeException(exc);
+      }
+    }
+
+    return client;
+  }
+
 
   Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
     this.apiKey = apiKey;
@@ -186,13 +297,24 @@ public class  Client {
     else
       publicSigningKey = null;
 
-    Retrofit build = new Retrofit.Builder()
-      .callbackExecutor(this.uiExecutor)
-      .client(new OkHttpClient.Builder()
-        .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host))
-        .build())
-      .baseUrl(host.resolve("/").toString())
-      .build();
+    Retrofit build;
+    if (Platform.isAndroid()) {
+      build = new Retrofit.Builder()
+        .callbackExecutor(uiExecutor)
+        .client(enableTLSv12(new OkHttpClient.Builder()
+          .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host)))
+          .build())
+        .baseUrl(host.resolve("/").toString())
+        .build();
+    } else {
+      build = new Retrofit.Builder()
+        .callbackExecutor(uiExecutor)
+        .client(new OkHttpClient.Builder()
+          .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host))
+          .build())
+        .baseUrl(host.resolve("/").toString())
+        .build();
+    }
 
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
@@ -941,8 +1063,7 @@ public class  Client {
 
     final RegisterAPI registerClient = new Retrofit.Builder()
       .callbackExecutor(uiExecutor)
-      .client(new OkHttpClient.Builder()
-        .build())
+      .client(anonymousClient)
       .baseUrl(URI.create(host).resolve("/").toString())
       .build().create(RegisterAPI.class);
 

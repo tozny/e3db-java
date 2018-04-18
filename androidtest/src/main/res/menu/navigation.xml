@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+            android:id="@+id/navigation_kp_none"
+            android:icon="@drawable/ic_no_encryption_black_24dp"
+            android:title="@string/title_kp_none"/>
+
+    <item
+            android:id="@+id/navigation_kp_password"
+            android:icon="@drawable/ic_enhanced_encryption_black_24dp"
+            android:title="@string/title_kp_password"/>
+
+    <item
+            android:id="@+id/navigation_kp_lock_screen"
+            android:icon="@drawable/ic_phonelink_lock_black_24dp"
+            android:title="@string/title_kp_lock_screen"/>
+
+    <item
+            android:id="@+id/navigation_kp_fingerprint"
+            android:icon="@drawable/ic_fingerprint_black_24dp"
+            android:title="@string/title_kp_fingerprint"/>
+
+</menu>

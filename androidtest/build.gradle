@@ -5,13 +5,14 @@ android {
 
     defaultConfig {
         applicationId "com.tozny.e3dbtest"
-        minSdkVersion 19
+        minSdkVersion 16
         targetSdkVersion 22
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
+        vectorDrawables.useSupportLibrary = true
     }
     buildTypes {
         release {
@@ -27,6 +28,9 @@ dependencies {
     implementation 'com.android.support:appcompat-v7:26.0.1'
     implementation 'com.android.support.constraint:constraint-layout:1.0.2'
 
+    implementation 'com.android.support:design:26.1.0'
+    implementation 'com.android.support:support-vector-drawable:26.1.0'
+    implementation 'com.android.support:support-v4:26.1.0'
     androidTestCompile 'com.android.support.test:runner:1.0.1'
     androidTestCompile 'com.android.support.test:rules:1.0.1'
     androidTestCompile 'com.android.support.test.espresso:espresso-core:3.0.1'
@@ -37,11 +41,18 @@ dependencies {
     androidTestCompile project(path: ':e3db')
     androidTestCompile project(path: ':e3db-crypto-interface')
     androidTestCompile project(path: ':e3db-crypto-android')
+
+    compile project(path: ':e3db')
+    compile project(path: ':e3db-crypto-interface')
+    compile project(path: ':e3db-crypto-android')
 }
 
 tasks.withType(Test) {
     testLogging {
         showStackTraces = true
-        exceptionFormat="full"
+        exceptionFormat = "full"
     }
 }
+
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'

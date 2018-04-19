@@ -1,89 +1,74 @@
 package com.tozny.e3db.crypto;
 
-
 import android.content.Context;
 import com.tozny.e3db.ConfigStorageHelper;
-
-
 import javax.crypto.Cipher;
 
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- * 
- * Copyright (c) 2018 
- * 
- * All rights reserved.
- * 
- * e3db-java
- * 
- * Created by Lilli Szafranski on 4/4/18.
- * 
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
-
-
 public class AndroidConfigStorageHelper implements ConfigStorageHelper {
-    private Context context;
-    private String identifier;
-    private KeyProtection protection;
-    private KeyAuthenticator keyAuthenticator;
+    private final Context context;
+    private final String identifier;
+    private final KeyProtection protection;
+    private final KeyAuthenticator keyAuthenticator;
 
     private static final String pattern = "^[a-zA-Z0-9-_]+$";
-
-    private static void checkArgs(Context context, String identifier, Object handler) {
-        if (context == null)
-            throw new IllegalArgumentException("Context cannot be null.");
-
-        if (identifier == null)
-            throw new IllegalArgumentException("Identifier cannot be null.");
-
-        if (handler == null)
-            throw new IllegalArgumentException("Handler cannot be null.");
-
-        if (!identifier.matches(pattern))
-            throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, and hyphens.");
-
-        if (identifier.length() > 100) /* In case device file system limits filenames 127 characters (and we're adding roughly 25 characters). */
-            throw new IllegalArgumentException("Identifier string cannot be more than 127 characters in length.");
-
-        if (identifier.trim().length() == 0)
-            throw new IllegalArgumentException("Identifier string cannot be empty.");
-    }
-
-    private static void checkArgs(Context context, String identifier, String config, Object handler) {
-        checkArgs(context, identifier, handler);
-
-        if (config == null)
-            throw new IllegalArgumentException("Config string cannot be null.");
-    }
-
     private final static String COM_TOZNY_E3DB_CRYPTO = "com.tozny.e3db.crypto-";
 
-    private static String full(String identifier, KeyProtection protection) {
-        if (protection == null)
-            return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
-
-        switch (protection.protectionType()) {
-            case NONE:        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
-            case FINGERPRINT: return COM_TOZNY_E3DB_CRYPTO + identifier + "-FP";
-            case LOCK_SCREEN: return COM_TOZNY_E3DB_CRYPTO + identifier + "-LS";
-            case PASSWORD:    return COM_TOZNY_E3DB_CRYPTO + identifier + "-PW";
-        }
-
-        return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
+    /**
+     * Create a helper for storing, deleting, or retrieving a config that is not protected by a password
+     * or other mechanism.
+     * @param context
+     * @param identifier
+     */
+    public AndroidConfigStorageHelper(Context context, String identifier) {
+        this(context, identifier, KeyProtection.withNone(), KeyAuthenticator.noAuthentication());
     }
 
     public AndroidConfigStorageHelper(Context context, String identifier, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+        if(context == null)
+            throw new IllegalArgumentException("context cannot be null.");
+        if(identifier == null || identifier.trim().isEmpty())
+            throw new IllegalArgumentException("identifier cannot be null or blank.");
+        if (!identifier.matches(pattern)) {
+            throw new IllegalArgumentException("Identifier string can only contain alphanumeric characters, underscores, and hyphens.");
+        }
+        if (identifier.length() > 100) /* In case device file system limits filenames 127 characters (and we're adding roughly 25 characters). */
+            throw new IllegalArgumentException("Identifier string cannot be more than 100 characters in length.");
+        if(protection == null)
+            throw new IllegalArgumentException("protection cannot be null.");
+        if(keyAuthenticator == null)
+            throw new IllegalArgumentException("keyAuthenticator cannot be null.");
+
         this.context    = context;
         this.identifier = identifier;
-        this.protection = protection == null ? KeyProtection.withNone() : protection;
+        this.protection = protection;
         this.keyAuthenticator = keyAuthenticator;
+    }
+
+    private static String full(String identifier, KeyProtection protection) {
+        final KeyProtection.KeyProtectionType keyProtectionType = protection.protectionType();
+        switch (keyProtectionType) {
+            case NONE:
+                return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
+            case FINGERPRINT:
+                return COM_TOZNY_E3DB_CRYPTO + identifier + "-FP";
+            case LOCK_SCREEN:
+                return COM_TOZNY_E3DB_CRYPTO + identifier + "-LS";
+            case PASSWORD:
+                return COM_TOZNY_E3DB_CRYPTO + identifier + "-PW";
+            default:
+                throw new RuntimeException("Unrecognized key protection type: " +  keyProtectionType.name());
+        }
     }
 
     @Override
     public void saveConfigSecurely(final String config, final SaveConfigHandler saveConfigHandler) {
-        try {
-            checkArgs(context, identifier, config, saveConfigHandler);
+        if (config == null)
+            throw new IllegalArgumentException("config cannot be null.");
 
+        if (saveConfigHandler == null)
+            throw new IllegalArgumentException("saveConfigHandler cannot be null.");
+
+        try {
             final String fullIdentifier = full(identifier, protection);
 
             KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
@@ -106,17 +91,16 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             });
 
         } catch (Throwable e) {
-            if (saveConfigHandler == null) throw new RuntimeException(e);
-
             saveConfigHandler.saveConfigDidFail(e);
         }
     }
 
     @Override
     public void loadConfigSecurely(final LoadConfigHandler loadConfigHandler) {
-        try {
-            checkArgs(context, identifier, loadConfigHandler);
+        if (loadConfigHandler == null)
+            throw new IllegalArgumentException("loadConfigHandler cannot be null.");
 
+        try {
             final String fullIdentifier = full(identifier, protection);
 
             if (!SecureStringManager.secureStringExists(context, fullIdentifier)) {
@@ -144,17 +128,16 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
 
             }
         } catch (Throwable e) {
-            if (loadConfigHandler == null) throw new RuntimeException(e);
-
             loadConfigHandler.loadConfigDidFail(e);
         }
     }
 
     @Override
     public void removeConfigSecurely(RemoveConfigHandler removeConfigHandler) {
-        try {
-            checkArgs(context, identifier, removeConfigHandler);
+        if (removeConfigHandler == null)
+            throw new IllegalArgumentException("removeConfigHandler");
 
+        try {
             String fullIdentifier = full(identifier, protection);
 
             Throwable throwable = null;
@@ -171,10 +154,7 @@ public class AndroidConfigStorageHelper implements ConfigStorageHelper {
             if (throwable != null) throw throwable;
 
             removeConfigHandler.removeConfigDidSucceed();
-
         } catch (Throwable e) {
-            if (removeConfigHandler == null) throw new RuntimeException(e);
-
             removeConfigHandler.removeConfigDidFail(new RuntimeException(e));
         }
     }

@@ -25,10 +25,11 @@ import javax.crypto.spec.PBEKeySpec;
 import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
-import java.security.spec.InvalidKeySpecException;
 
 class FSKSWrapper {
     private static final String TAG = "KeyProvider";
+    private static final String FSKS = "com.tozny.e3db.crypto.fsks";
+    private static final String FSKS_LOC = "com.tozny.e3db.crypto.sys";
 
     private static volatile KeyStore fsKS;
     private static final Object keyStoreCreateLock = new Object();
@@ -108,7 +109,7 @@ class FSKSWrapper {
         );
     }
 
-    private static KeyStore getFSKS(Context context, String name, String location) throws Throwable {
+    private static KeyStore getFSKS(Context context) throws Throwable {
         if (fsKS == null) {
             synchronized (keyStoreCreateLock) {
                 KeyStore result = fsKS;
@@ -116,20 +117,20 @@ class FSKSWrapper {
                     try {
                         result = KeyStore.getInstance("BKS");
                         Log.d(TAG, "Keystore: " + result.getClass().getCanonicalName());
-                        if (fileExists(context, name)) {
+                        if (fileExists(context, FSKS)) {
                             // load key store
-                            FileInputStream kstore = context.openFileInput(name);
+                            FileInputStream kstore = context.openFileInput(FSKS);
                             try {
-                                result.load(kstore, getPerf(context, location).toCharArray());
+                                result.load(kstore, getPerf(context, FSKS_LOC).toCharArray());
                             } finally {
                                 kstore.close();
                             }
                         } else {
                             // create key store
                             result.load(null, null);
-                            FileOutputStream out = context.openFileOutput(name, Context.MODE_PRIVATE);
+                            FileOutputStream out = context.openFileOutput(FSKS, Context.MODE_PRIVATE);
                             try {
-                                result.store(out, getPerf(context, location).toCharArray());
+                                result.store(out, getPerf(context, FSKS_LOC).toCharArray());
                             } finally {
                                 out.close();
                             }
@@ -146,13 +147,13 @@ class FSKSWrapper {
         return fsKS;
     }
 
-    private static void saveFSKS(Context context, String name, String location) throws Throwable {
+    private static void saveFSKS(Context context) throws Throwable {
         if (fsKS != null) {
             synchronized(keyStoreWriteLock) {
                 try {
-                    OutputStream output = context.openFileOutput(name, Context.MODE_PRIVATE);
+                    OutputStream output = context.openFileOutput(FSKS, Context.MODE_PRIVATE);
                     try {
-                        fsKS.store(output, getPerf(context,location).toCharArray());
+                        fsKS.store(output, getPerf(context, FSKS_LOC).toCharArray());
                         Log.d(TAG, "Saved keystore.");
                     } finally {
                         output.close();
@@ -185,7 +186,7 @@ class FSKSWrapper {
 
     private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Throwable {
 
-        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
+        KeyStore keyStore = getFSKS(context);
 
         if (!keyStore.containsAlias(alias)) {
 
@@ -196,24 +197,24 @@ class FSKSWrapper {
 
             keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
-            saveFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
+            saveFSKS(context);
         }
     }
 
     static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Throwable {
         createSecretKeyIfNeeded(context, alias, protection, password);
 
-        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
+        KeyStore keyStore = getFSKS(context);
 
         return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
     }
 
     static void removeSecretKey(Context context, String alias) throws Throwable {
-        KeyStore keyStore = getFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
+        KeyStore keyStore = getFSKS(context);
 
         if (keyStore.containsAlias(alias)) {
             keyStore.deleteEntry(alias);
-            saveFSKS(context, FileSystemManager.getFsksNameFilePath(context), FileSystemManager.getFsksLocFilePath(context));
+            saveFSKS(context);
         }
     }
 }

@@ -22,8 +22,6 @@ class FileSystemManager {
 
     private final static String SECURE_STRING_STORAGE_DIRECTORY = "com.tozny.e3db.crypto";
     private final static String IV_DIRECTORY                    = "ivs";
-    private static final String FSKS                            = "fsks";
-    private static final String LOC                             = "sys";
 
     private static String filesDirectory(Context context) throws Throwable {
         String filesDirectory = context.getFilesDir().getAbsolutePath();
@@ -60,11 +58,4 @@ class FileSystemManager {
         return filesDirectory(context) + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + fileName;
     }
 
-    static String getFsksNameFilePath(Context context) throws Throwable {
-        return SECURE_STRING_STORAGE_DIRECTORY + "." + FSKS;
-    }
-
-    static String getFsksLocFilePath(Context context) throws Throwable {
-        return SECURE_STRING_STORAGE_DIRECTORY + "." + LOC;
-    }
 }

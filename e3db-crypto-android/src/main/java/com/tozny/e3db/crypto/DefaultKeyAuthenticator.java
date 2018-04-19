@@ -52,7 +52,7 @@ import static android.app.Activity.RESULT_OK;
 /**
  * Performs fingerprint authentication to unlock protected keys.
  */
-public final class DefaultKeyAuthenticator implements KeyAuthenticator {
+public final class DefaultKeyAuthenticator extends KeyAuthenticator {
     private final Activity activity;
     private final String title;
 

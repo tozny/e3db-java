@@ -13,13 +13,31 @@ package com.tozny.e3db.crypto;
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 
+import android.app.Activity;
 import android.os.Build;
 import android.support.annotation.RequiresApi;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
 
 import java.security.UnrecoverableKeyException;
 
-public interface KeyAuthenticator {
+public abstract class KeyAuthenticator {
+    private static final KeyAuthenticator noAuthentication = new KeyAuthenticator() {
+        @Override
+        void getPassword(PasswordAuthenticatorCallbackHandler handler) {
+            throw new IllegalStateException("getPassword should not be called.");
+        }
+
+        @Override
+        void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler handler) {
+            throw new IllegalStateException("authenticateWithLockScreen should not be called.");
+        }
+
+        @Override
+        void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, DeviceLockAuthenticatorCallbackHandler handler) {
+            throw new IllegalStateException("authenticateWithFingerprint should not be called.");
+        }
+    };
+
     interface PasswordAuthenticatorCallbackHandler {
         void handlePassword(String password) throws UnrecoverableKeyException;
         void handleCancel();
@@ -32,14 +50,22 @@ public interface KeyAuthenticator {
         void handleError(Throwable e);
     }
 
-    void getPassword(PasswordAuthenticatorCallbackHandler handler);
+    abstract void getPassword(PasswordAuthenticatorCallbackHandler handler);
 
     // Make a note in docs that you can't call this if your activity has the 'noHistory' attribute set (via
     // AndroidManifest.xml). If you do, 'onActivityResult' is never called and the device credential flow
     // fails to finalize and call 'EnrollmentHandler#didCreateAccount'/'AuthorizationHandler#handleAuthorized'.
     @RequiresApi(api = Build.VERSION_CODES.M)
-    void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler handler);
+    abstract void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler handler);
 
     @RequiresApi(api = Build.VERSION_CODES.M)
-    void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, DeviceLockAuthenticatorCallbackHandler handler);
+    abstract void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, DeviceLockAuthenticatorCallbackHandler handler);
+
+    public static KeyAuthenticator defaultAuthenticator(Activity activity, String title) {
+        return new DefaultKeyAuthenticator(activity, title);
+    }
+
+    public static KeyAuthenticator noAuthentication() {
+        return noAuthentication;
+    }
 }

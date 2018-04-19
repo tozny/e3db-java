@@ -3,7 +3,7 @@ apply plugin: 'java'
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     compileOnly project(':e3db-crypto-interface')
-    compile 'org.abstractj.kalium:kalium:0.7.0'
+    implementation 'org.abstractj.kalium:kalium:0.7.0'
 }
 
 sourceCompatibility = "1.7"

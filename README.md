@@ -153,8 +153,7 @@ Client.register(token, clientName, host, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {
-      // write credentials to secure storage
-      writeFile("credentials.json", r.asValue().json());
+      // write credentials to secure storage ...
     }
     else {
       // throw to indicate registration error

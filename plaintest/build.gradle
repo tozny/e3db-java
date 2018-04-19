@@ -7,13 +7,13 @@ compileTestJava {
 }
 
 dependencies {
-    testCompile("junit:junit:[4,)")
-    testCompile project(path: ':e3db')
-    testCompile project(path: ':e3db-crypto-interface')
-    testCompile project(path: ':e3db-crypto-plain')
-    testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+    testImplementation("junit:junit:[4,)")
+    testImplementation project(path: ':e3db')
+    testImplementation project(path: ':e3db-crypto-interface')
+    testImplementation project(path: ':e3db-crypto-plain')
+    testImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
 }
 
 test {

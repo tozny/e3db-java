@@ -31,20 +31,20 @@ dependencies {
     implementation 'com.android.support:design:26.1.0'
     implementation 'com.android.support:support-vector-drawable:26.1.0'
     implementation 'com.android.support:support-v4:26.1.0'
-    androidTestCompile 'com.android.support.test:runner:1.0.1'
-    androidTestCompile 'com.android.support.test:rules:1.0.1'
-    androidTestCompile 'com.android.support.test.espresso:espresso-core:3.0.1'
+    androidTestImplementation 'com.android.support.test:runner:1.0.1'
+    androidTestImplementation 'com.android.support.test:rules:1.0.1'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
 
-    androidTestCompile project(path: ':e3db')
-    androidTestCompile project(path: ':e3db-crypto-interface')
-    androidTestCompile project(path: ':e3db-crypto-android')
+    androidTestImplementation project(path: ':e3db')
+    androidTestImplementation project(path: ':e3db-crypto-interface')
+    androidTestImplementation project(path: ':e3db-crypto-android')
 
-    compile project(path: ':e3db')
-    compile project(path: ':e3db-crypto-interface')
-    compile project(path: ':e3db-crypto-android')
+    implementation project(path: ':e3db')
+    implementation project(path: ':e3db-crypto-interface')
+    implementation project(path: ':e3db-crypto-android')
 }
 
 tasks.withType(Test) {

@@ -30,6 +30,10 @@ android {
 
 evaluationDependsOn(':publish')
 
+task sourceJar(type: Jar) {
+    from android.sourceSets.main.java.sourceFiles
+}
+
 publishing {
   publications {
     maven(MavenPublication) {
@@ -37,13 +41,17 @@ publishing {
       artifactId 'e3db-client-android'
       version project(":publish").ext.version
 
+      artifact sourceJar {
+        classifier "sources"
+      }
+
       artifact bundleRelease
 
       pom.withXml {
         def dependenciesNode = asNode().appendNode('dependencies')
 
-        // List all compile dependencies and write to POM
-        configurations.compile.getAllDependencies().each { Dependency dep ->
+        // List all implementation dependencies and write to POM
+        configurations.implementation.getAllDependencies().each { Dependency dep ->
           if (dep.group == null || dep.version == null || dep.name == null || dep.name == "unspecified")
             return // ignore invalid dependencies
 
@@ -82,13 +90,13 @@ publishing {
 }
 
 dependencies {
-    compile 'com.squareup.retrofit2:retrofit:2.3.0'
-    compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-    compile 'com.squareup.okio:okio:1.13.0'
-    compile 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
-    compile 'com.android.support:support-annotations:27.1.0'
+    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+    implementation 'com.squareup.okio:okio:1.13.0'
+    implementation 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
+    implementation 'com.android.support:support-annotations:27.1.0'
     implementation 'com.android.support:support-compat:26.0.1'
     implementation 'com.android.support:support-core-utils:26.0.1'
 }

@@ -26,8 +26,8 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import com.tozny.e3db.crypto.KeyAuthenticator;
-import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.KeyAuthentication;
+import com.tozny.e3db.KeyAuthenticator;
 
 
 /**
@@ -54,12 +54,12 @@ public class KPNoneFragment extends BaseFragment {
     }
 
     @Override
-    public KeyProtection keyProtection() {
-        return KeyProtection.withNone();
+    public KeyAuthentication keyProtection() {
+        return KeyAuthentication.withNone();
     }
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return null;
+        return KeyAuthenticator.noAuthentication();
     }
 }

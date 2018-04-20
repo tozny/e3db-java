@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.content.Context;
 

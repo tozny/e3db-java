@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -59,7 +59,7 @@ import static android.app.Activity.RESULT_OK;
 /**
  * Performs fingerprint authentication to unlock protected keys.
  */
-public final class DefaultKeyAuthenticator extends KeyAuthenticator {
+class DefaultKeyAuthenticator extends KeyAuthenticator {
   private final Activity activity;
   private final String title;
 
@@ -300,27 +300,11 @@ public final class DefaultKeyAuthenticator extends KeyAuthenticator {
   }
 
   /**
-   * Whether the device supports fingerprint authentication or not.
-   *
-   * @return
-   */
-  @SuppressLint("MissingPermission")
-  public boolean fingerprintSupported() {
-    FingerprintManagerCompat fm = FingerprintManagerCompat.from(this.activity);
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      return PermissionChecker.checkSelfPermission(this.activity, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
-                 fm.isHardwareDetected() &&
-                 fm.hasEnrolledFingerprints();
-    } else
-      return false;
-  }
-
-  /**
    * Public for technical reasons but shouldn't be.
    */
   @RequiresApi(Build.VERSION_CODES.M)
   public static final class DeviceCredentialsFragment extends Fragment {
-    private final DeviceLockAuthenticatorCallbackHandler cont;
+    private final AuthenticateHandler cont;
     private final String title;
     private final KeyguardManager mgr;
 
@@ -333,7 +317,7 @@ public final class DefaultKeyAuthenticator extends KeyAuthenticator {
 
     @SuppressLint("ValidFragment")
       // Only used internally
-    DeviceCredentialsFragment(DeviceLockAuthenticatorCallbackHandler cont, String title, KeyguardManager mgr) {
+    DeviceCredentialsFragment(AuthenticateHandler cont, String title, KeyguardManager mgr) {
       if (mgr == null)
         throw new IllegalArgumentException("mgr");
       if (cont == null)
@@ -373,7 +357,7 @@ public final class DefaultKeyAuthenticator extends KeyAuthenticator {
 
   @RequiresApi(api = Build.VERSION_CODES.M)
   @Override
-  public void authenticateWithLockScreen(DeviceLockAuthenticatorCallbackHandler cont) {
+  public void authenticateWithLockScreen(AuthenticateHandler cont) {
     DeviceCredentialsFragment f = new DeviceCredentialsFragment(cont, title, (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE));
     FragmentManager fragmentManager = activity.getFragmentManager();
     FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
@@ -384,7 +368,7 @@ public final class DefaultKeyAuthenticator extends KeyAuthenticator {
   final int[] wrongPasswordCount = {0};
 
   @Override
-  public void getPassword(final PasswordAuthenticatorCallbackHandler handler) {
+  public void getPassword(final PasswordHandler handler) {
     this.activity.runOnUiThread(new Runnable() {
       @Override
       public void run() {
@@ -441,7 +425,7 @@ public final class DefaultKeyAuthenticator extends KeyAuthenticator {
   }
 
   @Override
-  public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, final DeviceLockAuthenticatorCallbackHandler handler) {
+  public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, final AuthenticateHandler handler) {
     try {
       FingerprintAuthDialogFragment fragment = new FingerprintAuthDialogFragment();
       fragment.setCryptoObject(cryptoObject);

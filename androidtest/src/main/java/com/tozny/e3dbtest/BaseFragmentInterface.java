@@ -20,11 +20,11 @@
 
 package com.tozny.e3dbtest;
 
-import com.tozny.e3db.crypto.KeyAuthenticator;
-import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.KeyAuthenticator;
+import com.tozny.e3db.KeyAuthentication;
 
 public interface BaseFragmentInterface {
     String configName();
-    KeyProtection keyProtection();
+    KeyAuthentication keyProtection();
     KeyAuthenticator keyAuthenticationHandler();
 }

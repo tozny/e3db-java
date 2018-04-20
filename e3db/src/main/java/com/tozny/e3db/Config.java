@@ -238,7 +238,7 @@ public class Config {
     }
   }
 
-  public static void saveConfigSecurely(ConfigStorageHelper helper, String config, ConfigStorageHelper.SaveConfigHandler handler) {
+  public static void saveConfigSecurely(ConfigStore helper, String config, ConfigStore.SaveHandler handler) {
     if (helper == null)
       throw new IllegalArgumentException("helper cannot be null.");
     if (config == null)
@@ -246,24 +246,24 @@ public class Config {
     if (handler == null)
       throw new IllegalArgumentException("handler cannot be null.");
 
-    helper.saveConfigSecurely(config, handler);
+    helper.save(config, handler);
   }
 
-  public static void loadConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.LoadConfigHandler handler) {
+  public static void loadConfigSecurely(ConfigStore helper, ConfigStore.LoadHandler handler) {
     if (helper == null)
       throw new IllegalArgumentException("helper cannot be null.");
     if (handler == null)
       throw new IllegalArgumentException("handler cannot be null.");
 
-    helper.loadConfigSecurely(handler);
+    helper.load(handler);
   }
 
-  public static void removeConfigSecurely(ConfigStorageHelper helper, ConfigStorageHelper.RemoveConfigHandler handler) {
+  public static void removeConfigSecurely(ConfigStore helper, ConfigStore.RemoveHandler handler) {
     if (helper == null)
       throw new IllegalArgumentException("helper cannot be null.");
     if (handler == null)
       throw new IllegalArgumentException("handler cannot be null.");
 
-    helper.removeConfigSecurely(handler);
+    helper.remove(handler);
   }
 }

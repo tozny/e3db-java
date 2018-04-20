@@ -26,9 +26,8 @@ import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import com.tozny.e3db.crypto.DefaultKeyAuthenticator;
-import com.tozny.e3db.crypto.KeyAuthenticator;
-import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.KeyAuthenticator;
+import com.tozny.e3db.KeyAuthentication;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -56,12 +55,12 @@ public class KPFingerPrintFragment extends BaseFragment {
     }
 
     @Override
-    public KeyProtection keyProtection() {
-        return KeyProtection.withFingerprint();
+    public KeyAuthentication keyProtection() {
+        return KeyAuthentication.withFingerprint();
     }
 
     @Override
     public KeyAuthenticator keyAuthenticationHandler() {
-        return new DefaultKeyAuthenticator(this.getActivity(), getString(R.string.title_kp_fingerprint));
+        return KeyAuthenticator.defaultAuthenticator(this.getActivity(), getString(R.string.title_kp_fingerprint));
     }
 }

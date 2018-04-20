@@ -20,28 +20,27 @@
 
 package com.tozny.e3db;
 
-public interface ConfigStorageHelper {
-    interface SaveConfigHandler {
-        void saveConfigDidSucceed();
-        void saveConfigDidCancel();
-        void saveConfigDidFail(Throwable e);
-    }
+import android.util.Base64;
 
-    interface LoadConfigHandler {
-        void loadConfigDidSucceed(String config);
-        void loadConfigDidCancel();
-        void loadConfigNotFound();
-        void loadConfigDidFail(Throwable e);
-    }
+class Base64Util {
 
-    interface RemoveConfigHandler {
-        void removeConfigDidSucceed();
-        void removeConfigDidFail(Throwable e);
-    }
+  static String encode(byte[] s) {
+    String result = Base64.encodeToString(s, Base64.NO_WRAP);
+    return result;
+  }
 
-    void saveConfigSecurely(String config, SaveConfigHandler handler);
+  static String encodeUrl(byte[] s) {
+    String result = Base64.encodeToString(s, Base64.NO_WRAP | Base64.URL_SAFE);
+    return result;
+  }
 
-    void loadConfigSecurely(LoadConfigHandler handler);
+  static String encodeWithWrapping(byte[] s) {
+    String result = Base64.encodeToString(s, 0).trim();
+    return result;
+  }
 
-    void removeConfigSecurely(RemoveConfigHandler handler);
+  static byte[] decode(String s) {
+    byte[] result = Base64.decode(s, 0);
+    return result;
+  }
 }

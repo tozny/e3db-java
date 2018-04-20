@@ -63,6 +63,7 @@ public class LocalRecord implements Record {
    *
    * @param data Data contained in the record.
    * @param meta Data about the record. Consider using {@link LocalMeta}.
+   * @param signature Signature bytes, as a Base64URL encoded string.
    */
   public LocalRecord(Map<String, String> data, RecordMeta meta, String signature) {
     this.data = data;

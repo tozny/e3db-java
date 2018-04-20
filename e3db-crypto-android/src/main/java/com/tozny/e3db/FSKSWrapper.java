@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -173,14 +173,14 @@ class FSKSWrapper {
     }
   }
 
-  private static KeyStore.ProtectionParameter getProtectionParameter(KeyProtection protection, String password) {
-    if (protection.protectionType() == KeyProtection.KeyProtectionType.PASSWORD) {
+  private static KeyStore.ProtectionParameter getProtectionParameter(KeyAuthentication protection, String password) {
+    if (protection.authenticationType() == KeyAuthentication.KeyAuthenticationType.PASSWORD) {
       if (password == null || password.trim().length() == 0)
         throw new IllegalArgumentException("password cannot be blank.");
 
       return new KeyStore.PasswordProtection(password.toCharArray());
 
-    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.JELLY_BEAN && protection.protectionType() == KeyProtection.KeyProtectionType.NONE) {
+    } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.JELLY_BEAN && protection.authenticationType() == KeyAuthentication.KeyAuthenticationType.NONE) {
       // On API 16, the KeyStore will throw when `setEntry` is called with a null ProtectionParam.
       // Passing a null password wrapped a PasswordProtection instance has the same effect as no password, however.
       return new KeyStore.PasswordProtection(null);
@@ -191,7 +191,7 @@ class FSKSWrapper {
     }
   }
 
-  private static void createSecretKeyIfNeeded(Context context, String alias, KeyProtection protection, String password) throws Throwable {
+  private static void createSecretKeyIfNeeded(Context context, String alias, KeyAuthentication protection, String password) throws Throwable {
 
     KeyStore keyStore = getFSKS(context);
 
@@ -208,7 +208,7 @@ class FSKSWrapper {
     }
   }
 
-  static SecretKey getSecretKey(Context context, String alias, KeyProtection protection, String password) throws Throwable {
+  static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) throws Throwable {
     createSecretKeyIfNeeded(context, alias, protection, password);
 
     KeyStore keyStore = getFSKS(context);

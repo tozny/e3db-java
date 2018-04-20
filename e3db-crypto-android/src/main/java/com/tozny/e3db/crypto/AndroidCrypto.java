@@ -36,7 +36,7 @@ import static com.tozny.e3db.Checks.*;
 
 import static org.libsodium.jni.Sodium.*;
 
-public class AndroidCrypto implements Crypto {
+class AndroidCrypto implements Crypto {
   private final Sodium sodium;
   private final Random random;
 

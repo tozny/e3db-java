@@ -5,7 +5,10 @@ apply plugin: 'com.github.johnrengelman.shadow'
 sourceSets {
   main {
     java {
-      srcDirs "${project(":e3db").projectDir}/src/main/java", "${project(":e3db-crypto-interface").projectDir}/src/main/java", "${project(":e3db-crypto-plain").projectDir}/src/main/java", "${project(":e3db:e3db-crypto-stub-android").projectDir}/src/main/java"
+      srcDirs "${project(":e3db").projectDir}/src/main/java",
+              "${project(":e3db-crypto-interface").projectDir}/src/main/java",
+              "${project(":e3db-crypto-plain").projectDir}/src/main/java",
+              "${project(":stubs:e3db-crypto-stub-android").projectDir}/src/main/java"
     }
   }
 }
@@ -42,11 +45,11 @@ publishing {
 }
   
 dependencies {
-  implementation files("${project(":e3db").projectDir}/compileLibs/android-4.1.1.4.jar")
-  implementation 'com.squareup.retrofit2:retrofit:2.3.0'
-  implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-  implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-  implementation 'com.squareup.okio:okio:1.13.0'
-  implementation 'org.abstractj.kalium:kalium:0.7.0'
+  compile files("${project(":e3db").projectDir}/compileLibs/android-4.1.1.4.jar")
+  compile 'com.squareup.retrofit2:retrofit:2.3.0'
+  compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+  compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+  compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+  compile 'com.squareup.okio:okio:1.13.0'
+  compile 'org.abstractj.kalium:kalium:0.7.0'
 }

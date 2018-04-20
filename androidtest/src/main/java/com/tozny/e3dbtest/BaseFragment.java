@@ -31,9 +31,9 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import com.tozny.e3db.*;
-import com.tozny.e3db.crypto.AndroidConfigStorageHelper;
-import com.tozny.e3db.crypto.KeyAuthenticator;
-import com.tozny.e3db.crypto.KeyProtection;
+import com.tozny.e3db.AndroidConfigStore;
+import com.tozny.e3db.KeyAuthenticator;
+import com.tozny.e3db.KeyAuthentication;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -148,8 +148,8 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         mListener = null;
     }
 
-    private AndroidConfigStorageHelper configStorageHelper() { // TODO: Maybe make this the interface instead of the individual methods?
-        return new AndroidConfigStorageHelper(getContext(), configName(), keyProtection(), keyAuthenticationHandler());
+    private AndroidConfigStore ConfigStore() { // TODO: Maybe make this the interface instead of the individual methods?
+        return new AndroidConfigStore(getContext(), configName(), keyProtection(), keyAuthenticationHandler());
     }
 
     private View.OnClickListener loadConfigButtonOnClickListener = new View.OnClickListener() {
@@ -158,7 +158,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             updateLabels(getString(R.string.loading_config), "", "");
 
-            Config.loadConfigSecurely(configStorageHelper(), new ConfigStorageHelper.LoadConfigHandler() {
+            Config.loadConfigSecurely(ConfigStore(), new ConfigStore.LoadHandler() {
                 @Override
                 public void loadConfigDidSucceed(String config) {
                     try {
@@ -204,7 +204,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         public void onClick(View v) {
             updateLabels(getString(R.string.saving_config), "", "");
 
-            Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
+            Config.saveConfigSecurely(ConfigStore(), mConfig.json(), new ConfigStore.SaveHandler() {
                 @Override
                 public void saveConfigDidSucceed() {
                     updateLabels(getString(R.string.config_saved), "", mConfig.json());
@@ -229,7 +229,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
         public void onClick(View v) {
             updateLabels(getString(R.string.deleting_config), "", "");
 
-            Config.removeConfigSecurely(configStorageHelper(), new ConfigStorageHelper.RemoveConfigHandler() {
+            Config.removeConfigSecurely(ConfigStore(), new ConfigStore.RemoveHandler() {
                 @Override
                 public void removeConfigDidSucceed() {
                     mConfig = null;
@@ -265,7 +265,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                     if (!r.isError()) {
 
                         mConfig = r.asValue();
-                        Config.saveConfigSecurely(configStorageHelper(), mConfig.json(), new ConfigStorageHelper.SaveConfigHandler() {
+                        Config.saveConfigSecurely(ConfigStore(), mConfig.json(), new ConfigStore.SaveHandler() {
                             @Override
                             public void saveConfigDidSucceed() {
                                 mState = State.CONFIG_LOADED;
@@ -354,7 +354,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     }
 
     @Override
-    public KeyProtection keyProtection() {
+    public KeyAuthentication keyProtection() {
         throw new IllegalStateException("Method should be overridden by subclass.");
     }
 

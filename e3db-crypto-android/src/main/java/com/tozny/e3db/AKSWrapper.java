@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
@@ -31,7 +31,7 @@ import java.security.*;
 
 class AKSWrapper {
   @RequiresApi(api = Build.VERSION_CODES.M)
-  private static void createSecretKeyIfNeeded(String alias, KeyProtection protection) throws Throwable {
+  private static void createSecretKeyIfNeeded(String alias, KeyAuthentication protection) throws Throwable {
 
     KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
     keyStore.load(null);
@@ -45,7 +45,7 @@ class AKSWrapper {
         builder.setInvalidatedByBiometricEnrollment(false);
       }
 
-      switch(protection.protectionType()) {
+      switch(protection.authenticationType()) {
         case FINGERPRINT:
           builder.setUserAuthenticationRequired(true);
 
@@ -63,7 +63,7 @@ class AKSWrapper {
           break;
 
         default:
-          throw new IllegalStateException("Unhandled protection type: " + protection.protectionType());
+          throw new IllegalStateException("Unhandled protection type: " + protection.authenticationType());
       }
 
       KeyGenParameterSpec spec = builder.build();
@@ -76,7 +76,7 @@ class AKSWrapper {
   }
 
   @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
-  static SecretKey getSecretKey(String alias, KeyProtection protection) throws Throwable {
+  static SecretKey getSecretKey(String alias, KeyAuthentication protection) throws Throwable {
 
     createSecretKeyIfNeeded(alias, protection);
 

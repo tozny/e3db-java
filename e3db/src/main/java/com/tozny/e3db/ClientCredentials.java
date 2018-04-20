@@ -23,7 +23,7 @@ package com.tozny.e3db;
 import java.util.UUID;
 
 /**
- * Holds information necessary to authenticate with E3DB. See {@link Client#register(String, String, String, String, ResultHandler)} for
+ * Holds information necessary to authenticate with E3DB. See {@code Client.register} for
  * registering and capturing credentials; Use {@link Config#fromJson(String)} and {@link Config#json()} to convert credentials to a
  * standard JSON format.
  */

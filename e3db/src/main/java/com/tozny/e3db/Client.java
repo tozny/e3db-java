@@ -1065,6 +1065,8 @@ public class  Client {
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
    *                  private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */
@@ -1578,6 +1580,7 @@ public class  Client {
    *
    * @param record The record to encrypt.
    * @param eakInfo The key to use for encrypting.
+   * @throws E3DBException An E3DB-specific error occurred.
    * @return The deccrypted record.
    */
   public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {

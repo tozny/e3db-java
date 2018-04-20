@@ -18,9 +18,10 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.content.Context;
+import com.tozny.e3db.FileSystemManager;
 
 
 import javax.crypto.*;

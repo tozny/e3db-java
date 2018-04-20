@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -27,36 +27,37 @@ import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.support.v4.content.PermissionChecker;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import com.tozny.e3db.FSKSWrapper;
 
 
 import javax.crypto.Cipher;
 import java.security.*;
 
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.FINGERPRINT;
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.LOCK_SCREEN;
-import static com.tozny.e3db.crypto.KeyProtection.KeyProtectionType.PASSWORD;
+import static com.tozny.e3db.KeyAuthentication.KeyAuthenticationType.FINGERPRINT;
+import static com.tozny.e3db.KeyAuthentication.KeyAuthenticationType.LOCK_SCREEN;
+import static com.tozny.e3db.KeyAuthentication.KeyAuthenticationType.PASSWORD;
 
 public class KeyStoreManager {
 
-  private static void checkArgs(Context context, KeyProtection protection, KeyAuthenticator keyAuthenticator) {
+  private static void checkArgs(Context context, KeyAuthentication protection, KeyAuthenticator keyAuthenticator) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-      if (protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN)
-        throw new IllegalArgumentException(protection.protectionType().toString() + " not supported below API 23.");
+      if (protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN)
+        throw new IllegalArgumentException(protection.authenticationType().toString() + " not supported below API 23.");
     }
 
-    if (protection.protectionType() == PASSWORD || protection.protectionType() == FINGERPRINT || protection.protectionType() == LOCK_SCREEN) {
+    if (protection.authenticationType() == PASSWORD || protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN) {
       if (keyAuthenticator == null) {
-        throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.protectionType().toString());
+        throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.authenticationType().toString());
       }
     }
 
-    if (protection.protectionType() == FINGERPRINT) {
+    if (protection.authenticationType() == FINGERPRINT) {
       if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED ||
               !FingerprintManagerCompat.from(context).isHardwareDetected())
-        throw new IllegalArgumentException(protection.protectionType().toString() + " not currently supported.");
+        throw new IllegalArgumentException(protection.authenticationType().toString() + " not currently supported.");
     }
 
-    if (protection.protectionType() == LOCK_SCREEN) {
+    if (protection.authenticationType() == LOCK_SCREEN) {
       if (protection.validUntilSecondsSinceUnlock() < 1)
         throw new IllegalArgumentException("secondsSinceUnlock must be greater than 0.");
     }
@@ -69,14 +70,14 @@ public class KeyStoreManager {
   }
 
   @SuppressLint("NewApi")
-  static void getCipher(final Context context, final String identifier, final KeyProtection protection, final KeyAuthenticator keyAuthenticator,
+  static void getCipher(final Context context, final String identifier, final KeyAuthentication protection, final KeyAuthenticator keyAuthenticator,
                         final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
 
     checkArgs(context, protection, keyAuthenticator);
 
     final Cipher cipher;
 
-    switch(protection.protectionType()) {
+    switch(protection.authenticationType()) {
       case NONE:
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
           authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, null)));
@@ -88,7 +89,7 @@ public class KeyStoreManager {
       case FINGERPRINT:
         cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
 
-        keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+        keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.AuthenticateHandler() {
           @Override
           public void handleAuthenticated() {
             try {
@@ -123,7 +124,7 @@ public class KeyStoreManager {
 
           } else {
 
-            keyAuthenticator.authenticateWithLockScreen(new KeyAuthenticator.DeviceLockAuthenticatorCallbackHandler() {
+            keyAuthenticator.authenticateWithLockScreen(new KeyAuthenticator.AuthenticateHandler() {
               @Override
               public void handleAuthenticated() {
                 try {
@@ -150,7 +151,7 @@ public class KeyStoreManager {
         break;
 
       case PASSWORD:
-        keyAuthenticator.getPassword(new KeyAuthenticator.PasswordAuthenticatorCallbackHandler() {
+        keyAuthenticator.getPassword(new KeyAuthenticator.PasswordHandler() {
 
           @Override
           public void handlePassword(String password) throws UnrecoverableKeyException {
@@ -180,7 +181,7 @@ public class KeyStoreManager {
         break;
 
       default:
-        throw new IllegalStateException("Unhandled key protection: " + protection.protectionType().toString());
+        throw new IllegalStateException("Unhandled key protection: " + protection.authenticationType().toString());
     }
   }
 

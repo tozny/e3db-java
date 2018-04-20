@@ -12,7 +12,10 @@ android {
       main {
         manifest.srcFile ("${project(":e3db-crypto-android").projectDir}/src/main/AndroidManifest.xml")
         java {
-          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java", "${project(":e3db").projectDir}/src/main/java", "${project(":e3db-crypto-interface").projectDir}/src/main/java", "${project(":e3db:e3db-crypto-stub-plain").projectDir}/src/main/java"
+          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java",
+                  "${project(":e3db").projectDir}/src/main/java",
+                  "${project(":e3db-crypto-interface").projectDir}/src/main/java",
+                  "${project(":stubs:e3db-crypto-stub-plain").projectDir}/src/main/java"
         }
       }
     }

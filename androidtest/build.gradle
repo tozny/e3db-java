@@ -40,14 +40,16 @@ dependencies {
 
     androidTestImplementation project(path: ':e3db')
     androidTestImplementation project(path: ':e3db-crypto-interface')
-    androidTestImplementation project(path: ':e3db-crypto-android')
+    androidTestImplementation(project(path: ':e3db-crypto-android'))
 
     implementation project(path: ':e3db')
     implementation project(path: ':e3db-crypto-interface')
-    implementation project(path: ':e3db-crypto-android')
+    implementation(project(path: ':e3db-crypto-android'))
 }
 
 tasks.withType(Test) {
+    // always re-run tests
+    outputs.upToDateWhen { false }
     testLogging {
         showStackTraces = true
         exceptionFormat = "full"

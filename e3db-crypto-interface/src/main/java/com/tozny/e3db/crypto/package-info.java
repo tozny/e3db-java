@@ -18,12 +18,7 @@
  *
  */
 
-package com.tozny.e3dbtest;
-
-import com.tozny.e3db.android.*;
-
-public interface BaseFragmentInterface {
-    String configName();
-    KeyAuthentication keyProtection();
-    KeyAuthenticator keyAuthenticationHandler();
-}
+/**
+ * Provides interfaces and utility classes for implementing E3DB's cryptographic protocols.
+ */
+package com.tozny.e3db.crypto;

@@ -24,7 +24,15 @@ import okio.ByteString;
 
 import static com.tozny.e3db.Checks.checkNotEmpty;
 
-class Base64 {
+/**
+ * Utility methods for Base64 encoding &amp; decoding.
+ */
+public class Base64 {
+  /**
+   * Encode the given bytes use Base64URL encoding (without wrapping).
+   * @param bytes Ibid.
+   * @return Ibid.
+   */
   public static String encodeURL(byte[] bytes) {
     checkNotEmpty(bytes, "bytes");
     String s = ByteString.of(bytes).base64Url();
@@ -35,6 +43,11 @@ class Base64 {
       return s;
   }
 
+  /**
+   * Decode the given Base64Url encoded string into a byte array.
+   * @param encoded Ibid.
+   * @return Ibid.
+   */
   public static byte[] decodeURL(String encoded) {
     checkNotEmpty(encoded, "encoded");
     final ByteString byteString = ByteString.decodeBase64(encoded);

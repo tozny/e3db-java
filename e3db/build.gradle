@@ -3,8 +3,8 @@ apply plugin: 'java'
 dependencies {
     compileOnly files('compileLibs/android-4.1.1.4.jar')
 
-    compileOnly project(':stubs:e3db-crypto-stub-plain')
-    compileOnly project(':stubs:e3db-crypto-stub-android')
+    compileOnly project(':e3db-crypto-stub-plain')
+    compileOnly project(':e3db-crypto-stub-android')
 
     compile 'com.squareup.retrofit2:retrofit:2.3.0'
     compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'

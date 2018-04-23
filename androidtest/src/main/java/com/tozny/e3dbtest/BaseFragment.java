@@ -31,9 +31,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import com.tozny.e3db.*;
-import com.tozny.e3db.AndroidConfigStore;
-import com.tozny.e3db.KeyAuthenticator;
-import com.tozny.e3db.KeyAuthentication;
+import com.tozny.e3db.android.*;
 
 import java.io.IOException;
 import java.util.UUID;

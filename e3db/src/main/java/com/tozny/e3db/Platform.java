@@ -20,8 +20,7 @@
 
 package com.tozny.e3db;
 
-import com.tozny.e3db.crypto.AndroidCrypto;
-import com.tozny.e3db.crypto.KaliumCrypto;
+import com.tozny.e3db.crypto.Crypto;
 
 final class Platform {
   public static final Crypto crypto;

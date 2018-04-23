@@ -8,7 +8,7 @@ sourceSets {
       srcDirs "${project(":e3db").projectDir}/src/main/java",
               "${project(":e3db-crypto-interface").projectDir}/src/main/java",
               "${project(":e3db-crypto-plain").projectDir}/src/main/java",
-              "${project(":stubs:e3db-crypto-stub-android").projectDir}/src/main/java"
+              "${project(":e3db-crypto-stub-android").projectDir}/src/main/java"
     }
   }
 }

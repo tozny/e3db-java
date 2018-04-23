@@ -15,7 +15,10 @@ android {
           srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java",
                   "${project(":e3db").projectDir}/src/main/java",
                   "${project(":e3db-crypto-interface").projectDir}/src/main/java",
-                  "${project(":stubs:e3db-crypto-stub-plain").projectDir}/src/main/java"
+                  "${project(":e3db-crypto-stub-plain").projectDir}/src/main/java"
+        }
+        res {
+          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/res"
         }
       }
     }

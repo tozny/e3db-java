@@ -37,7 +37,7 @@ buildscript {
   }
 }
 
-compile('com.tozny.e3db:e3db-client-android:2.0.1@aar') {
+compile('com.tozny.e3db:e3db-client-android:<i>VERSION</i>@aar') {
    transitive = true
 }
  * </pre>
@@ -57,7 +57,7 @@ compile('com.tozny.e3db:e3db-client-android:2.0.1@aar') {
   &lt;dependency&gt;
     &lt;groupId&gt;com.tozny.e3db&lt;/groupId&gt;
     &lt;artifactId&gt;e3db-client-plain&lt;/artifactId&gt;
-    &lt;version&gt;2.0.1&lt;/version&gt;
+    &lt;version&gt;<i>VERSION</i>&lt;/version&gt;
   &lt;/dependency&gt;
 &lt;/dependencies&gt;
  * </pre>

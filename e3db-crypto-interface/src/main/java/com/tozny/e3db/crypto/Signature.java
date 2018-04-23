@@ -18,12 +18,18 @@
  *
  */
 
-package com.tozny.e3dbtest;
+package com.tozny.e3db.crypto;
 
-import com.tozny.e3db.android.*;
+import static com.tozny.e3db.Checks.*;
 
-public interface BaseFragmentInterface {
-    String configName();
-    KeyAuthentication keyProtection();
-    KeyAuthenticator keyAuthenticationHandler();
+/**
+ * Holds the bytes representing an Ed25519 signature.
+ */
+public class Signature {
+  public final byte[] bytes;
+
+  public Signature(byte[] signature) {
+    checkNotNull(signature, "bytes");
+    this.bytes = signature;
+  }
 }

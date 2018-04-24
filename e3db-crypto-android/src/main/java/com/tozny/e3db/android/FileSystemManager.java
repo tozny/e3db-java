@@ -30,38 +30,29 @@ class FileSystemManager {
   private final static String SECURE_STRING_STORAGE_DIRECTORY = "com.tozny.e3db.crypto";
   private final static String IV_DIRECTORY                    = "ivs";
 
-  private static String filesDirectory(Context context) throws Throwable {
+  private static String filesDirectory(Context context) {
     String filesDirectory = context.getFilesDir().getAbsolutePath();
     File sssDirectory     = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY);
     File ivDirectory      = new File(filesDirectory + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + IV_DIRECTORY);
 
-    boolean success = true;
     if (!sssDirectory.exists()) {
-      success = sssDirectory.mkdir();
-    }
-
-    if (!success) {
-      throw new Exception("Error creating secure string storage directory.");
+      sssDirectory.mkdir();
     }
 
     if (!ivDirectory.exists()) {
-      success = ivDirectory.mkdir();
-    }
-
-    if (!success) {
-      throw new Exception("Error creating secure string storage directory.");
+      ivDirectory.mkdir();
     }
 
     return filesDirectory;
   }
 
-  static String getInitializationVectorFilePath(Context context, String fileName) throws Throwable {
+  static String getInitializationVectorFilePath(Context context, String fileName) {
     return filesDirectory(context) +
                File.separator + SECURE_STRING_STORAGE_DIRECTORY +
                File.separator + IV_DIRECTORY + File.separator + fileName;
   }
 
-  static String getEncryptedDataFilePath(Context context, String fileName) throws Throwable {
+  static String getEncryptedDataFilePath(Context context, String fileName) {
     return filesDirectory(context) + File.separator + SECURE_STRING_STORAGE_DIRECTORY + File.separator + fileName;
   }
 

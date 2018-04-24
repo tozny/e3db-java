@@ -48,14 +48,6 @@ class FSKSWrapper {
     return new File(filesDir, privateFile).exists();
   }
 
-  private static byte[] getRandomBytes(int numberOfBytes) throws Throwable {
-    byte[] bytes = new byte[numberOfBytes];
-
-    SecureRandom r = SecureRandom.getInstance("SHA1PRNG");
-    r.nextBytes(bytes);
-    return bytes;
-  }
-
   private synchronized static String getPerf(Context context, String dir) throws Throwable {
     final int count = 65, bytes = 20;
 
@@ -64,7 +56,7 @@ class FSKSWrapper {
 
     if (!fileExists(context, dir)) {
       // should only run once, the first time the keystore is accessed.
-      buf = getRandomBytes(count);
+      buf = CipherManager.getRandomBytes(count);
 
       for (int i = 0; i + 1 < buf.length; i += 2) {
         byte a = buf[i];
@@ -80,7 +72,7 @@ class FSKSWrapper {
       }
 
       r = SecureRandom.getInstance("SHA1PRNG").nextInt(1000) + 10000;
-      s = getRandomBytes(bytes);
+      s = CipherManager.getRandomBytes(bytes);
 
       SharedPreferences sharedPreferences = context.getSharedPreferences(dir, Context.MODE_PRIVATE);
       SharedPreferences.Editor editor = sharedPreferences.edit();

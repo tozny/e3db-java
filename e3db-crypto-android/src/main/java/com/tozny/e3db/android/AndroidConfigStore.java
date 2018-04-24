@@ -149,7 +149,7 @@ public class AndroidConfigStore implements ConfigStore {
     try {
       final String fullIdentifier = full(identifier, protection);
 
-      KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, CipherManager.saveCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+      KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.SaveCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
         @Override
         public void onAuthenticated(Cipher cipher) throws Throwable {
           SecureStringManager.saveStringToSecureStorage(context, fullIdentifier, config, cipher);
@@ -185,7 +185,7 @@ public class AndroidConfigStore implements ConfigStore {
         LoadHandler.loadConfigNotFound();
 
       } else {
-        KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, CipherManager.loadCipherGetter(), new KeyStoreManager.AuthenticatedCipherHandler() {
+        KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.LoadCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
           @Override
           public void onAuthenticated(Cipher cipher) throws Throwable {
             String configString = SecureStringManager.loadStringFromSecureStorage(context, fullIdentifier, cipher);

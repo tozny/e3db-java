@@ -24,22 +24,20 @@ import android.content.Context;
 import android.os.Build;
 
 import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.*;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
-
 
 class CipherManager {
 
-  interface GetCipher {
-    Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable;
-  }
-
-  private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws Throwable {
+  private static void saveInitializationVector(Context context, String fileName, byte[] bytes) {
     FileOutputStream fos = null;
 
     try {
@@ -47,12 +45,20 @@ class CipherManager {
       fos.write(bytes);
       fos.flush();
 
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     } finally {
-      if (fos != null) fos.close();
+      if (fos != null) {
+        try {
+          fos.close();
+        } catch (IOException e) {
+
+        }
+      }
     }
   }
 
-  private static byte[] loadInitializationVector(Context context, String fileName) throws Throwable {
+  private static byte[] loadInitializationVector(Context context, String fileName) {
     FileInputStream fis = null;
     byte[] bytes;
 
@@ -63,57 +69,126 @@ class CipherManager {
       fis = new FileInputStream(file);
       fis.read(bytes, 0, fileSize);
 
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     } finally {
-      if (fis != null) fis.close();
+      if (fis != null) {
+        try {
+          fis.close();
+        } catch (IOException e) {
+
+        }
+      }
     }
 
     return bytes;
   }
 
-  static void deleteInitializationVector(Context context, String fileName) throws Throwable {
+  static byte[] getRandomBytes(int numberOfBytes) {
+    try {
+      byte[] bytes = new byte[numberOfBytes];
+      SecureRandom r = SecureRandom.getInstance("SHA1PRNG");
+      r.nextBytes(bytes);
+      return bytes;
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  static void deleteInitializationVector(Context context, String fileName) {
     if (new File(FileSystemManager.getInitializationVectorFilePath(context, fileName)).exists()) {
       File file = new File(FileSystemManager.getInitializationVectorFilePath(context, fileName));
       file.delete();
     }
   }
 
+  static IvParameterSpec createIV() {
+    return new IvParameterSpec(getRandomBytes(12));
+  }
+
+  interface GetCipher {
+    Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException;
+  }
+
   static class SaveCipherGetter implements GetCipher {
 
-    @Override
-    public Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable {
-      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-      cipher.init(Cipher.ENCRYPT_MODE, key);
 
-      saveInitializationVector(context, identifier, cipher.getIV());
+    private final KeyAuthentication.KeyAuthenticationType protection;
 
-      return cipher;
+    SaveCipherGetter(KeyAuthentication.KeyAuthenticationType protection) {
+      this.protection = protection;
     }
+
+    @Override
+    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException {
+      try {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+          cipher.init(Cipher.ENCRYPT_MODE, key, createIV());
+        } else {
+          switch (protection) {
+            case FINGERPRINT:
+            case LOCK_SCREEN:
+            case NONE:
+              // These keys will use the Android Key Store, which does not allow a
+              // provided IV.
+              cipher.init(Cipher.ENCRYPT_MODE, key);
+              break;
+            case PASSWORD:
+              cipher.init(Cipher.ENCRYPT_MODE, key, createIV());
+              break;
+            default:
+              throw new RuntimeException("Unrecognized protection type " + protection.name());
+          }
+        }
+
+        saveInitializationVector(context, identifier, cipher.getIV());
+        return cipher;
+      } catch (InvalidAlgorithmParameterException | NoSuchPaddingException | NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
   }
 
   static class LoadCipherGetter implements GetCipher {
-    private static int RECC_AUTH_TAG_LEN = 128;
+
+    static int RECC_AUTH_TAG_BITS = 128;
+    private final KeyAuthentication.KeyAuthenticationType protection;
+
+    LoadCipherGetter(KeyAuthentication.KeyAuthenticationType protection) {
+      this.protection = protection;
+    }
+
+    private AlgorithmParameterSpec makeIvSpec(byte[] iv) {
+      if(Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+        return new IvParameterSpec(iv);
+      }
+      else {
+        switch(protection) {
+          case FINGERPRINT:
+          case LOCK_SCREEN:
+          case NONE:
+            // These keys will use the Android Key Store and only support GCMParameterSpec
+            return new GCMParameterSpec(RECC_AUTH_TAG_BITS, iv);
+          case PASSWORD:
+            return new IvParameterSpec(iv);
+          default:
+            throw new RuntimeException("Unrecognized protection type " + protection.name());
+        }
+      }
+    }
 
     @Override
-    public Cipher getCipher(Context context, String identifier, SecretKey key) throws Throwable {
-      AlgorithmParameterSpec params;
-
-      if (key.getClass().getSimpleName().equals("AndroidKeyStoreSecretKey") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-        params = new GCMParameterSpec(RECC_AUTH_TAG_LEN, loadInitializationVector(context, identifier));
-      else
-        params = new IvParameterSpec(loadInitializationVector(context, identifier));
-
-      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-      cipher.init(Cipher.DECRYPT_MODE, key, params);
-
-      return cipher;
+    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException {
+      try {
+        AlgorithmParameterSpec params = makeIvSpec(loadInitializationVector(context, identifier));
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, key, params);
+        return cipher;
+      } catch (NoSuchPaddingException | InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
     }
-  }
-
-  static GetCipher saveCipherGetter() {
-    return new SaveCipherGetter();
-  }
-
-  static GetCipher loadCipherGetter() {
-    return new LoadCipherGetter();
   }
 }

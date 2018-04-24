@@ -32,9 +32,7 @@ import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
 import javax.crypto.Cipher;
 import java.security.*;
 
-import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.FINGERPRINT;
-import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.LOCK_SCREEN;
-import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.PASSWORD;
+import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.*;
 
 class KeyStoreManager {
 

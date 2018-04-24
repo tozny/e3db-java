@@ -23,7 +23,7 @@ and Java, and tests.
 * publish/android & publish/plain - Contains gradle scripts for publishing our library as an AAR (for
   Android) and as a JAR (for plain Java).
 
-* androidtest - Android crypto tests.
+* androidtest - Android-specific tests.
 * plaintest - Plain java integration tests.
 
 Plain Java Testing
@@ -42,11 +42,15 @@ you can replace the token via System properies:
 Android Testing
 ====
 
-The `androidtest` project contains minimal unit tests covering the crypto library used on Android. All other
-code used on Android is identical to the Plain java version, and is therefore tested using `plaintest`.
+The `androidtest` project contains Android-specific tests (for crypto operations as well as secure configuration storage).
 
-You can run the Andrdoid tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
+You can run the Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
 plugged in and has USB debugging enabled.
+
+The `androidtest` project also contain an app which exercises all secure configuration storage options. You can register
+a client and protect the generated configuration with a password, lock screen PIN, fingerprint, or not at all (depending
+on API level of the device, of course). The app is not intended to be used as an automated test, but as a tool for manual
+testing.
 
 Testing Single Methods
 ----

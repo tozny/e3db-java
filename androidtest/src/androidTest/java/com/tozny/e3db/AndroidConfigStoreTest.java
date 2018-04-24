@@ -257,7 +257,7 @@ public class AndroidConfigStoreTest {
     /* Null authenticator */
     try {
       new AndroidConfigStore(context, name, KeyAuthentication.withPassword(), null);
-      fail("Didn't hit expected exceptoin.");
+      fail("Didn't hit expected exception.");
     } catch (IllegalArgumentException e) { }
   }
 

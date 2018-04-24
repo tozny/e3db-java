@@ -344,7 +344,6 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
       if (this.cont != null) {
         if (requestCode == 1 && resultCode == RESULT_OK) {
-          // TODO: Need error handling
           this.cont.handleAuthenticated();
         } else if (requestCode == 1) {
           this.cont.handleCancel();

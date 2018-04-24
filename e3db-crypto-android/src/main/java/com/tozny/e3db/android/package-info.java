@@ -19,6 +19,8 @@
  */
 
 /**
+ * Android-specific E3DB functionality.
+ *
  * <h1>Secure Configuration Storage</h1>
  *
  * <p>The classes in this package support storage of E3DB credentials &amp; configuration using

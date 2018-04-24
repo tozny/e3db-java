@@ -62,7 +62,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-compile('com.tozny.e3db:e3db-client-android:2.2.0@aar') {
+compile('com.tozny.e3db:e3db-client-android:2.3.0@aar') {
     transitive = true
 }
 ```
@@ -87,7 +87,7 @@ For use with Maven, declare the following repository and dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>2.2.0</version>
+    <version>2.3.0</version>
   </dependency>
 </dependencies>
 ```

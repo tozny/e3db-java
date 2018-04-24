@@ -1,3 +1,34 @@
 <resources>
     <string name="app_name">E3DBTest</string>
+    <string name="title_activity_main2">Main2Activity</string>
+    <string name="title_kp_none">None</string>
+    <string name="title_kp_password">Password</string>
+    <string name="title_kp_lock_screen">Lock Screen</string>
+    <string name="title_kp_fingerprint">Fingerprint</string>
+
+    <string name="title_activity_main">MainActivity</string>
+    <string name="load_config">Load Config</string>
+    <string name="delete_config">Delete Config</string>
+    <string name="new_config">New Config</string>
+    <string name="save_config">Save Config</string>
+    <string name="status">Status</string>
+    <string name="errors">Errors</string>
+    <string name="config">Config</string>
+    <string name="unknown_state">Unknown State</string>
+    <string name="loading_config">Loading Config…</string>
+    <string name="config_loaded">Config Loaded</string>
+    <string name="config_load_canceled">Config Load Canceled</string>
+    <string name="config_not_found">No Config Found</string>
+    <string name="load_config_failed">Load Config Failed</string>
+    <string name="saving_config">Saving Config…</string>
+    <string name="config_saved">Config Saved</string>
+    <string name="save_config_canceled">Config Save Canceled</string>
+    <string name="deleting_config">Deleting Config…</string>
+    <string name="config_deleted">Config Deleted</string>
+    <string name="save_config_failed">Save Config Failed</string>
+    <string name="delete_config_failed">Delete Config Failed</string>
+    <string name="registering_new_client">Registering new client…</string>
+    <string name="new_config_created_and_saved">New Config Created and Saved</string>
+    <string name="config_create_canceled">Config Create Canceled</string>
+    <string name="create_config_failed">Create Config Failed</string>
 </resources>

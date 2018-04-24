@@ -10,13 +10,15 @@ dependencies {
     testCompile("junit:junit:[4,)")
     testCompile project(path: ':e3db')
     testCompile project(path: ':e3db-crypto-interface')
-    testCompile project(path: ':e3db-crypto-plain')
+    testCompile(project(path: ':e3db-crypto-plain'))
     testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
     testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
     testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
 }
 
 test {
+    // always re-run tests
+    outputs.upToDateWhen { false }
     testLogging {
         exceptionFormat "full"
         showStackTraces true

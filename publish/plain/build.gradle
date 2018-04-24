@@ -5,17 +5,28 @@ apply plugin: 'com.github.johnrengelman.shadow'
 sourceSets {
   main {
     java {
-      srcDirs "${project(":e3db").projectDir}/src/main/java", "${project(":e3db-crypto-interface").projectDir}/src/main/java", "${project(":e3db-crypto-plain").projectDir}/src/main/java", "${project(":e3db:e3db-crypto-stub-android").projectDir}/src/main/java"
+      srcDirs "${project(":e3db").projectDir}/src/main/java",
+              "${project(":e3db-crypto-interface").projectDir}/src/main/java",
+              "${project(":e3db-crypto-plain").projectDir}/src/main/java",
+              "${project(":e3db-crypto-stub-android").projectDir}/src/main/java"
     }
   }
 }
 
 evaluationDependsOn(':publish')
 
+task sourceJar(type: Jar) {
+  from sourceSets.main.allJava
+}
+
 publishing {
   publications {
     maven(MavenPublication) {
       from components.java
+
+      artifact sourceJar {
+        classifier "sources"
+      }
 
       groupId project(":publish").ext.groupId
       artifactId 'e3db-client-plain'

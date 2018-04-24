@@ -1,3 +1,23 @@
+/*
+ * TOZNY NON-COMMERCIAL LICENSE
+ *
+ * Tozny dual licenses this product. For commercial use, please contact
+ * info@tozny.com. For non-commercial use, the contents of this file are
+ * subject to the TOZNY NON-COMMERCIAL LICENSE (the "License") which
+ * permits use of the software only by government agencies, schools,
+ * universities, non-profit organizations or individuals on projects that
+ * do not receive external funding other than government research grants
+ * and contracts.  Any other use requires a commercial license. You may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at https://tozny.com/legal/non-commercial-license.
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations under
+ * the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
+ * All rights reserved.
+ *
+ */
+
 package com.tozny.e3db;
 
 import android.os.Build;
@@ -32,6 +52,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.*;
+import okhttp3.Interceptor;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+
 import okio.ByteString;
 import retrofit2.Retrofit;
 
@@ -1045,6 +1073,8 @@ public class  Client {
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
    *                  private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */
@@ -1558,6 +1588,7 @@ public class  Client {
    *
    * @param record The record to encrypt.
    * @param eakInfo The key to use for encrypting.
+   * @throws E3DBException An E3DB-specific error occurred.
    * @return The deccrypted record.
    */
   public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {

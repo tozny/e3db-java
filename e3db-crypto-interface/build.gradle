@@ -2,7 +2,7 @@ apply plugin: 'java'
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'com.squareup.okio:okio:1.13.0'
+    compile 'com.squareup.okio:okio:1.13.0'
 }
 
 sourceCompatibility = "1.7"

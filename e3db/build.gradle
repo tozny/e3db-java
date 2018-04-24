@@ -3,15 +3,15 @@ apply plugin: 'java'
 dependencies {
     compileOnly files('compileLibs/android-4.1.1.4.jar')
 
-    compileOnly project(':e3db:e3db-crypto-stub-plain')
-    compileOnly project(':e3db:e3db-crypto-stub-android')
+    compileOnly project(':e3db-crypto-stub-plain')
+    compileOnly project(':e3db-crypto-stub-android')
 
-    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-    implementation 'com.squareup.okio:okio:1.13.0'
-    implementation project(':e3db-crypto-interface')
+    compile 'com.squareup.retrofit2:retrofit:2.3.0'
+    compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+    compile 'com.squareup.okio:okio:1.13.0'
+    compile project(':e3db-crypto-interface')
 }
 
 sourceCompatibility = 1.7
@@ -22,9 +22,13 @@ setJava7(this.project)
 evaluationDependsOn(':publish')
 
 javadoc {
+    outputs.upToDateWhen { false }
     source = files(["${project(":e3db").projectDir}/src/main/java",
-                    "${project(":e3db-crypto-interface").projectDir}/src/main/java"])
+                    "${project(":e3db-crypto-interface").projectDir}/src/main/java",
+                    "${project(":e3db-crypto-android").projectDir}/src/main/java",
+                    "${project(":e3db-crypto-plain").projectDir}/src/main/java"])
     title = "E3DB API Client"
     destinationDir = file("${rootDir}/docs/docs/${project(":publish").ext.version}")
     options.noQualifiers "java.lang", "java.util"
+    classpath = files([project(":e3db").sourceSets.main.compileClasspath.files])
 }

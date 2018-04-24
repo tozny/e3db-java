@@ -1,3 +1,23 @@
+/*
+ * TOZNY NON-COMMERCIAL LICENSE
+ *
+ * Tozny dual licenses this product. For commercial use, please contact
+ * info@tozny.com. For non-commercial use, the contents of this file are
+ * subject to the TOZNY NON-COMMERCIAL LICENSE (the "License") which
+ * permits use of the software only by government agencies, schools,
+ * universities, non-profit organizations or individuals on projects that
+ * do not receive external funding other than government research grants
+ * and contracts.  Any other use requires a commercial license. You may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at https://tozny.com/legal/non-commercial-license.
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations under
+ * the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
+ * All rights reserved.
+ *
+ */
+
 package com.tozny.e3db;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -43,6 +63,7 @@ public class LocalRecord implements Record {
    *
    * @param data Data contained in the record.
    * @param meta Data about the record. Consider using {@link LocalMeta}.
+   * @param signature Signature bytes, as a Base64URL encoded string.
    */
   public LocalRecord(Map<String, String> data, RecordMeta meta, String signature) {
     this.data = data;

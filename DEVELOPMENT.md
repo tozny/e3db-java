@@ -52,6 +52,8 @@ a client and protect the generated configuration with a password, lock screen PI
 on API level of the device, of course). The app is not intended to be used as an automated test, but as a tool for manual
 testing.
 
+Note that to run the app, you must publish the SDK locally
+
 Testing Single Methods
 ----
 
@@ -85,8 +87,8 @@ $ gradlew :publish:plain:publishToMavenLocal :publish:android:publishToMavenLoca
 
 The published artifacts have different names, but should share versions. They are:
 
-* Plain Java - 'com.tozny.e3db:e3db-client-plain:2.1.0'
-* Android - 'com.tozny.e3db:e3db-client-android:2.1.0@aar'
+* Plain Java - 'com.tozny.e3db:e3db-client-plain:<version>'
+* Android - 'com.tozny.e3db:e3db-client-android:<version>@aar'
 
 (The version is specified in the file `./publish/build.gradle`.)
 

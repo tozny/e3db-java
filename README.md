@@ -47,8 +47,8 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [2.2.0](https://tozny.github.io/e3db-java/docs/2.2.0/) - The most recently released version of the client.
-* Older versions: [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/).
+* [2.3.0](https://tozny.github.io/e3db-java/docs/2.3.0/) - The most recently released version of the client.
+* Older versions: [2.2.0](https://tozny.github.io/e3db-java/docs/2.2.0/), [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/).
 
 Code examples for the most common operations can be found below.
 

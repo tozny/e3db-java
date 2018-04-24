@@ -29,8 +29,6 @@ import org.abstractj.kalium.keys.KeyPair;
 
 import java.util.Arrays;
 
-import javax.print.attribute.standard.MediaSize;
-
 import static com.tozny.e3db.Checks.*;
 import static org.abstractj.kalium.NaCl.Sodium.*;
 

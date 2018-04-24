@@ -51,8 +51,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import com.tozny.e3db.crypto.CipherWithNonce;
-import com.tozny.e3db.crypto.Signature;
 import okhttp3.*;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;

@@ -1,5 +1,4 @@
-E3DB Java SDK
-====
+# E3DB Java SDK
 
 The Tozny End-to-End Encrypted Database (E3DB) is a storage platform
 with powerful sharing and consent management features.
@@ -29,8 +28,7 @@ All rights reserved.
 Your use of E3DB must abide by our [Terms of Service](terms.pdf), as detailed in
 the linked document.
 
-Getting Started
-====
+# Getting Started
 
 The E3DB SDK for Android and plain Java lets your application
 interact with our end-to-end encrypted storage solution. Whether
@@ -44,8 +42,7 @@ the `Client Registration Tokens` heading. This value will allow your
 app to self-register a new user with E3DB. Note that this value is not
 meant to be secret and is safe to embed in your app.
 
-Documentation
-====
+# Documentation
 
 Full API documentation for various versions can be found at the
 following locations:
@@ -55,8 +52,7 @@ following locations:
 
 Code examples for the most common operations can be found below.
 
-Using the SDK with Android
-====
+# Using the SDK with Android
 
 The E3DB SDK targets Android API 16 and higher. To use the SDK in your
 app, add it as a dependency to your build. In Gradle, use:
@@ -74,8 +70,7 @@ compile('com.tozny.e3db:e3db-client-android:2.2.0@aar') {
 Because the SDK contacts Tozny's E3DB service, your application also
 needs to request INTERNET permissions.
 
-Using the SDK with Plain Java
-====
+# Using the SDK with Plain Java
 
 For use with Maven, declare the following repository and dependencies:
 
@@ -97,20 +92,18 @@ For use with Maven, declare the following repository and dependencies:
 </dependencies>
 ```
 
-libsodium
-----
+## libsodium
 
 The plain Java SDK requires that the libsodium .so/.dll be on your
 path. On Linux or MacOS, use a package manager to install libsodium.
 
-Windows users should download a recent "MSVC" build of libsodium from
+Windows users should download a "MSVC" build of libsodium 1.0.14 from
 https://download.libsodium.org/libsodium/releases. Unzip the archive
 and find the most recent "Release" version of libsodium.dll
 for your architecture (32 or 64 bits), and copy that that file to a location
 on your PATH environment variable.
 
-Asynchronous Result Handling
-====
+# Asynchronous Result Handling
 
 The SDK supports asynchronous execution by returning all results to
 callback handlers of type `ResultHandler<T>`, where `T` is the type of
@@ -130,8 +123,7 @@ called on the same background thread used for E3DB interactions.
 E3DB operations do not have timeouts defined -- you will have to
 manage those within your own application.
 
-Registering a Client
-====
+# Registering a Client
 
 Registering creates a new client that can be used to interact with
 E3DB. Each client has a unique ID and is associated with your Tozny
@@ -140,16 +132,13 @@ after credentials have been stored securely, the client can be
 authenticated again using the stored credentials.
 
 ```java
-import com.tozny.e3db.Client;
-import com.tozny.e3db.ResultHandler;
-import com.tozny.e3db.Result;
-import com.tozny.e3db.Config;
+import com.tozny.e3db.*;
 ...
 
 String token = "<registration token>";
 String host = "https://api.e3db.com";
 
-Client.register(token, clientName, host, new ResultHandler<Config>() {
+Client.register(token, "client1", host, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {
@@ -164,8 +153,111 @@ Client.register(token, clientName, host, new ResultHandler<Config>() {
 
 ```
 
-Using a Client to Interact with E3DB
-====
+# Android-specific Features
+
+The E3DB SDK provides special support for storing credentials securely on Android devices.
+
+## Storing credentials securely
+
+The E3DB SDK supports several methods for storing credentials using Android's built-in
+security features. On API 23+ devices, credentials can be protected with:
+
+  * Password
+  * Fingerprint
+  * Lock Screen PIN
+
+On older devices, credentials can be protected with a password. We recommend using "Lock Screen PIN"
+on newer devices, and password on older devices.
+
+To protect credentials, first register a client as above. The credentials created on registration can be saved
+and protected by requiring the user to enter their lock screen PIN as follows:
+
+```java
+import com.tozny.e3db.*;
+import com.tozny.e3db.android.*;
+...
+
+Activity context = ...; // application context
+
+Client.register(token, "client1", host, new ResultHandler<Config>() {
+  @Override
+  public void handle(Result<Config> r) {
+    if(! r.isError()) {
+        Config mConfig = r.asValue();
+        Config.saveConfigSecurely(new AndroidConfigStore(context,  KeyAuthentication.withLockScreen(), KeyAuthenticator.defaultAuthenticator(context, "")), mConfig.json(), new ConfigStore.SaveHandler() {
+                @Override
+                public void saveConfigDidSucceed() {
+                    // configuration successfully saved
+                }
+
+                @Override
+                public void saveConfigDidCancel() {
+                }
+
+                @Override
+                public void saveConfigDidFail(Throwable e) {
+                }
+            });
+    }
+    else {
+      // throw to indicate registration error
+      throw new RuntimeException(r.asError().other())
+    }
+  }
+});
+```
+
+The configuration can then be loaded as follows:
+
+```java
+Config.loadConfigSecurely(new AndroidConfigStore(context,  KeyAuthentication.withLockScreen(), KeyAuthenticator.defaultAuthenticator(context, "")), new ConfigStore.LoadHandler() {
+    @Override
+    public void loadConfigDidSucceed(String config) {
+        // Config loaded successfully
+    }
+
+    @Override
+    public void loadConfigDidCancel() {
+        // User cancelled authentication method
+    }
+
+    @Override
+    public void loadConfigNotFound() {
+        // Config does not exist
+    }
+
+    @Override
+    public void loadConfigDidFail(Throwable e) {
+        // An error occurred while loading - user entered wrong authentication, etc.
+    }
+});
+```
+
+The `AndroidConfigStore` class has additional constructors for managing multiple credentials (by name). The `KeyAuthentication`
+class provides static methods for other authentication types, as well methods for testing if a particular type of authentication
+is supported by the device. The `KeyAuthenticator` interface can be used to provide a custom UI for gathering fingerprint, password, and
+lock screen PIN if desired. It also provides the static method `defaultAuthenticator` which gives a default UI.
+
+## A note about "`allowBackup`" (`AndroidManifest.xml`)
+
+If your `AndroidManifest.xml` specifies `allowBackup="true"`, your app will fail to compile as one of E3DB's dependencies
+carries its own `AndroidManifest.xml` which specifies `allowBackup="false"`. If your app does allow backups, we recommend that
+you do not back up credentials or that you store them securely, as above. In any case, to correct the error, add the `tools:replace="android:allowBackup"`
+attribute to the `application` element in your `AndroidManifest.xml`. For example:
+
+```xml
+<manifest ...
+   xmlns:tools="http://schemas.android.com/tools">
+    ...
+    <application
+        ...
+        tools:replace="android:allowBackup">
+    ...
+    </application>
+</manifest>
+```
+
+# Using a Client to Interact with E3DB
 
 Once a client has been registered and credentials have been stored,
 you can use the `ClientBuilder` class to create an authenticated client
@@ -181,8 +273,7 @@ Client client = new ClientBuilder()
 
 Now the `client` value can be used to interact with E3DB.
 
-Write a record
-====
+## Write a record
 
 Records are represented as a `Map` with `String`-typed keys and
 `String`-typed values. 
@@ -221,8 +312,7 @@ Any data format, such as JSON or raw bytes, can be stored as long as
 it is first converted to a `String` for a write operation. Just be sure
 to reverse the process later when reading the data.
 
-Query records
-====
+## Query records
 
 E3DB allows you to query records based on a number of criteria,
 including record type. Use the `QueryParamsBuilder` object to build a
@@ -262,8 +352,7 @@ filters include:
 - `setIncludeAllWriters`: Set this flag to include records that have been shared
   with you, defaults to `false`
 
-Pagination
-====
+## Pagination
 
 The `QueryResponse` object's method `last()` gives a value indicating the last
 record returned. Passing this value to the `setAfter()` method on the `QueryParamsBuilder`
@@ -316,8 +405,7 @@ while(! done.get()) {
 }
 ```
 
-Sharing Records
-====
+## Sharing Records
 
 E3DB allows the writer of a record to securely share that record with
 other E3DB clients. To share, you must know the client ID of the
@@ -357,8 +445,7 @@ Note that the `Void` type means that the `Result` passed to `handle`
 represents whether an error occurred or not, and nothing else. Sharing
 operations do not return any useful information on success.
 
-Local Encryption & Decryption
-====
+## Local Encryption & Decryption
 
 The E3DB SDK allows you to encrypt documents for local storage, which can
 be decrypted later, by the client that created the document or any client with which
@@ -410,8 +497,7 @@ EAKInfo writerKey = // read stored EAKInfo instance from local storage
 Record decrypted = client.decryptExisting(encrypted, writerKey);
 ```
 
-Local Decryption of Shared Records
-====
+## Local Decryption of Shared Records
 
 When two clients have a sharing relationship, the "reader" can locally decrypt any documents encrypted
 by the "writer," without using E3DB for storage.
@@ -437,8 +523,7 @@ reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new Resul
 });
 ```
 
-Document Signing & Verification
-====
+## Document Signing & Verification
 
 Every E3DB client created with this SDK is capable of signing documents and verifying the signature
 associated with a document. (Note that E3DB records are also stored with a signature attached, but
@@ -474,8 +559,7 @@ if(! client.verify(signed, clientConfig.publicSigningKey)) {
 }
 ```
 
-Exceptions
-====
+## Exceptions
 
 The following E3DB-specific exceptions can be thrown:
 

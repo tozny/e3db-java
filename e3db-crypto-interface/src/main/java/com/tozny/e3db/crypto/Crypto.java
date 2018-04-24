@@ -20,6 +20,9 @@
 
 package com.tozny.e3db.crypto;
 
+import com.tozny.e3db.CipherWithNonce;
+import com.tozny.e3db.Signature;
+
 /**
  * Provides cryptographic operations necessary for interacting with E3DB. Android and
  * plain Java implementations of this class are automatically included in each respective

@@ -18,7 +18,7 @@
  *
  */
 
-package com.tozny.e3db.crypto;
+package com.tozny.e3db;
 
 import static com.tozny.e3db.Base64.decodeURL;
 import static com.tozny.e3db.Base64.encodeURL;

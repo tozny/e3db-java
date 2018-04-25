@@ -62,7 +62,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-compile('com.tozny.e3db:e3db-client-android:2.3.0@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:2.3.0@aar') {
     transitive = true
 }
 ```

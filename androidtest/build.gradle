@@ -20,6 +20,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    sourceSets.androidTest.java {
+        srcDirs = ['src/androidTest/java', "${project(":common-test").projectDir}/src/test/java"]
+    }
 }
 
 dependencies {

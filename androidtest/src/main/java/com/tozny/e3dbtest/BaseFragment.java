@@ -25,6 +25,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -186,6 +187,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                 @Override
                 public void loadConfigDidFail(Throwable e) {
+                    Log.e(getTag(), e.getLocalizedMessage(), e);
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;
@@ -215,6 +217,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                 @Override
                 public void saveConfigDidFail(Throwable e) {
+                    Log.e(getTag(), e.getLocalizedMessage(), e);
                     e.printStackTrace();
                     updateLabels(getString(R.string.save_config_failed), e.getLocalizedMessage(), "");
                 }
@@ -240,6 +243,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
                 @Override
                 public void removeConfigDidFail(Throwable e) {
+                    Log.e(getTag(), e.getLocalizedMessage(), e);
                     e.printStackTrace();
 
                     mState = State.ERROR_FOUND;

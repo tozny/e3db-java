@@ -1,0 +1,32 @@
+apply plugin: 'java-library'
+
+compileTestJava {
+  sourceCompatibility = 1.8
+  targetCompatibility = 1.8
+  options.compilerArgs += '-parameters'
+}
+
+dependencies {
+  testImplementation("junit:junit:[4,)")
+  implementation project(path: ':e3db')
+  implementation project(path: ':e3db-crypto-interface')
+  compileOnly project(":e3db-crypto-stub-plain")
+  compileOnly project(":e3db-crypto-stub-android")
+  testImplementation project(path: ':e3db')
+  testImplementation project(path: ':e3db-crypto-interface')
+  testCompileOnly project(":e3db-crypto-stub-plain")
+  testCompileOnly project(":e3db-crypto-stub-android")
+}
+
+test {
+  // always re-run tests
+  outputs.upToDateWhen { false }
+  testLogging {
+    exceptionFormat "full"
+    showStackTraces true
+    showStandardStreams true
+  }
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"

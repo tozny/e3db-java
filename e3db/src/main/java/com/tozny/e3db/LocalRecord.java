@@ -25,9 +25,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
+
+import static com.tozny.e3db.Checks.checkNotNull;
 
 /**
  * Represents an E3DB record.
@@ -47,12 +47,15 @@ public class LocalRecord implements Record {
   private final String signature;
 
   /**
-   * Creates a representation of a Record suitable for signing or storing locally..
+   * Creates a representation of a Record suitable for signing or storing locally.
    *
-   * @param data Data contained in the record.
-   * @param meta Data about the record. Consider using {@link LocalMeta}.
+   * @param data Data contained in the record. Cannot be {@code null}.
+   * @param meta Data about the record. Cannot be {@code null}. Consider using {@link LocalMeta}.
    */
   public LocalRecord(Map<String, String> data, RecordMeta meta) {
+    checkNotNull(data, "data");
+    checkNotNull(meta, "meta");
+
     this.data = data;
     this.meta = meta;
     this.signature = null;
@@ -61,11 +64,15 @@ public class LocalRecord implements Record {
   /**
    * Creates a record with an associated signature.
    *
-   * @param data Data contained in the record.
-   * @param meta Data about the record. Consider using {@link LocalMeta}.
-   * @param signature Signature bytes, as a Base64URL encoded string.
+   * @param data Data contained in the record. Cannot be {@code null}.
+   * @param meta Data about the record. Consider using {@link LocalMeta}. Cannot be {@code null}.
+   * @param signature Signature bytes, as a Base64URL encoded string. Cannot be {@code null}.
    */
   public LocalRecord(Map<String, String> data, RecordMeta meta, String signature) {
+    checkNotNull(data, "data");
+    checkNotNull(meta, "meta");
+    checkNotNull(signature, "signature");
+
     this.data = data;
     this.meta = meta;
     this.signature = signature;
@@ -91,23 +98,32 @@ public class LocalRecord implements Record {
     return this;
   }
 
-  @Override
-  public String toSerialized() {
+  /**
+   * Gives a standard representation for signing records, of any sort.
+   * @param record The record to sign.
+   * @return A string representing the record, for signing purposes.
+   */
+  public static String toSerialized(Record record) {
     try {
       SortedMap<String, Object> clientMeta = new TreeMap<>();
-      clientMeta.put("writer_id", meta().writerId().toString());
-      clientMeta.put("user_id", meta().userId().toString());
-      clientMeta.put("type", meta().type().toString());
-      Map<String, String> plain = meta().plain();
+      clientMeta.put("writer_id", record.meta().writerId().toString());
+      clientMeta.put("user_id", record.meta().userId().toString());
+      clientMeta.put("type", record.meta().type().toString());
+      Map<String, String> plain = record.meta().plain();
       clientMeta.put("plain", plain == null ?
-          new TreeMap<String, String>() :
-          new TreeMap<String, String>(plain));
+                                  new TreeMap<String, String>() :
+                                  new TreeMap<>(plain));
 
       String clientMetaSerial = mapper.writeValueAsString(clientMeta);
-      String dataSerial = mapper.writeValueAsString(data());
+      String dataSerial = mapper.writeValueAsString(record.data());
       return new StringBuffer(clientMetaSerial.length() + dataSerial.length()).append(clientMetaSerial).append(dataSerial).toString();
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public String toSerialized() {
+    return toSerialized(this);
   }
 }

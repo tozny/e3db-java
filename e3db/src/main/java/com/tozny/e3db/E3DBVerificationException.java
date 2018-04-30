@@ -36,8 +36,17 @@ public class E3DBVerificationException extends E3DBException {
     this.meta = meta;
   }
 
+  public E3DBVerificationException(RecordMeta meta, String message) {
+    super(message);
+    this.meta = meta;
+  }
+
   public E3DBVerificationException(RecordMeta meta, String message, Exception inner) {
     super(message, inner);
     this.meta = meta;
+  }
+
+  public RecordMeta getMeta() {
+    return meta;
   }
 }

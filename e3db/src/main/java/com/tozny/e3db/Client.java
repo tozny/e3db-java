@@ -1572,7 +1572,7 @@ public class  Client {
         try {
           EAKEntry eak = getEAK(writerId, userId, Client.this.clientId, type);
           if(eak == null)
-            uiError(handleResult, new E3DBException("Access key not not found."));
+            uiError(handleResult, new E3DBException("Access key not found."));
           else
             uiValue(handleResult, eak.eakInfo);
         }
@@ -1588,68 +1588,61 @@ public class  Client {
    *
    * @param record The record to encrypt.
    * @param eakInfo The key to use for encrypting.
-   * @throws E3DBException An E3DB-specific error occurred.
-   * @return The deccrypted record.
+   * @throws E3DBException Thrown when the signature is not present, the eakInfo does not include a
+   * public signing key, or when verification of the signature fails.
+   * @return The decrypted record.
    */
-  public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
-    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty()) {
-      throw new E3DBException("EAKInfo has no signing key");
-    }
+  public LocalRecord decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
+    if(record.signature() == null)
+      throw new E3DBVerificationException(record.meta(), "Record must have a signature in order to decrypt.");
 
-    if (record.signature() == null) {
-      throw new E3DBVerificationException(record.meta());
-    }
+    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
+      throw new IllegalStateException("eakInfo cannot be used to verify the record as it has no public signing key");
 
     byte[] ak = getCachedAccessKey(record, eakInfo);
 
     try {
       Map<String, String> plainRecord = decryptObject(ak, record.data());
 
-      Record decrypted = new LocalRecord(plainRecord, record.meta());
-      SignedDocument<Record> signed = new SD<Record>(decrypted, record.signature());
-
-      if(!verify(signed, eakInfo.getSignerSigningKey())) {
+      if(!verify(new SD<Record>(new LocalRecord(plainRecord, record.meta()),
+          record.signature()), eakInfo.getSignerSigningKey()))
         throw new E3DBVerificationException(record.meta());
-      }
 
-      return new LocalRecord(plainRecord, record.meta());
+      return new LocalRecord(plainRecord, record.meta(), record.signature());
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
   }
 
   /**
-   * Encrypt an existing record for local storage.
+   * Sign &amp; encrypt an existing record for local storage.
    *
    * @param record The record to encrypt.
    * @param eakInfo The key to use for encrypting.
-   * @return The encrypted record. Note that server-provided metadata values will not throw if accessed.
+   * @return The encrypted record.
    */
-  public Record encryptExisting(Record record, EAKInfo eakInfo) {
+  public EncryptedRecord encryptExisting(Record record, EAKInfo eakInfo) {
     checkNotNull(record, "record");
     checkNotNull(eakInfo, "eak");
 
-    String signature = record.signature();
-    if (signature == null && Client.this.privateSigningKey != null) {
-      SignedDocument<Record> document = sign(record);
-      signature = document.signature();
-    }
+    if(Client.this.privateSigningKey == null)
+      throw new IllegalStateException("Client must have a signing key to encrypt locally.");
 
     byte[] ak = getCachedAccessKey(record, eakInfo);
-    return new LocalRecord(encryptObject(ak, record.data()), record.meta(), signature);
+    return new EncryptedRecord(encryptObject(ak, record.data()), record.meta(), sign(record).signature());
   }
 
   /**
-   * Encrypt a record for local storage.
+   * Sign &amp; encrypt a record for local storage.
    *
    * @param type The type of the record.
    * @param data Fields to encrypt.
    * @param plain Plaintext metadata which will be stored with the record.
    * @param eakInfo The key to use for encrypting.
-   * @return The encrypted record. Note that server-provided metadata values ({@code recordId}, {@code createdd}, etc.)
+   * @return The encrypted record. Note that server-provided metadata values ({@code recordId}, {@code created}, etc.)
    * will throw if accessed.
    */
-  public Record encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
+  public EncryptedRecord encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
     checkNotNull(type, "type");
     checkNotNull(data, "data");
     checkMap(data.getCleartext(), "data");
@@ -1657,13 +1650,7 @@ public class  Client {
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
-    String signature = null;
-    if (Client.this.privateSigningKey != null) {
-      SignedDocument<Record> document = sign((Record) new LocalRecord(data.getCleartext(), new LocalMeta(clientId, clientId, type.trim(), plain)));
-      signature = document.signature();
-    }
-
-    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain), signature), eakInfo);
+    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain)), eakInfo);
   }
 
   /**
@@ -1677,7 +1664,8 @@ public class  Client {
    */
   public <T extends Signable> SignedDocument<T> sign(T document) {
     checkNotNull(document, "document");
-    checkNotNull(this.privateSigningKey, "signingKey");
+    if(this.privateSigningKey == null)
+      throw new IllegalStateException("Client must have a signing key.");
 
     return new SD<T>(document, Base64.encodeURL(
       Platform.crypto.signature(

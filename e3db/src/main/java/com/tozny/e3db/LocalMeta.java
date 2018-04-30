@@ -24,6 +24,8 @@ import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.tozny.e3db.Checks.checkNotNull;
+
 /**
  * Represents metadata about a record.
  */
@@ -42,6 +44,10 @@ public class LocalMeta implements RecordMeta {
    * @param plain Plaintext metadata about the record. Can be {@code null}.
    */
   public LocalMeta(UUID writerId, UUID userId, String type, Map<String, String> plain) {
+    checkNotNull(writerId, "writerId");
+    checkNotNull(userId, "userId");
+    checkNotNull(type, "type");
+
     this.writerId = writerId;
     this.userId = userId;
     this.type = type;

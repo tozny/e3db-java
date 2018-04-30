@@ -31,5 +31,5 @@ public interface Signable {
    *
    * @return A string representing the document.
    */
-  public String toSerialized();
+  String toSerialized();
 }

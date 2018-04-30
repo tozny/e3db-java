@@ -1,29 +1,34 @@
 apply plugin: 'java'
 
 compileTestJava {
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
-    options.compilerArgs += '-parameters'
+  sourceCompatibility = 1.8
+  targetCompatibility = 1.8
+  options.compilerArgs += '-parameters'
+}
+
+sourceSets.test.java {
+  srcDirs = ["src/test/java", "${project(":common-test").projectDir}/src/test/java"]
 }
 
 dependencies {
-    testCompile("junit:junit:[4,)")
-    testCompile project(path: ':e3db')
-    testCompile project(path: ':e3db-crypto-interface')
-    testCompile(project(path: ':e3db-crypto-plain'))
-    testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+  testImplementation project(":common-test")
+  testCompile("junit:junit:[4,)")
+  testCompile project(path: ':e3db')
+  testCompile project(path: ':e3db-crypto-interface')
+  testCompile(project(path: ':e3db-crypto-plain'))
+  testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+  testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+  testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
 }
 
 test {
-    // always re-run tests
-    outputs.upToDateWhen { false }
-    testLogging {
-        exceptionFormat "full"
-        showStackTraces true
-        showStandardStreams true
-    }
+  // always re-run tests
+  outputs.upToDateWhen { false }
+  testLogging {
+    exceptionFormat "full"
+    showStackTraces true
+    showStandardStreams true
+  }
 }
 
 sourceCompatibility = "1.7"

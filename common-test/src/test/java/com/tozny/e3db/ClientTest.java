@@ -593,8 +593,6 @@ public class ClientTest {
 
     final CI from = getClient();
     final CI to = getClient(shareProfile);
-    Config toConfig = Config.fromJson(profiles.get(shareProfile));
-    Config fromConfig = Config.fromJson(profiles.get("default"));
 
     withTimeout(new AsyncAction() {
       @Override
@@ -1059,14 +1057,256 @@ public class ClientTest {
             try {
               client.decryptExisting(unsigned, eak);
               fail();
-            } catch (E3DBVerificationException eve) {
-
-            } catch (E3DBException ex) {
-              fail();
+            } catch (E3DBException eve) {
+              assertTrue("Expected verification exception but got: " + eve.getClass().getCanonicalName() + "; " + eve.getMessage(), eve instanceof E3DBVerificationException );
             }
           }
         }));
       }
     });
+  }
+
+  @Test
+  public void testEncodeDecodeLocal() throws IOException, E3DBException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String recordType = "signedLyric";
+    final AtomicReference<EAKInfo> eak = new AtomicReference<>();
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+          @Override
+          public void handle(Result<EAKInfo> result) {
+            if(result.isError())
+              throw new Error(result.asError().other());
+
+            eak.set(result.asValue());
+          }
+        }));
+      }
+    });
+
+    Map<String, String> plain = new HashMap<>();
+    plain.put("hello", "world");
+
+    Map<String, String> data = new HashMap<>();
+    data.put("Jabberwock", "Not to put too fine a point on it");
+
+    LocalRecord unencrypted = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
+    LocalRecord unencryptedWithPlain = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+    LocalRecord unencryptedWithEmptyPlain = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, new HashMap<String, String>()));
+
+    // encrypt, encode, decode
+    {
+      EncryptedRecord encrypted = client.encryptExisting(unencrypted, eak.get());
+      String encodedEncrypted = encrypted.encode();
+      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedEncrypted.meta().plain());
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedEncrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedEncrypted.signature());
+      assertEquals("Encrypted data not equal. (" + encodedEncrypted + ")", encrypted.data().get("Jabberwock"), decodedEncrypted.data().get("Jabberwock"));
+    }
+
+    {
+      EncryptedRecord encrypted = client.encryptExisting(unencryptedWithPlain, eak.get());
+      String encodedEncrypted = encrypted.encode();
+      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedEncrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedEncrypted.signature());
+      assertEquals("Encrypted data not equal. (" + encodedEncrypted + ")", encrypted.data().get("Jabberwock"), decodedEncrypted.data().get("Jabberwock"));
+      assertEquals("Plain should be equal. (" + encodedEncrypted + ")", unencryptedWithPlain.meta().plain().get("hello"), decodedEncrypted.meta().plain().get("hello"));
+    }
+
+    {
+      EncryptedRecord encrypted = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
+      String encodedEncrypted = encrypted.encode();
+      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedEncrypted.meta().plain().size());
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedEncrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedEncrypted.signature());
+      assertEquals("Encrypted data not equal. (" + encodedEncrypted + ")", encrypted.data().get("Jabberwock"), decodedEncrypted.data().get("Jabberwock"));
+    }
+
+    // encrypt, encode, decode, decrypt
+    {
+      EncryptedRecord encryptedRecord = client.encryptExisting(unencrypted, eak.get());
+      String encodedEncrypted = encryptedRecord.encode();
+      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      LocalRecord decodedDecrypted = client.decryptExisting(decodedEncrypted, eak.get());
+      assertNull("Plain should be absent.", decodedDecrypted.meta().plain());
+      assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal.", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal.", encryptedRecord.signature(), decodedDecrypted.signature());
+      assertEquals("Data not decrypted", data.get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    {
+      EncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithPlain, eak.get());
+      String encodedEncrypted = encryptedRecord.encode();
+      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      LocalRecord decodedDecrypted = client.decryptExisting(decodedEncrypted, eak.get());
+      assertEquals("Plain should be equal. (" + encodedEncrypted + ")", unencryptedWithPlain.meta().plain().get("hello"), decodedDecrypted.meta().plain().get("hello"));
+      assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal.", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal.", encryptedRecord.signature(), decodedEncrypted.signature());
+      assertEquals("Data not decrypted", data.get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    {
+      EncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
+      String encodedEncrypted = encryptedRecord.encode();
+      LocalRecord decodedDecrypted = client.decryptExisting(EncryptedRecord.decode(encodedEncrypted), eak.get());
+      assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedDecrypted.meta().plain().size());
+      assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal.", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal.", encryptedRecord.signature(), decodedDecrypted.signature());
+      assertEquals("Data not decrypted", data.get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    // badly encoded
+    try {
+      EncryptedRecord.decode("foo");
+      fail("Should not decode.");
+    }
+    catch(IOException ex) {
+
+    }
+
+    try {
+      EncryptedRecord.decode(client.encryptExisting(unencrypted, eak.get()).encode().substring(1));
+      fail("Should not decode.");
+    }
+    catch(IOException ex) {
+
+    }
+  }
+
+  @Test
+  public void testEncodeDecodeWrite() throws IOException, E3DBException {
+    final AtomicReference<Client> client1 = new AtomicReference<>();
+    final AtomicReference<Client> client2 = new AtomicReference<>();
+    final AtomicReference<EAKInfo> writerEak = new AtomicReference<>();
+    final AtomicReference<EAKInfo> readerEak = new AtomicReference<>();
+    final String recordType = "signedLyric";
+
+    registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
+      @Override
+      public void handle(Result<Config> r) {
+        if(r.isError())
+          throw new Error(r.asError().other());
+
+        client1.set(new ClientBuilder().fromConfig(r.asValue()).build());
+      }
+    });
+
+    registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
+      @Override
+      public void handle(Result<Config> r) {
+        if(r.isError())
+          throw new Error(r.asError().other());
+
+        client2.set(new ClientBuilder().fromConfig(r.asValue()).build());
+      }
+    });
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+          @Override
+          public void handle(Result<EAKInfo> result) {
+            if(result.isError())
+              throw new Error(result.asError().other());
+
+            writerEak.set(result.asValue());
+          }
+        }));
+      }
+    });
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> r) {
+            if(r.isError())
+              throw new Error(r.asError().other());
+          }
+        }));
+      }
+    });
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+          @Override
+          public void handle(Result<EAKInfo> result) {
+            if(result.isError())
+              throw new Error(result.asError().other());
+
+            readerEak.set(result.asValue());
+          }
+        }));
+      }
+    });
+
+    Map<String, String> plain = new HashMap<>();
+    plain.put("hello", "world");
+    Map<String, String> data = new HashMap<>();
+    data.put("Jabberwock", "Not to put too fine a point on it");
+
+    LocalRecord unencrypted = new LocalRecord(data, new LocalMeta(client1.get().clientId(), client1.get().clientId(), recordType, null));
+    LocalRecord unencryptedWithPlain = new LocalRecord(data, new LocalMeta(client1.get().clientId(), client1.get().clientId(), recordType, plain));
+    LocalRecord unencryptedWithEmptyPlain = new LocalRecord(data, new LocalMeta(client1.get().clientId(), client1.get().clientId(), recordType, new HashMap<String, String>()));
+    // client1: encrypt, encode
+    // client2: decode, decrypt
+    {
+      EncryptedRecord encrypted = client1.get().encryptExisting(unencrypted, writerEak.get());
+      String encodedEncrypted = encrypted.encode();
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedDecrypted.meta().plain());
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
+      assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    {
+      EncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithPlain, writerEak.get());
+      String encodedEncrypted = encrypted.encode();
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      assertEquals("Plain should be equal. (" + encodedEncrypted + ")", unencryptedWithPlain.meta().plain().get("hello"), decodedDecrypted.meta().plain().get("hello"));
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
+      assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    {
+      EncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithEmptyPlain, writerEak.get());
+      String encodedEncrypted = encrypted.encode();
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedDecrypted.meta().plain().size());
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
+      assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
   }
 }

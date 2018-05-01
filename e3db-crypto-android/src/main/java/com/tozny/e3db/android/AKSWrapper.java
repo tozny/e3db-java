@@ -24,6 +24,7 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.support.annotation.RequiresApi;
+import android.util.Log;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -32,13 +33,17 @@ import java.security.*;
 import java.security.cert.CertificateException;
 
 class AKSWrapper {
+  private static final String TAG = "AKSWrapper";
+
   @RequiresApi(api = Build.VERSION_CODES.M)
   private static void createSecretKeyIfNeeded(String alias, KeyAuthentication protection) {
     try {
+      Log.d(TAG, "createSecretKeyIfNeeded: " + alias + "; " + protection.authenticationType());
       KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
       keyStore.load(null);
 
       if (!keyStore.containsAlias(alias)) {
+        Log.d(TAG, "Creating key.");
         KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                                                   .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                                                   .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE);
@@ -65,12 +70,15 @@ class AKSWrapper {
         }
 
         KeyGenParameterSpec spec = builder.build();
+        Log.d(TAG, "Spec built.");
 
         KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
         keyGenerator.init(spec);
         keyGenerator.generateKey();
+        Log.d(TAG, "Key generated.");
       }
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }
@@ -78,25 +86,33 @@ class AKSWrapper {
   @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
   static SecretKey getSecretKey(String alias, KeyAuthentication protection) {
     try {
+      Log.d(TAG, "getSecretKey: " + alias + ";" + protection.authenticationType());
       createSecretKeyIfNeeded(alias, protection);
 
       KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
       keyStore.load(null);
 
-      return (SecretKey) keyStore.getKey(alias, null);
+      Key key = keyStore.getKey(alias, null);
+      Log.d(TAG, "got key: " + (key != null));
+      return (SecretKey) key;
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }
 
   static void removeSecretKey(String alias) {
     try {
+      Log.d(TAG, "removeSecretKey: " + alias);
       KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
       keyStore.load(null);
 
-      if (keyStore.containsAlias(alias))
+      if (keyStore.containsAlias(alias)) {
+        Log.d(TAG, "deleting key.");
         keyStore.deleteEntry(alias);
+      }
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }

@@ -36,7 +36,7 @@ import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 
 class FSKSWrapper {
-  private static final String TAG = "KeyProvider";
+  private static final String TAG = "FSKSWrapper";
   private static final String FSKS = "com.tozny.e3db.crypto.fsks";
   private static final String FSKS_LOC = "com.tozny.e3db.crypto.sys";
 
@@ -50,6 +50,7 @@ class FSKSWrapper {
   }
 
   private synchronized static String getPerf(Context context, String dir) {
+    Log.d(TAG, "getPerf");
     try {
       final int count = 65, bytes = 20;
 
@@ -70,7 +71,11 @@ class FSKSWrapper {
         try {
           output.write(buf);
         } finally {
-          output.close();
+          try {
+            output.close();
+          } catch (IOException e) {
+
+          }
         }
 
         r = SecureRandom.getInstance("SHA1PRNG").nextInt(1000) + 10000;
@@ -90,7 +95,11 @@ class FSKSWrapper {
           if (input.read(buf) != count)
             throw new RuntimeException("Invalid perf log");
         } finally {
-          input.close();
+          try {
+            input.close();
+          } catch (IOException e) {
+
+          }
         }
 
         SharedPreferences sharedPreferences = context.getSharedPreferences(dir, Context.MODE_PRIVATE);
@@ -104,17 +113,21 @@ class FSKSWrapper {
         buf[i + (i % 2 == 1 ? i - (i - 1) : 1)] = a;
       }
 
-      return Base64.encodeURL(
+      String p = Base64.encodeURL(
           SecretKeyFactory.getInstance("PBKDF2WITHHMACSHA1").generateSecret(
               new PBEKeySpec(Base64.encodeURL(buf).toCharArray(), s, r, bytes * 8)
           ).getEncoded()
       );
+      Log.d(TAG, "returning: " + (p != null));
+      return p;
     } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }
 
   private static KeyStore getFSKS(Context context) {
+    Log.d(TAG, "getFSKS");
     if (fsKS == null) {
       synchronized (keyStoreCreateLock) {
         KeyStore result = fsKS;
@@ -124,25 +137,38 @@ class FSKSWrapper {
             Log.d(TAG, "Keystore: " + result.getClass().getCanonicalName());
             if (fileExists(context, FSKS)) {
               // load key store
+              Log.d(TAG, "reading existing keystore");
               FileInputStream kstore = context.openFileInput(FSKS);
               try {
                 result.load(kstore, getPerf(context, FSKS_LOC).toCharArray());
               } finally {
-                kstore.close();
+                try {
+                  Log.d(TAG, "closing existing keystore");
+                  kstore.close();
+                } catch (IOException e) {
+
+                }
               }
             } else {
               // create key store
+              Log.d(TAG, "creating keystore");
               result.load(null, null);
               FileOutputStream out = context.openFileOutput(FSKS, Context.MODE_PRIVATE);
               try {
                 result.store(out, getPerf(context, FSKS_LOC).toCharArray());
               } finally {
-                out.close();
+                try {
+                  Log.d(TAG, "closing new keystore");
+                  out.close();
+                } catch (IOException e) {
+
+                }
               }
             }
 
             fsKS = result;
           } catch (KeyStoreException | IOException | NoSuchAlgorithmException| CertificateException e) {
+            Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
             throw new RuntimeException(e);
           }
         }
@@ -153,6 +179,7 @@ class FSKSWrapper {
   }
 
   private static void saveFSKS(Context context) {
+    Log.d(TAG, "saveFSKS.");
     if (fsKS != null) {
       synchronized(keyStoreWriteLock) {
         try {
@@ -161,10 +188,14 @@ class FSKSWrapper {
             fsKS.store(output, getPerf(context, FSKS_LOC).toCharArray());
             Log.d(TAG, "Saved keystore.");
           } finally {
-            output.close();
+            try {
+              output.close();
+            } catch (IOException e) {
+
+            }
           }
         } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
-          Log.e(TAG, e.getMessage());
+          Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
           throw new RuntimeException(e);
         }
       }
@@ -190,11 +221,12 @@ class FSKSWrapper {
   }
 
   private static void createSecretKeyIfNeeded(Context context, String alias, KeyAuthentication protection, String password) {
-
     try {
+      Log.d(TAG, "createSecretKeyIfNeeded " + alias + "; " + protection.authenticationType() + "; " + (password != null));
       KeyStore keyStore = getFSKS(context);
 
       if (!keyStore.containsAlias(alias)) {
+        Log.d(TAG, "Creating key.");
 
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
         SecureRandom random = new SecureRandom();
@@ -203,31 +235,40 @@ class FSKSWrapper {
 
         keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));
 
+        Log.d(TAG, "Key created.");
         saveFSKS(context);
       }
     } catch (KeyStoreException | NoSuchAlgorithmException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }
 
   static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) {
     try {
+      Log.d(TAG, "getSecretKey " + alias + "; " + protection.authenticationType() + "; " + (password != null));
       createSecretKeyIfNeeded(context, alias, protection, password);
       KeyStore keyStore = getFSKS(context);
-      return (SecretKey) keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
+      Key key = keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
+      Log.d(TAG, "got key: " + (key != null));
+      return (SecretKey) key;
     } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }
 
   static void removeSecretKey(Context context, String alias) {
     try {
+      Log.d(TAG, "removeSecretKey " + alias);
       KeyStore keyStore = getFSKS(context);
       if (keyStore.containsAlias(alias)) {
+        Log.d(TAG, "deleting key.");
         keyStore.deleteEntry(alias);
         saveFSKS(context);
       }
     } catch (KeyStoreException e) {
+      Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }
   }

@@ -23,6 +23,7 @@ package com.tozny.e3db.android;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
 import android.support.v4.content.PermissionChecker;
@@ -36,6 +37,7 @@ import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.*;
 
 class KeyStoreManager {
 
+  @SuppressLint({"MissingPermission", "NewApi"})
   private static void checkArgs(Context context, KeyAuthentication protection, KeyAuthenticator keyAuthenticator) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
       if (protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN)
@@ -49,9 +51,14 @@ class KeyStoreManager {
     }
 
     if (protection.authenticationType() == FINGERPRINT) {
-      if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED ||
-              !FingerprintManagerCompat.from(context).isHardwareDetected())
-        throw new IllegalArgumentException(protection.authenticationType().toString() + " not currently supported.");
+      if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED)
+        throw new IllegalArgumentException(protection.authenticationType().toString() + " permission not granted.");
+
+      // Some devices support fingerprint but the support library doesn't recognize it, so
+      // we use the actual FingerprintManager here. (https://stackoverflow.com/a/45181416/169359)
+      FingerprintManager mgr = context.getSystemService(FingerprintManager.class);
+      if (mgr == null || ! mgr.isHardwareDetected())
+        throw new IllegalArgumentException(protection.authenticationType().toString() + " hardware not available.");
     }
 
     if (protection.authenticationType() == LOCK_SCREEN) {

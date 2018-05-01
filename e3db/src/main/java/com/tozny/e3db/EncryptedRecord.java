@@ -6,13 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.io.IOException;
-import java.text.DateFormat;
 import java.util.*;
 
 import static com.tozny.e3db.Checks.checkNotNull;
 
 /**
- * A record holding encrypted data, plus a signature. Should be used to persiste records to storage (and to
+ * A record holding encrypted data, plus a signature. Should be used to persist records to storage (and to
  * restore them from storage, as well).
  *
  * <p>Usually produced by calling  {@link Client#encryptRecord(String, RecordData, Map, EAKInfo)}
@@ -93,8 +92,8 @@ public class EncryptedRecord implements Record {
       if (record.meta().plain() != null)
         meta.put("plain", mapper.writeValueAsString(record.meta().plain()));
 
-      meta.put("userId", record.meta().userId().toString());
-      meta.put("writerId", record.meta().writerId().toString());
+      meta.put("user_id", record.meta().userId().toString());
+      meta.put("writer_id", record.meta().writerId().toString());
 
       HashMap<String, Object> r = new HashMap<>();
       r.put("data", record.data());
@@ -131,8 +130,8 @@ public class EncryptedRecord implements Record {
     try {
       Map<String, String> dataMap = getMap(data);
       Map<String, String> plain = meta.get("plain") != null ? getMap(mapper.readTree(meta.get("plain").asText())) : null;
-      LocalMeta localMeta = new LocalMeta(UUID.fromString(meta.get("writerId").asText()),
-          UUID.fromString(meta.get("userId").asText()),
+      LocalMeta localMeta = new LocalMeta(UUID.fromString(meta.get("writer_id").asText()),
+          UUID.fromString(meta.get("user_id").asText()),
           meta.get("type").asText(),
           plain);
 

@@ -244,7 +244,7 @@ class FSKSWrapper {
     }
   }
 
-  static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) {
+  static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) throws UnrecoverableKeyException {
     try {
       Log.d(TAG, "getSecretKey " + alias + "; " + protection.authenticationType() + "; " + (password != null));
       createSecretKeyIfNeeded(context, alias, protection, password);
@@ -252,7 +252,7 @@ class FSKSWrapper {
       Key key = keyStore.getKey(alias, (password == null) ? null : password.toCharArray());
       Log.d(TAG, "got key: " + (key != null));
       return (SecretKey) key;
-    } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException e) {
+    } catch (KeyStoreException | NoSuchAlgorithmException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }

@@ -83,8 +83,8 @@ class AKSWrapper {
     }
   }
 
-  @android.support.annotation.RequiresApi(api = Build.VERSION_CODES.M)
-  static SecretKey getSecretKey(String alias, KeyAuthentication protection) {
+  @RequiresApi(api = Build.VERSION_CODES.M)
+  static SecretKey getSecretKey(String alias, KeyAuthentication protection) throws UnrecoverableKeyException {
     try {
       Log.d(TAG, "getSecretKey: " + alias + ";" + protection.authenticationType());
       createSecretKeyIfNeeded(alias, protection);
@@ -95,7 +95,7 @@ class AKSWrapper {
       Key key = keyStore.getKey(alias, null);
       Log.d(TAG, "got key: " + (key != null));
       return (SecretKey) key;
-    } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException e) {
+    } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
       throw new RuntimeException(e);
     }

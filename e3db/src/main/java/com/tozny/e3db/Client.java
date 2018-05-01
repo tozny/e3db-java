@@ -839,7 +839,7 @@ public class  Client {
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws UnsupportedEncodingException {
+  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) {
     Map<String, String> decryptedFields = new HashMap<>();
     for(Map.Entry<String,String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
@@ -1601,17 +1601,13 @@ public class  Client {
 
     byte[] ak = getCachedAccessKey(record, eakInfo);
 
-    try {
-      Map<String, String> plainRecord = decryptObject(ak, record.data());
+    Map<String, String> plainRecord = decryptObject(ak, record.data());
 
-      if(!verify(new SD<Record>(new LocalRecord(plainRecord, record.meta()),
-          record.signature()), eakInfo.getSignerSigningKey()))
-        throw new E3DBVerificationException(record.meta());
+    if(!verify(new SD<Record>(new LocalRecord(plainRecord, record.meta()),
+        record.signature()), eakInfo.getSignerSigningKey()))
+      throw new E3DBVerificationException(record.meta());
 
-      return new LocalRecord(plainRecord, record.meta(), record.signature());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return new LocalRecord(plainRecord, record.meta(), record.signature());
   }
 
   /**

@@ -24,25 +24,23 @@ import android.content.Context;
 
 
 import javax.crypto.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.*;
 import java.util.ArrayList;
 
 class SecureStringManager {
 
-  static boolean secureStringExists(Context context, String fileName) throws Throwable {
+  static boolean secureStringExists(Context context, String fileName) {
     return new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists();
   }
 
-  static void deleteStringFromSecureStorage(Context context, String fileName) throws Throwable {
+  static void deleteStringFromSecureStorage(Context context, String fileName) {
     if (new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {
       File file = new File(FileSystemManager.getEncryptedDataFilePath(context, fileName));
       file.delete();
     }
   }
 
-  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) throws Throwable {
+  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) {
     CipherOutputStream cipherOutputStream = null;
 
     try {
@@ -51,27 +49,50 @@ class SecureStringManager {
 
       cipherOutputStream.write(string.getBytes("UTF-8"));
 
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     } finally {
-      if (cipherOutputStream != null) cipherOutputStream.close();
+      if (cipherOutputStream != null) {
+        try {
+          cipherOutputStream.close();
+        } catch (IOException e) {
+
+        }
+      }
     }
   }
 
-  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) throws Throwable {
-    ArrayList<Byte> values = new ArrayList<>();
-
-    CipherInputStream cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
-
-    int nextByte;
-    while ((nextByte = cipherInputStream.read()) != -1) {
-      values.add((byte) nextByte);
+  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) {
+    CipherInputStream cipherInputStream;
+    try {
+      cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+    } catch (FileNotFoundException e) {
+      throw new RuntimeException(e);
     }
 
-    byte[] bytes = new byte[values.size()];
-    for (int i = 0; i < values.size(); i++) {
-      bytes[i] = values.get(i);
-    }
+    try {
+      int nextByte;
+      ArrayList<Byte> values = new ArrayList<>();
+      while ((nextByte = cipherInputStream.read()) != -1) {
+        values.add((byte) nextByte);
+      }
 
-    return new String(bytes, "UTF-8");
+      byte[] bytes = new byte[values.size()];
+      for (int i = 0; i < values.size(); i++) {
+        bytes[i] = values.get(i);
+      }
+
+      return new String(bytes, "UTF-8");
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    finally {
+      try {
+        cipherInputStream.close();
+      } catch (IOException e) {
+
+      }
+    }
   }
 }
 

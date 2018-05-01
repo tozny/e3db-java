@@ -68,128 +68,132 @@ class KeyStoreManager {
   }
 
   interface AuthenticatedCipherHandler {
-    void onAuthenticated(Cipher cipher) throws Throwable;
+    void onAuthenticated(Cipher cipher);
     void onCancel();
     void onError(Throwable e);
   }
 
   @SuppressLint("NewApi")
   static void getCipher(final Context context, final String identifier, final KeyAuthentication protection, final KeyAuthenticator keyAuthenticator,
-                        final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) throws Throwable {
+                        final CipherManager.GetCipher cipherGetter, final AuthenticatedCipherHandler authenticatedCipherHandler) {
 
-    checkArgs(context, protection, keyAuthenticator);
+    try {
+      checkArgs(context, protection, keyAuthenticator);
 
-    final Cipher cipher;
+      final Cipher cipher;
 
-    switch(protection.authenticationType()) {
-      case NONE:
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
-          authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, null)));
-        else
-          authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection)));
+      switch(protection.authenticationType()) {
+        case NONE:
+          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M)
+            authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, null)));
+          else
+            authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection)));
 
-        break;
+          break;
 
-      case FINGERPRINT:
-        cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
+        case FINGERPRINT:
+          cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
 
-        keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.AuthenticateHandler() {
-          @Override
-          public void handleAuthenticated() {
-            try {
-              authenticatedCipherHandler.onAuthenticated(cipher);
-            } catch (Throwable e) {
+          keyAuthenticator.authenticateWithFingerprint(new FingerprintManagerCompat.CryptoObject(cipher), new KeyAuthenticator.AuthenticateHandler() {
+            @Override
+            public void handleAuthenticated() {
+              try {
+                authenticatedCipherHandler.onAuthenticated(cipher);
+              } catch (Throwable e) {
+                authenticatedCipherHandler.onError(e);
+              }
+            }
+
+            @Override
+            public void handleCancel() {
+              authenticatedCipherHandler.onCancel();
+            }
+
+            @Override
+            public void handleError(Throwable e) {
               authenticatedCipherHandler.onError(e);
+            }
+          });
+
+          break;
+
+        case LOCK_SCREEN:
+          try {
+            cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
+            authenticatedCipherHandler.onAuthenticated(cipher); /* If the user unlocked the screen within the timeout limit, then this is already authenticated. */
+
+          } catch (InvalidKeyException e) {
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && e instanceof KeyPermanentlyInvalidatedException) {
+              authenticatedCipherHandler.onError(e);
+
+            } else {
+
+              keyAuthenticator.authenticateWithLockScreen(new KeyAuthenticator.AuthenticateHandler() {
+                @Override
+                public void handleAuthenticated() {
+                  try {
+                    getCipher(context, identifier, protection, keyAuthenticator, cipherGetter, authenticatedCipherHandler);
+
+                  } catch (Throwable e) {
+                    authenticatedCipherHandler.onError(e);
+                  }
+                }
+
+                @Override
+                public void handleCancel() {
+                  authenticatedCipherHandler.onCancel();
+                }
+
+                @Override
+                public void handleError(Throwable e) {
+                  authenticatedCipherHandler.onError(e);
+                }
+              });
             }
           }
 
-          @Override
-          public void handleCancel() {
-            authenticatedCipherHandler.onCancel();
-          }
+          break;
 
-          @Override
-          public void handleError(Throwable e) {
-            authenticatedCipherHandler.onError(e);
-          }
-        });
+        case PASSWORD:
+          keyAuthenticator.getPassword(new KeyAuthenticator.PasswordHandler() {
 
-        break;
+            @Override
+            public void handlePassword(String password) throws UnrecoverableKeyException {
+              try {
+                authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, password)));
+              } catch (Throwable e) {
 
-      case LOCK_SCREEN:
-        try {
-          cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
-          authenticatedCipherHandler.onAuthenticated(cipher); /* If the user unlocked the screen within the timeout limit, then this is already authenticated. */
-
-        } catch (InvalidKeyException e) {
-
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && e instanceof KeyPermanentlyInvalidatedException) {
-            authenticatedCipherHandler.onError(e);
-
-          } else {
-
-            keyAuthenticator.authenticateWithLockScreen(new KeyAuthenticator.AuthenticateHandler() {
-              @Override
-              public void handleAuthenticated() {
-                try {
-                  getCipher(context, identifier, protection, keyAuthenticator, cipherGetter, authenticatedCipherHandler);
-
-                } catch (Throwable e) {
+                if (e instanceof UnrecoverableKeyException) {
+                  throw (UnrecoverableKeyException) e;
+                } else {
                   authenticatedCipherHandler.onError(e);
                 }
               }
-
-              @Override
-              public void handleCancel() {
-                authenticatedCipherHandler.onCancel();
-              }
-
-              @Override
-              public void handleError(Throwable e) {
-                authenticatedCipherHandler.onError(e);
-              }
-            });
-          }
-        }
-
-        break;
-
-      case PASSWORD:
-        keyAuthenticator.getPassword(new KeyAuthenticator.PasswordHandler() {
-
-          @Override
-          public void handlePassword(String password) throws UnrecoverableKeyException {
-            try {
-              authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, password)));
-            } catch (Throwable e) {
-
-              if (e instanceof UnrecoverableKeyException) {
-                throw (UnrecoverableKeyException) e;
-              } else {
-                authenticatedCipherHandler.onError(e);
-              }
             }
-          }
 
-          @Override
-          public void handleCancel() {
-            authenticatedCipherHandler.onCancel();
-          }
+            @Override
+            public void handleCancel() {
+              authenticatedCipherHandler.onCancel();
+            }
 
-          @Override
-          public void handleError(Throwable e) {
-            authenticatedCipherHandler.onError(e);
-          }
-        });
+            @Override
+            public void handleError(Throwable e) {
+              authenticatedCipherHandler.onError(e);
+            }
+          });
 
-        break;
+          break;
 
-      default:
-        throw new IllegalStateException("Unhandled key protection: " + protection.authenticationType().toString());
+        default:
+          throw new IllegalStateException("Unhandled key protection: " + protection.authenticationType().toString());
+      }
+    } catch (Exception e) {
+      authenticatedCipherHandler.onError(e);
     }
   }
 
-  static void removeSecretKey(Context context, String identifier) throws Throwable {
+  static void removeSecretKey(Context context, String identifier) {
     FSKSWrapper.removeSecretKey(context, identifier);
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
       AKSWrapper.removeSecretKey(identifier);

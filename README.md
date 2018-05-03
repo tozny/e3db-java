@@ -351,6 +351,8 @@ filters include:
 - `setTypes`: Filter to records that match the given types
 - `setIncludeAllWriters`: Set this flag to include records that have been shared
   with you, defaults to `false`
+  
+> While the Java SDK supports _writing_ plaintext meta with records, the query interface does not support filtering on that meta information at this time.
 
 ## Pagination
 

@@ -1,6 +1,5 @@
 package com.tozny.e3db;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -176,9 +175,9 @@ public class ClientTest {
       @Override
       public void act(CountDownLatch wait) throws Exception {
         clientInfo.client.getReaderKey(clientInfo.client.clientId(), clientInfo.client.clientId(), type,
-          new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+          new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
             @Override
-            public void handle(Result<EAKInfo> r) {
+            public void handle(Result<LocalEAKInfo> r) {
               if(r.isError())
                 throw new Error(r.asError().other());
 
@@ -192,9 +191,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientInfo.client.createWriterKey(type, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+        clientInfo.client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> r) {
+          public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
               throw new Error(r.asError().other());
 
@@ -423,7 +422,7 @@ public class ClientTest {
             final Record record = r.asValue();
             Map<String, String> fields = new HashMap<>();
             fields.put(FIELD, updatedMessage);
-            client.update(record.meta(), new RecordData(fields), null, new ResultHandler<Record>() {
+            client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
                 if(! r.isError())
@@ -480,7 +479,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), plain, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), plain, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -518,7 +517,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), null, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), null, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -550,7 +549,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(recordRef.get().meta(), new RecordData(recordRef.get().data()), new HashMap<String, String>(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), new HashMap<String, String>(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -855,9 +854,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(type, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> r) {
+          public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
               throw new Error(r.asError().other());
 
@@ -881,7 +880,7 @@ public class ClientTest {
     assertEquals("Types not equal", encrypted.meta().type(), type);
     assertEquals("Plain meta not equal", mapper.writeValueAsString(encrypted.meta().plain()), mapper.writeValueAsString(plain));
 
-    Record decrypted = client.decryptExisting(encrypted, eakInfo);
+    LocalRecord decrypted = client.decryptExisting(encrypted, eakInfo);
     assertEquals("Writer ID not equal to client ID", decrypted.meta().writerId(), client.clientId());
     assertEquals("User ID not equal to client ID", decrypted.meta().userId(), client.clientId());
     assertEquals("Types not equal", decrypted.meta().type(), type);
@@ -912,9 +911,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.createWriterKey(type, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+        client1.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> r) {
+          public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
               throw new Error(r.asError().other());
 
@@ -943,9 +942,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.getReaderKey(client1.clientId(), client1.clientId(), type, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+        client2.getReaderKey(client1.clientId(), client1.clientId(), type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> r) {
+          public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
               throw new Error(r.asError().other());
             
@@ -958,7 +957,7 @@ public class ClientTest {
     EAKInfo readerKey = readerKeyRef.get();
     assertNotNull("EAK not returned", readerKey);
     
-    Record decrypted = client2.decryptExisting(encrypted, writerKey);
+    LocalRecord decrypted = client2.decryptExisting(encrypted, writerKey);
     assertEquals("Writer ID not equal to client ID", decrypted.meta().writerId(), client1.clientId());
     assertEquals("User ID not equal to client ID", decrypted.meta().userId(), client1.clientId());
     assertEquals("Types not equal", decrypted.meta().type(), type);
@@ -978,9 +977,9 @@ public class ClientTest {
       final Map<String, String> plain = new HashMap<>();
       plain.put("frabjous", "Filibuster vigilantly");
 
-      Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+      LocalRecord local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
-      SignedDocument<Record> sign = client.sign(local);
+      SignedDocument<LocalRecord> sign = client.sign(local);
       assertNotNull("Signed document is null", sign);
       assertNotNull("Signature absent", sign.signature());
       assertFalse("Signature empty", sign.signature().trim().length() == 0);
@@ -990,11 +989,11 @@ public class ClientTest {
     {
       final Map<String, String> plain = new HashMap<>();
 
-      Record local1 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
-      Record local2 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+      LocalRecord local1 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
+      LocalRecord local2 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
-      SignedDocument<Record> sign1 = client.sign(local1);
-      SignedDocument<Record> sign2 = client.sign(local2);
+      SignedDocument<LocalRecord> sign1 = client.sign(local1);
+      SignedDocument<LocalRecord> sign2 = client.sign(local2);
       assertTrue("Unable to verify document", client.verify(sign1, clientInfo1.clientConfig.publicSigningKey));
       assertTrue("Unable to verify document", client.verify(sign2, clientInfo1.clientConfig.publicSigningKey));
       assertEquals("Absent plain and empty plain should give the same signature.", sign1.signature(), sign2.signature());
@@ -1007,7 +1006,7 @@ public class ClientTest {
     final Client client = clientInfo1.client;
     final JsonNode nodeDoc = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
     final JsonNode doc = nodeDoc.get("doc");
-    final EncryptedRecord record = EncryptedRecord.decode(mapper.writeValueAsString(doc));
+    final EncryptedRecord record = LocalEncryptedRecord.decode(mapper.writeValueAsString(doc));
 
     assertTrue("Unable to verify document.", client.verify(new SignedDocument<EncryptedRecord>() {
       @Override
@@ -1033,27 +1032,27 @@ public class ClientTest {
     final Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
 
-    final Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+    final LocalRecord local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(recordType, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
+        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> result) {
+          public void handle(Result<LocalEAKInfo> result) {
             EAKInfo eak = result.asValue();
             final EncryptedRecord encrypted = client.encryptExisting(local, eak);
 
             assertNotNull(encrypted.signature());
 
-            SignedDocument<Record> signed = new SignedDocument<Record>() {
+            SignedDocument<LocalRecord> signed = new SignedDocument<LocalRecord>() {
               @Override
               public String signature() {
                 return encrypted.signature();
               }
 
               @Override
-              public Record document() {
+              public LocalRecord document() {
                 return local;
               }
             };
@@ -1075,9 +1074,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> result) {
+          public void handle(Result<LocalEAKInfo> result) {
             if(result.isError())
               throw new Error(result.asError().other());
 
@@ -1099,9 +1098,9 @@ public class ClientTest {
 
     // encrypt, encode, decode
     {
-      EncryptedRecord encrypted = client.encryptExisting(unencrypted, eak.get());
+      LocalEncryptedRecord encrypted = client.encryptExisting(unencrypted, eak.get());
       String encodedEncrypted = encrypted.encode();
-      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      EncryptedRecord decodedEncrypted = LocalEncryptedRecord.decode(encodedEncrypted);
       assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedEncrypted.meta().plain());
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
@@ -1111,9 +1110,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encrypted = client.encryptExisting(unencryptedWithPlain, eak.get());
+      LocalEncryptedRecord encrypted = client.encryptExisting(unencryptedWithPlain, eak.get());
       String encodedEncrypted = encrypted.encode();
-      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      EncryptedRecord decodedEncrypted = LocalEncryptedRecord.decode(encodedEncrypted);
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
       assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedEncrypted.meta().writerId());
@@ -1123,9 +1122,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encrypted = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
+      LocalEncryptedRecord encrypted = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
       String encodedEncrypted = encrypted.encode();
-      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      EncryptedRecord decodedEncrypted = LocalEncryptedRecord.decode(encodedEncrypted);
       assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedEncrypted.meta().plain().size());
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedEncrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedEncrypted.meta().userId());
@@ -1136,9 +1135,9 @@ public class ClientTest {
 
     // encrypt, encode, decode, decrypt
     {
-      EncryptedRecord encryptedRecord = client.encryptExisting(unencrypted, eak.get());
+      LocalEncryptedRecord encryptedRecord = client.encryptExisting(unencrypted, eak.get());
       String encodedEncrypted = encryptedRecord.encode();
-      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      EncryptedRecord decodedEncrypted = LocalEncryptedRecord.decode(encodedEncrypted);
       LocalRecord decodedDecrypted = client.decryptExisting(decodedEncrypted, eak.get());
       assertNull("Plain should be absent.", decodedDecrypted.meta().plain());
       assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
@@ -1148,9 +1147,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithPlain, eak.get());
+      LocalEncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithPlain, eak.get());
       String encodedEncrypted = encryptedRecord.encode();
-      EncryptedRecord decodedEncrypted = EncryptedRecord.decode(encodedEncrypted);
+      EncryptedRecord decodedEncrypted = LocalEncryptedRecord.decode(encodedEncrypted);
       LocalRecord decodedDecrypted = client.decryptExisting(decodedEncrypted, eak.get());
       assertEquals("Plain should be equal. (" + encodedEncrypted + ")", unencryptedWithPlain.meta().plain().get("hello"), decodedDecrypted.meta().plain().get("hello"));
       assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
@@ -1161,9 +1160,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
+      LocalEncryptedRecord encryptedRecord = client.encryptExisting(unencryptedWithEmptyPlain, eak.get());
       String encodedEncrypted = encryptedRecord.encode();
-      LocalRecord decodedDecrypted = client.decryptExisting(EncryptedRecord.decode(encodedEncrypted), eak.get());
+      LocalRecord decodedDecrypted = client.decryptExisting(LocalEncryptedRecord.decode(encodedEncrypted), eak.get());
       assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedDecrypted.meta().plain().size());
       assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
@@ -1173,7 +1172,7 @@ public class ClientTest {
 
     // badly encoded
     try {
-      EncryptedRecord.decode("foo");
+      LocalEncryptedRecord.decode("foo");
       fail("Should not decode.");
     }
     catch(IOException ex) {
@@ -1181,7 +1180,7 @@ public class ClientTest {
     }
 
     try {
-      EncryptedRecord.decode(client.encryptExisting(unencrypted, eak.get()).encode().substring(1));
+      LocalEncryptedRecord.decode(client.encryptExisting(unencrypted, eak.get()).encode().substring(1));
       fail("Should not decode.");
     }
     catch(IOException ex) {
@@ -1220,9 +1219,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> result) {
+          public void handle(Result<LocalEAKInfo> result) {
             if(result.isError())
               throw new Error(result.asError().other());
 
@@ -1248,9 +1247,9 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<EAKInfo>() {
+        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
-          public void handle(Result<EAKInfo> result) {
+          public void handle(Result<LocalEAKInfo> result) {
             if(result.isError())
               throw new Error(result.asError().other());
 
@@ -1271,9 +1270,9 @@ public class ClientTest {
     // client1: encrypt, encode
     // client2: decode, decrypt
     {
-      EncryptedRecord encrypted = client1.get().encryptExisting(unencrypted, writerEak.get());
+      LocalEncryptedRecord encrypted = client1.get().encryptExisting(unencrypted, writerEak.get());
       String encodedEncrypted = encrypted.encode();
-      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(LocalEncryptedRecord.decode(encodedEncrypted), readerEak.get());
       assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedDecrypted.meta().plain());
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
@@ -1282,9 +1281,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithPlain, writerEak.get());
+      LocalEncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithPlain, writerEak.get());
       String encodedEncrypted = encrypted.encode();
-      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(LocalEncryptedRecord.decode(encodedEncrypted), readerEak.get());
       assertEquals("Plain should be equal. (" + encodedEncrypted + ")", unencryptedWithPlain.meta().plain().get("hello"), decodedDecrypted.meta().plain().get("hello"));
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
@@ -1293,9 +1292,9 @@ public class ClientTest {
     }
 
     {
-      EncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithEmptyPlain, writerEak.get());
+      LocalEncryptedRecord encrypted = client1.get().encryptExisting(unencryptedWithEmptyPlain, writerEak.get());
       String encodedEncrypted = encrypted.encode();
-      LocalRecord decodedDecrypted = client2.get().decryptExisting(EncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(LocalEncryptedRecord.decode(encodedEncrypted), readerEak.get());
       assertEquals("Plain should be empty but present. (" + encodedEncrypted + ")", 0, decodedDecrypted.meta().plain().size());
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());

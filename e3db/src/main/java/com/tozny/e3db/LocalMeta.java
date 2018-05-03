@@ -1,27 +1,12 @@
-/*
- * TOZNY NON-COMMERCIAL LICENSE
- *
- * Tozny dual licenses this product. For commercial use, please contact
- * info@tozny.com. For non-commercial use, the contents of this file are
- * subject to the TOZNY NON-COMMERCIAL LICENSE (the "License") which
- * permits use of the software only by government agencies, schools,
- * universities, non-profit organizations or individuals on projects that
- * do not receive external funding other than government research grants
- * and contracts.  Any other use requires a commercial license. You may
- * not use this file except in compliance with the License. You may obtain
- * a copy of the License at https://tozny.com/legal/non-commercial-license.
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
- * License for the specific language governing rights and limitations under
- * the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
- * All rights reserved.
- *
- */
-
 package com.tozny.e3db;
 
-import java.util.Date;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static com.tozny.e3db.Checks.checkNotNull;
@@ -29,7 +14,14 @@ import static com.tozny.e3db.Checks.checkNotNull;
 /**
  * Represents metadata about a record.
  */
-public class LocalMeta implements RecordMeta {
+public class LocalMeta implements ClientMeta {
+  private static final ObjectMapper mapper;
+
+  static {
+    mapper = new ObjectMapper();
+    mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+  }
+
   private final UUID writerId;
   private final UUID userId;
   private final String type;
@@ -55,11 +47,6 @@ public class LocalMeta implements RecordMeta {
   }
 
   @Override
-  public UUID recordId() {
-    throw new IllegalStateException("recordId not defined");
-  }
-
-  @Override
   public UUID writerId() {
     return writerId;
   }
@@ -70,26 +57,28 @@ public class LocalMeta implements RecordMeta {
   }
 
   @Override
-  public Date created() {
-    throw new IllegalStateException("created not defined");
-  }
-
-  @Override
-  public Date lastModified() {
-    throw new IllegalStateException("lastModified not defined");
-  }
-
-  @Override
-  public String version() {
-    throw new IllegalStateException("version not defined");
-  }
-
-  @Override
   public String type() {
     return type;
   }
   @Override
   public Map<String, String> plain() {
     return plain;
+  }
+
+  @Override
+  public String toSerialized() {
+    try {
+      SortedMap<String, Object> clientMeta = new TreeMap<>();
+      clientMeta.put("writer_id", writerId().toString());
+      clientMeta.put("user_id", userId().toString());
+      clientMeta.put("type", type());
+      clientMeta.put("plain", plain() == null ?
+                                  new TreeMap<String, String>() :
+                                  new TreeMap<>(plain()));
+
+      return mapper.writeValueAsString(clientMeta);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

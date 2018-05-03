@@ -284,9 +284,9 @@ lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
 lyric.put("artist", "They Might Be Giants");
 
-String recordType = "lyric";
+String type = "lyric";
 
-client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>() {
+client.write(type, new RecordData(lyric), null, new ResultHandler<Record>() {
     @Override
     public void handle(Result<Record> r) {
       if(! r.isError()) {
@@ -473,15 +473,15 @@ lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
 lyric.put("artist", "They Might Be Giants");
 
-String recordType = "lyric";
-client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
+String type = "lyric";
+client.createWriterKey(type, new ResultHandler<EAKInfo>() {
     @Override
     public void handle(Result<EAKInfo> r) {
         if(r.isError())
             throw new Error(r.asError().other());
 
         EAKInfo key = r.asValue();
-        Record encrypted = client1.encryptRecord(recordType, new RecordData(lyric), null, key);
+        Record encrypted = client1.encryptRecord(type, new RecordData(lyric), null, key);
         // Write record to storage in suitable format.
     }
 });
@@ -508,9 +508,9 @@ then decrypt any locally encrypted records as follows:
 ```java
 Record encrypted = // read encrypted record from local storage
 UUID writerID = // ID of writer that produced record
-String recordType = "lyric";
+String type = "lyric";
 
-reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<EAKInfo>() {
+reader.getReaderKey(writerID, writerID, reader.clientId(), type, new ResultHandler<EAKInfo>() {
     @Override
     public void handle(Result<EAKInfo> r) {
         if(r.isError())
@@ -537,7 +537,7 @@ be confident in:
 To create a signature, use the `sign` method:
 
 ```java
-final String recordType = "lyric";
+final String type = "lyric";
 final Map<String, String> plain = new HashMap<>();
 plain.put("frabjous", "Filibuster vigilantly");
 final Map<String, String> data = new HashMap<>();
@@ -545,7 +545,7 @@ data.put("Jabberwock", "Not to put too fine a point on it");
 UUID writerId = client.clientId();
 UUID userId = client.clientId();
 
-Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
+Record local = new LocalRecord(data, new LocalMeta(writerId, userId, type, plain));
 SignedDocument<Record> signed = client.sign(local);
 ```
 

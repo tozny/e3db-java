@@ -20,7 +20,6 @@
 
 package com.tozny.e3db;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -32,7 +31,7 @@ import static com.tozny.e3db.Checks.checkNotNull;
 /**
  * Represents an E3DB record.
  */
-public class LocalRecord implements Record {
+public class LocalRecord implements Signable {
   private static final ObjectMapper mapper;
 
   static {
@@ -41,7 +40,7 @@ public class LocalRecord implements Record {
   }
 
   private final Map<String, String> data;
-  private final RecordMeta meta;
+  private final ClientMeta meta;
 
   /**
    * Creates a representation of a Record suitable for signing or storing locally.
@@ -49,7 +48,7 @@ public class LocalRecord implements Record {
    * @param data Data contained in the record. Cannot be {@code null}.
    * @param meta Data about the record. Cannot be {@code null}. Consider using {@link LocalMeta}.
    */
-  public LocalRecord(Map<String, String> data, RecordMeta meta) {
+  public LocalRecord(Map<String, String> data, ClientMeta meta) {
     checkNotNull(data, "data");
     checkNotNull(meta, "meta");
 
@@ -57,12 +56,10 @@ public class LocalRecord implements Record {
     this.meta = meta;
   }
 
-  @Override
-  public RecordMeta meta() {
+  public ClientMeta meta() {
     return meta;
   }
 
-  @Override
   public Map<String, String> data() {
     return data;
   }
@@ -70,16 +67,8 @@ public class LocalRecord implements Record {
   @Override
   public String toSerialized() {
     try {
-      SortedMap<String, Object> clientMeta = new TreeMap<>();
-      clientMeta.put("writer_id", meta().writerId().toString());
-      clientMeta.put("user_id", meta().userId().toString());
-      clientMeta.put("type", meta().type().toString());
-      Map<String, String> plain = meta().plain();
-      clientMeta.put("plain", meta().plain() == null ?
-                                  new TreeMap<String, String>() :
-                                  new TreeMap<>(plain));
 
-      return mapper.writeValueAsString(clientMeta) + mapper.writeValueAsString(data());
+      return meta.toSerialized() + mapper.writeValueAsString(data());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

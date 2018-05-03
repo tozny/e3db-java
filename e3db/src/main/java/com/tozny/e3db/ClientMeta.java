@@ -21,25 +21,43 @@
 package com.tozny.e3db;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * An individual, decrypted E3DB record.
+ * Immutable information about a locally stored record (a subset
+ * of {@link RecordMeta}.
+ *
+ * <p>Consider using the {@link LocalMeta} implementation.
  */
-public interface Record extends Signable {
+public interface ClientMeta extends Signable {
   /**
-   * Information about the record.
+   * ID of client that wrote the record.
    *
-   * Includes items such as writer ({@link RecordMeta#writerId()}),
-   * creation date ({@link RecordMeta#created()}, type ({@link RecordMeta#type}), etc.
-   *
-   * @return meta.
+   * @return writerId.
    */
-  RecordMeta meta();
+  UUID writerId();
 
   /**
-   * Decrypted field names and values.
+   * ID of user associated with the record.
    *
-   * @return data.
+   * This field is always equal to writer ID when records are written by this
+   * client.
+   *
+   * @return userId.
    */
-  Map<String, String> data();
+  UUID userId();
+
+  /**
+   * The type given to the record.
+   *
+   * @return type.
+   */
+  String type();
+
+  /**
+   * Unencrypted, metadata values stored with the record. May be {@code null}.
+   *
+   * @return plain.
+   */
+  Map<String, String> plain();
 }

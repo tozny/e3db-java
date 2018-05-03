@@ -875,7 +875,7 @@ public class ClientTest {
     Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
 
-    Record encrypted = client.encryptRecord(type, new RecordData(data), plain, eakInfo);
+    EncryptedRecord encrypted = client.encryptRecord(type, new RecordData(data), plain, eakInfo);
     assertEquals("Writer ID not equal to client ID", encrypted.meta().writerId(), client.clientId());
     assertEquals("User ID not equal to client ID", encrypted.meta().userId(), client.clientId());
     assertEquals("Types not equal", encrypted.meta().type(), type);
@@ -932,7 +932,7 @@ public class ClientTest {
     Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
 
-    Record encrypted = client1.encryptRecord(type, new RecordData(data), plain, writerKey);
+    EncryptedRecord encrypted = client1.encryptRecord(type, new RecordData(data), plain, writerKey);
     assertEquals("Writer ID not equal to client ID", encrypted.meta().writerId(), client1.clientId());
     assertEquals("User ID not equal to client ID", encrypted.meta().userId(), client1.clientId());
     assertEquals("Types not equal", encrypted.meta().type(), type);
@@ -972,18 +972,55 @@ public class ClientTest {
     CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "lyric";
-    final Map<String, String> plain = new HashMap<>();
-    plain.put("frabjous", "Filibuster vigilantly");
     final Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
+    {
+      final Map<String, String> plain = new HashMap<>();
+      plain.put("frabjous", "Filibuster vigilantly");
 
-    Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+      Record local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
-    SignedDocument<Record> sign = client.sign(local);
-    assertNotNull("Signed document is null", sign);
-    assertNotNull("Signature absent", sign.signature());
-    assertFalse("Signature empty", sign.signature().trim().length() == 0);
-    assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
+      SignedDocument<Record> sign = client.sign(local);
+      assertNotNull("Signed document is null", sign);
+      assertNotNull("Signature absent", sign.signature());
+      assertFalse("Signature empty", sign.signature().trim().length() == 0);
+      assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
+    }
+
+    {
+      final Map<String, String> plain = new HashMap<>();
+
+      Record local1 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
+      Record local2 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+
+      SignedDocument<Record> sign1 = client.sign(local1);
+      SignedDocument<Record> sign2 = client.sign(local2);
+      assertTrue("Unable to verify document", client.verify(sign1, clientInfo1.clientConfig.publicSigningKey));
+      assertTrue("Unable to verify document", client.verify(sign2, clientInfo1.clientConfig.publicSigningKey));
+      assertEquals("Absent plain and empty plain should give the same signature.", sign1.signature(), sign2.signature());
+    }
+  }
+
+  @Test
+  public void testNode() throws IOException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final JsonNode nodeDoc = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
+    final JsonNode doc = nodeDoc.get("doc");
+    final EncryptedRecord record = EncryptedRecord.decode(mapper.writeValueAsString(doc));
+
+    assertTrue("Unable to verify document.", client.verify(new SignedDocument<EncryptedRecord>() {
+      @Override
+      public String signature() {
+        return nodeDoc.get("sig").asText();
+      }
+
+      @Override
+      public EncryptedRecord document() {
+        return record;
+      }
+    }, doc.get("meta").get("plain").get("client_pub_sig_key").asText()));
+
   }
 
   @Test
@@ -1005,7 +1042,7 @@ public class ClientTest {
           @Override
           public void handle(Result<EAKInfo> result) {
             EAKInfo eak = result.asValue();
-            final Record encrypted = client.encryptExisting(local, eak);
+            final EncryptedRecord encrypted = client.encryptExisting(local, eak);
 
             assertNotNull(encrypted.signature());
 
@@ -1022,44 +1059,6 @@ public class ClientTest {
             };
 
             client.verify(signed, clientInfo1.clientConfig.publicSigningKey);
-          }
-        }));
-      }
-    });
-  }
-
-  @Test
-  public void testFailedEncryptSigning() throws IOException {
-    final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
-    final String recordType = "signedLyric";
-    final Map<String, String> plain = new HashMap<>();
-    plain.put("frabjous", "Filibuster vigilantly");
-    final Map<String, String> data = new HashMap<>();
-    data.put("Jabberwock", "Not to put too fine a point on it");
-
-    final RecordMeta localMeta = new LocalMeta(client.clientId(), client.clientId(), recordType, plain);
-    final Record local = new LocalRecord(data, localMeta);
-
-    withTimeout(new AsyncAction() {
-      @Override
-      public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(recordType, new ResultWithWaiting<EAKInfo>(wait, new ResultHandler<EAKInfo>() {
-          @Override
-          public void handle(Result<EAKInfo> result) {
-            if(result.isError())
-              throw new Error(result.asError().other());
-
-            EAKInfo eak = result.asValue();
-            Record encrypted = client.encryptExisting(local, eak);
-            Record unsigned = new LocalRecord(encrypted.data(), localMeta);
-
-            try {
-              client.decryptExisting(unsigned, eak);
-              fail();
-            } catch (E3DBException eve) {
-              assertTrue("Expected verification exception but got: " + eve.getClass().getCanonicalName() + "; " + eve.getMessage(), eve instanceof E3DBVerificationException );
-            }
           }
         }));
       }
@@ -1145,7 +1144,6 @@ public class ClientTest {
       assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
       assertEquals("writerId not equal.", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
-      assertEquals("Signature not equal.", encryptedRecord.signature(), decodedDecrypted.signature());
       assertEquals("Data not decrypted", data.get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
 
@@ -1170,7 +1168,6 @@ public class ClientTest {
       assertEquals("type not equal.", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal.", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
       assertEquals("writerId not equal.", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
-      assertEquals("Signature not equal.", encryptedRecord.signature(), decodedDecrypted.signature());
       assertEquals("Data not decrypted", data.get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
 
@@ -1281,7 +1278,6 @@ public class ClientTest {
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
       assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
-      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
       assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
 
@@ -1293,7 +1289,6 @@ public class ClientTest {
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
       assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
-      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
       assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
 
@@ -1305,7 +1300,6 @@ public class ClientTest {
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
       assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
-      assertEquals("Signature not equal. (" + encodedEncrypted + ")", encrypted.signature(), decodedDecrypted.signature());
       assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
   }

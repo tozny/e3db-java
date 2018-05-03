@@ -1592,22 +1592,22 @@ public class  Client {
    * public signing key, or when verification of the signature fails.
    * @return The decrypted record.
    */
-  public LocalRecord decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
+  public <T extends Record> LocalRecord decryptExisting(SignedDocument<T> record, EAKInfo eakInfo) throws E3DBException {
     if(record.signature() == null)
-      throw new E3DBVerificationException(record.meta(), "Record must have a signature in order to decrypt.");
+      throw new E3DBVerificationException(record.document().meta(), "Record must have a signature in order to decrypt.");
 
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
       throw new IllegalStateException("eakInfo cannot be used to verify the record as it has no public signing key");
 
-    byte[] ak = getCachedAccessKey(record, eakInfo);
+    byte[] ak = getCachedAccessKey(record.document(), eakInfo);
 
-    Map<String, String> plainRecord = decryptObject(ak, record.data());
+    Map<String, String> plainRecord = decryptObject(ak, record.document().data());
 
-    if(!verify(new SD<Record>(new LocalRecord(plainRecord, record.meta()),
+    if(!verify(new SD<Record>(new LocalRecord(plainRecord, record.document().meta()),
         record.signature()), eakInfo.getSignerSigningKey()))
-      throw new E3DBVerificationException(record.meta());
+      throw new E3DBVerificationException(record.document().meta());
 
-    return new LocalRecord(plainRecord, record.meta(), record.signature());
+    return new LocalRecord(plainRecord, record.document().meta());
   }
 
   /**

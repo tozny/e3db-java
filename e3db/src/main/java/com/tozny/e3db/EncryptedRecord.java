@@ -17,7 +17,7 @@ import static com.tozny.e3db.Checks.checkNotNull;
  * <p>Usually produced by calling  {@link Client#encryptRecord(String, RecordData, Map, EAKInfo)}
  * or {@link Client#encryptExisting(Record, EAKInfo)}.
  */
-public class EncryptedRecord implements Record {
+public class EncryptedRecord implements Record, SignedDocument<EncryptedRecord> {
   private final Map<String, String> data;
   private final RecordMeta meta;
   private final String signature;
@@ -86,11 +86,11 @@ public class EncryptedRecord implements Record {
     checkNotNull(record, "record");
 
     try {
-      HashMap<String, String> meta = new HashMap<>();
+      HashMap<String, Object> meta = new HashMap<>();
       meta.put("type", record.meta().type());
 
       if (record.meta().plain() != null)
-        meta.put("plain", mapper.writeValueAsString(record.meta().plain()));
+        meta.put("plain", record.meta().plain());
 
       meta.put("user_id", record.meta().userId().toString());
       meta.put("writer_id", record.meta().writerId().toString());
@@ -129,7 +129,7 @@ public class EncryptedRecord implements Record {
 
     try {
       Map<String, String> dataMap = getMap(data);
-      Map<String, String> plain = meta.get("plain") != null ? getMap(mapper.readTree(meta.get("plain").asText())) : null;
+      Map<String, String> plain = meta.get("plain") != null ? getMap(meta.get("plain")) : null;
       LocalMeta localMeta = new LocalMeta(UUID.fromString(meta.get("writer_id").asText()),
           UUID.fromString(meta.get("user_id").asText()),
           meta.get("type").asText(),
@@ -160,11 +160,29 @@ public class EncryptedRecord implements Record {
 
   @Override
   public String toSerialized() {
-    return LocalRecord.toSerialized(this);
+    try {
+      SortedMap<String, Object> clientMeta = new TreeMap<>();
+      clientMeta.put("writer_id", meta().writerId().toString());
+      clientMeta.put("user_id", meta().userId().toString());
+      clientMeta.put("type", meta().type().toString());
+      Map<String, String> plain = meta().plain();
+      clientMeta.put("plain", meta().plain() == null ?
+                                  new TreeMap<String, String>() :
+                                  new TreeMap<>(plain));
+
+      SortedMap<String, Object> serializable = new TreeMap<>();
+      serializable.put("data", data());
+      serializable.put("meta", clientMeta);
+      serializable.put("rec_sig", signature());
+
+      return mapper.writeValueAsString(serializable);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
-  public Record document() {
+  public EncryptedRecord document() {
     return this;
   }
 }

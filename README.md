@@ -133,7 +133,7 @@ authenticated again using the stored credentials.
 
 ```java
 import com.tozny.e3db.*;
-...
+// ...
 
 String token = "<registration token>";
 String host = "https://api.e3db.com";
@@ -142,11 +142,12 @@ Client.register(token, "client1", host, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {
+      Config info = r.asValue();
       // write credentials to secure storage ...
     }
     else {
       // throw to indicate registration error
-      throw new RuntimeException(r.asError().other())
+      throw new RuntimeException(r.asError().other());
     }
   }
 });
@@ -175,7 +176,7 @@ and protected by requiring the user to enter their lock screen PIN as follows:
 ```java
 import com.tozny.e3db.*;
 import com.tozny.e3db.android.*;
-...
+// ...
 
 Activity context = ...; // application context
 
@@ -184,7 +185,7 @@ Client.register(token, "client1", host, new ResultHandler<Config>() {
   public void handle(Result<Config> r) {
     if(! r.isError()) {
         Config mConfig = r.asValue();
-        Config.saveConfigSecurely(new AndroidConfigStore(context,  KeyAuthentication.withLockScreen(), KeyAuthenticator.defaultAuthenticator(context, "")), mConfig.json(), new ConfigStore.SaveHandler() {
+        Config.saveConfigSecurely(new AndroidConfigStore(context, KeyAuthentication.withLockScreen(), KeyAuthenticator.defaultAuthenticator(context, "")), mConfig.json(), new ConfigStore.SaveHandler() {
                 @Override
                 public void saveConfigDidSucceed() {
                     // configuration successfully saved
@@ -201,7 +202,7 @@ Client.register(token, "client1", host, new ResultHandler<Config>() {
     }
     else {
       // throw to indicate registration error
-      throw new RuntimeException(r.asError().other())
+      throw new RuntimeException(r.asError().other());
     }
   }
 });
@@ -264,7 +265,6 @@ you can use the `ClientBuilder` class to create an authenticated client
 that can interact with E3DB:
 
 ```java
-
 String storedCredentials = ...; // Read from secure storage
 Client client = new ClientBuilder()
   .fromConfig(Config.fromJson(storedCredentials))
@@ -279,6 +279,8 @@ Records are represented as a `Map` with `String`-typed keys and
 `String`-typed values. 
 
 ```java
+Client client = ...; // Get a client instance
+
 Map<String, String> lyric = new HashMap<>();
 lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
@@ -293,7 +295,7 @@ client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>(
         // record written successfully
         Record record = r.asValue();
         // Log or print record ID, e.g.:
-        System.out.println("Record ID: " + record.recordId());
+        System.out.println("Record ID: " + record.meta().recordId());
       }
       else {
         // an error occurred
@@ -324,6 +326,8 @@ QueryParams params = new QueryParamsBuilder()
   .setIncludeData(true)
   .setCount(50)
   .build();
+
+Client client = ...; // Get a client instance
 
 client.query(params, new ResultHandler<QueryResponse>() {
    @Override
@@ -362,6 +366,8 @@ object will cause E3DB to return records that come "after" that value. For examp
 snippet will loop through all "lyric" records in 10-row increments:
 
 ```java
+Client client = ...; // Get a client instance
+
 // Create a parameter builder that we can re-use to
 // call the `setAfter()` method over and over, for 
 // pagination.
@@ -418,6 +424,9 @@ Records are shared by `type`; the below shows sharing "lyric" records
 with a recipient represented by the variable `readerId`:
 
 ```java
+Client client = ...; // Get a client instance
+UUID readerId = ...; // Get the ID of the reader with whom we share
+
 client.share("lyric", readerId, new ResultHandler<Void>() {
   @Override
   public void handle(Result<Void> r) {
@@ -470,6 +479,8 @@ of those records has given access to the calling client through the `share` oper
 Here is an example of encrypting a document locally:
 
 ```java
+Client client = ...; // Get a client instance
+
 Map<String, String> lyric = new HashMap<>();
 lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
@@ -483,7 +494,7 @@ client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
             throw new Error(r.asError().other());
 
         EAKInfo key = r.asValue();
-        Record encrypted = client1.encryptRecord(recordType, new RecordData(lyric), null, key);
+        Record encrypted = client.encryptRecord(recordType, new RecordData(lyric), null, key);
         // Write record to storage in suitable format.
     }
 });
@@ -493,8 +504,8 @@ client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
 The client can decrypt the given record as follows:
 
 ```java
-Record encrypted = // read encrypted record from local storage
-EAKInfo writerKey = // read stored EAKInfo instance from local storage
+Record encrypted = ...; // read encrypted record from local storage
+EAKInfo writerKey = ...; // read stored EAKInfo instance from local storage
 
 Record decrypted = client.decryptExisting(encrypted, writerKey);
 ```
@@ -508,8 +519,10 @@ The 'writer' must first share records with a 'reader', using the `share` method.
 then decrypt any locally encrypted records as follows:
 
 ```java
-Record encrypted = // read encrypted record from local storage
-UUID writerID = // ID of writer that produced record
+Client reader = ...; // Get a client instance
+
+Record encrypted = ...; // read encrypted record from local storage
+UUID writerID = ...; // ID of writer that produced record
 String recordType = "lyric";
 
 reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<EAKInfo>() {
@@ -539,6 +552,8 @@ be confident in:
 To create a signature, use the `sign` method:
 
 ```java
+Client client = ...; // Get a client instance
+
 final String recordType = "lyric";
 final Map<String, String> plain = new HashMap<>();
 plain.put("frabjous", "Filibuster vigilantly");
@@ -551,12 +566,11 @@ Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType,
 SignedDocument<Record> signed = client.sign(local);
 ```
 
-To verify a document, use the `verify` method. Here, we use the same `signed` instance as above. `clientConfig` holds
-the private & public keys for the client. (Note that, in general, `verify` requires the public signing key of the client
+To verify a document, use the `verify` method. Here, we use the same `signed` instance as above. (Note that, in general, `verify` requires the public signing key of the client
 that wrote the record):
 
 ```java
-if(! client.verify(signed, clientConfig.publicSigningKey)) {
+if(! client.verify(signed, client.clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
 ```

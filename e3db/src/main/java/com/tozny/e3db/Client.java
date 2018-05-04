@@ -1130,15 +1130,14 @@ public class  Client {
    *               RecordData} instance to prevent confusing with the
    *               {@code plain} parameter.
    * @param plain Any metadata associated with the record that will
- *              <b>NOT</b> be encrypted. If {@code null}, existing
- *              metadata will be removed.
+   *              <b>NOT</b> be encrypted. If {@code null}, existing
+   *              metadata will be removed.
    * @param handleResult If the update succeeds, returns the updated
-*                     record. If the update fails due to a version
-*                     conflict, the value passed to the {@link
-*                     ResultHandler#handle(Result)}} method return
-*                     an instance of {@link E3DBVersionException}
-*                     when {@code asError().error()} is called.
-   * @param updateMeta
+   *                     record. If the update fails due to a version
+   *                     conflict, the value passed to the {@link
+   *                     ResultHandler#handle(Result)}} method return
+   *                     an instance of {@link E3DBVersionException}
+   *                     when {@code asError().error()} is called.
    */
   public void update(final UpdateMeta updateMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotNull(updateMeta, "updateMeta");

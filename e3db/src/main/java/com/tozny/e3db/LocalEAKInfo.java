@@ -79,7 +79,7 @@ public class LocalEAKInfo implements EAKInfo {
    * @return
    * @throws IOException
    */
-  public static EAKInfo decode(String doc) throws IOException {
+  public static LocalEAKInfo decode(String doc) throws IOException {
     JsonNode info = mapper.readTree(doc);
 
     UUID authorizerId = UUID.fromString(info.get("authorizer_id").asText());

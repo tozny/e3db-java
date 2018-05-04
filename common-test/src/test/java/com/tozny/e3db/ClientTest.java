@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import jdk.nashorn.internal.runtime.PropertyAccess;
 import org.junit.*;
 
 import static junit.framework.Assert.assertTrue;
@@ -1301,5 +1302,67 @@ public class ClientTest {
       assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
       assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
     }
+  }
+
+  @Test
+  public void testEAK() throws IOException, E3DBException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String type = UUID.randomUUID().toString();
+    final AtomicReference<LocalEAKInfo> info = new AtomicReference<>();
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+          @Override
+          public void handle(Result<LocalEAKInfo> r) {
+            if (r.isError())
+              throw new RuntimeException(r.asError().other());
+
+            info.set(r.asValue());
+          }
+        }));
+      }
+    });
+
+    // esnure we can encode/decode EAKs.
+    String encodedEAK = info.get().encode();
+    final LocalEAKInfo eak = LocalEAKInfo.decode(encodedEAK);
+    Map<String, String> data = new HashMap<>();
+    data.put("vorpal", "Bluebird of friendliness");
+    assertNotNull("EAK not decoded: " + encodedEAK, eak);
+
+    // ensure we can use a different EAKInfo implementation for encrypt/decrypt.
+    EAKInfo localEAK = new EAKInfo() {
+      @Override
+      public String getKey() {
+        return eak.getKey();
+      }
+
+      @Override
+      public String getPublicKey() {
+        return eak.getPublicKey();
+      }
+
+      @Override
+      public UUID getAuthorizerId() {
+        return eak.getAuthorizerId();
+      }
+
+      @Override
+      public UUID getSignerId() {
+        return eak.getSignerId();
+      }
+
+      @Override
+      public String getSignerSigningKey() {
+        return eak.getSignerSigningKey();
+      }
+    };
+    String localEncryptedRecord = client.encryptRecord(type, new RecordData(data), null, localEAK).encode();
+
+    LocalRecord decoded = client.decryptExisting(LocalEncryptedRecord.decode(localEncryptedRecord), localEAK);
+    assertEquals("Decrypted record not equal to original.", data.get("vorpal"), decoded.data().get("vorpal"));
   }
 }

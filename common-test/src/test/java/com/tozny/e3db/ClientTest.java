@@ -1,10 +1,29 @@
+/*
+ * TOZNY NON-COMMERCIAL LICENSE
+ *
+ * Tozny dual licenses this product. For commercial use, please contact
+ * info@tozny.com. For non-commercial use, the contents of this file are
+ * subject to the TOZNY NON-COMMERCIAL LICENSE (the "License") which
+ * permits use of the software only by government agencies, schools,
+ * universities, non-profit organizations or individuals on projects that
+ * do not receive external funding other than government research grants
+ * and contracts.  Any other use requires a commercial license. You may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at https://tozny.com/legal/non-commercial-license.
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations under
+ * the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
+ * All rights reserved.
+ *
+ */
+
 package com.tozny.e3db;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import jdk.nashorn.internal.runtime.PropertyAccess;
 import org.junit.*;
 
 import static junit.framework.Assert.assertTrue;
@@ -423,25 +442,70 @@ public class ClientTest {
             final Record record = r.asValue();
             Map<String, String> fields = new HashMap<>();
             fields.put(FIELD, updatedMessage);
-            client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new ResultHandler<Record>() {
+            client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
-                if(! r.isError())
-                  assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
-                new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
-                  @Override
-                  public void handle(final Result<Record> r1) {
-                    if(r1.isError())
-                      throw new Error(r1.asError().other());
-                  }
-                }).handle(r);
+                if(r.isError())
+                  throw new RuntimeException(r.asError().other());
+
+                assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
               }
-            });
+            }));
           }
         });
       }
     });
   }
+
+  @Test
+  public void testRecordDataCustomUpdateMetaClass() throws IOException, InterruptedException {
+    final Client client = getClient().client;
+    final String updatedMessage = "Not to put too fine a point on it";
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(final CountDownLatch wait) throws Exception {
+        write1(client, new ResultHandler<Record>() {
+          @Override
+          public void handle(Result<Record> r) {
+            if(r.isError())
+              throw new Error(r.asError().other());
+
+            final Record record = r.asValue();
+
+            Map<String, String> fields = new HashMap<>();
+            fields.put(FIELD, updatedMessage);
+
+            client.update(new UpdateMeta() {
+              @Override
+              public String getType() {
+                return record.meta().type();
+              }
+
+              @Override
+              public UUID getRecordId() {
+                return record.meta().recordId();
+              }
+
+              @Override
+              public String getVersion() {
+                return record.meta().version();
+              }
+            }, new RecordData(fields), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+              @Override
+              public void handle(Result<Record> r) {
+                if(r.isError())
+                  throw new RuntimeException(r.asError().other());
+
+                assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
+              }
+            }));
+            ;
+          }
+        });
+      }
+    });
+  }
+
 
   @Test
   public void testPlaintextMetaUpdate() throws InterruptedException, IOException {
@@ -969,7 +1033,7 @@ public class ClientTest {
 
   @Test
   public void testSigning() throws IOException {
-    CI clientInfo1 = getClient();
+    final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "lyric";
     final Map<String, String> data = new HashMap<>();
@@ -999,20 +1063,46 @@ public class ClientTest {
       assertTrue("Unable to verify document", client.verify(sign2, clientInfo1.clientConfig.publicSigningKey));
       assertEquals("Absent plain and empty plain should give the same signature.", sign1.signature(), sign2.signature());
     }
+
+    {
+      // read a remote record, sign it, verify signature
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          client.write(recordType, new RecordData(data), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if(r.isError())
+                throw new RuntimeException(r.asError().other());
+
+              assertTrue("Unable to verify document.", client.verify(client.sign(r.asValue()),
+                  clientInfo1.clientConfig.publicSigningKey));
+
+              {
+                LocalRecord local = new LocalRecord(r.asValue().data(), LocalMeta.fromRecordMeta(r.asValue().meta()));
+                assertTrue("Unable to verify document.", client.verify(client.sign(local),
+                    clientInfo1.clientConfig.publicSigningKey)
+                );
+              }
+            }
+          }));
+        }
+      });
+    }
   }
 
   @Test
-  public void testNode() throws IOException {
+  public void testExternalEncryptedRecord() throws IOException {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
-    final JsonNode nodeDoc = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
-    final JsonNode doc = nodeDoc.get("doc");
+    final JsonNode extEncryptedRecord = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
+    final JsonNode doc = extEncryptedRecord.get("doc");
     final EncryptedRecord record = LocalEncryptedRecord.decode(mapper.writeValueAsString(doc));
 
     assertTrue("Unable to verify document.", client.verify(new SignedDocument<EncryptedRecord>() {
       @Override
       public String signature() {
-        return nodeDoc.get("sig").asText();
+        return extEncryptedRecord.get("sig").asText();
       }
 
       @Override
@@ -1020,7 +1110,6 @@ public class ClientTest {
         return record;
       }
     }, doc.get("meta").get("plain").get("client_pub_sig_key").asText()));
-
   }
 
   @Test
@@ -1274,6 +1363,46 @@ public class ClientTest {
       LocalEncryptedRecord encrypted = client1.get().encryptExisting(unencrypted, writerEak.get());
       String encodedEncrypted = encrypted.encode();
       LocalRecord decodedDecrypted = client2.get().decryptExisting(LocalEncryptedRecord.decode(encodedEncrypted), readerEak.get());
+      assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedDecrypted.meta().plain());
+      assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
+      assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());
+      assertEquals("writerId not equal. (" + encodedEncrypted + ")", unencrypted.meta().writerId(), decodedDecrypted.meta().writerId());
+      assertEquals("Decrypted data not equal. (" + encodedEncrypted + ")", unencrypted.data().get("Jabberwock"), decodedDecrypted.data().get("Jabberwock"));
+    }
+
+    {
+      // Use a custom EncryptedRecord implementation.
+      LocalEncryptedRecord encrypted = client1.get().encryptExisting(unencrypted, writerEak.get());
+      final String encodedEncrypted = encrypted.encode();
+      EncryptedRecord decoded = new EncryptedRecord() {
+        private LocalEncryptedRecord x = LocalEncryptedRecord.decode(encodedEncrypted);
+
+        @Override
+        public ClientMeta meta() {
+          return x.meta();
+        }
+
+        @Override
+        public Map<String, String> data() {
+          return x.data();
+        }
+
+        @Override
+        public String signature() {
+          return x.signature();
+        }
+
+        @Override
+        public String toSerialized() {
+          return x.toSerialized();
+        }
+
+        @Override
+        public EncryptedRecord document() {
+          return x.document();
+        }
+      };
+      LocalRecord decodedDecrypted = client2.get().decryptExisting(decoded, readerEak.get());
       assertNull("Plain should be absent. (" + encodedEncrypted + ")", decodedDecrypted.meta().plain());
       assertEquals("type not equal. (" + encodedEncrypted + ")", unencrypted.meta().type(), decodedDecrypted.meta().type());
       assertEquals("userId not equal. (" + encodedEncrypted + ")", unencrypted.meta().userId(), decodedDecrypted.meta().userId());

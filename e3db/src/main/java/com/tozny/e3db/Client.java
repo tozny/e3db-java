@@ -135,6 +135,53 @@ import static com.tozny.e3db.Checks.*;
  *
  * <p>To share records, use the {@link #share(String, UUID, ResultHandler)} method. To remove sharing access, use the {@link #revoke(String, UUID, ResultHandler)}} method.
  *
+ * <h1>Local Encryption &amp; Decryption</h1>
+ * The client instance has the ability to encrypt records for local storage, and to decrypt locally-stored records. Locally-encrypted records are
+ * always encrypted with a key that can be shared with other clients via E3DB's sharing mechanism.
+ *
+ * <p>Local encryption (and decryption) requires two steps:
+ *
+ * <oL>
+ *   <li>Create a 'writer key' (for encryption) or obtain a 'reader key' (for decryption).</li>
+ *  <li>Call {@link #encryptRecord(String, RecordData, Map, EAKInfo)} (for a new document) or {@link #encryptExisting(LocalRecord, EAKInfo)}
+ *  (for an existing {@link LocalRecord} instance); for decryption, call {@link #decryptExisting(EncryptedRecord, EAKInfo)}.</li>
+ * </ol>
+ *
+ * <h1>Obtaining A Key for Local Encryption &amp; Decryption</h1>
+ *
+ * A writer key can be created by calling {@link #createWriterKey(String, ResultHandler)}; a 'reader key' can be obtained by calling
+ * {@link #getReaderKey(UUID, UUID, String, ResultHandler)}. (Note that the client calling {@code getReaderKey} will only receive a key if the writer
+ * of those records has given access to the calling client through the `share` operation.)
+ *
+ * <p>The 'writer key' and 'reader key' returned from the client are both {@link LocalEAKInfo} objects (an implementation of the {@link EAKInfo} interface), which can be persisted to storage via the {@link LocalEAKInfo#encode()}
+ * method. Previously-persisted keys can be parsed using the {@link LocalEAKInfo#decode(String)} method.
+ *
+ * <p>However, note that {@code EAKInfo} objects are encrypted with the client's private key, meaning they cannot be decoded by any other client.
+ *
+ * <h1>Storing Encrypted Records Locally</h1>
+ *
+ * Use the {@link LocalEncryptedRecord#encode()} method to convert an encrypted record to a string for storage. You can use
+ * the {@link LocalEncryptedRecord#decode(String)} method to convert an encoded record back to an {@code EncryptedRecord}
+ * instance.
+ *
+ * <h1>Document Signing &amp; Verification</h1>
+ *
+ * <p>Every E3DB client created with this SDK is capable of signing documents and verifying the signature
+ * associated with a document. (Note that E3DB records are also stored with a signature attached, but
+ * verification of that is handled internally to the SDK.) By attaching signatures to documents, clients can
+ * be confident in:
+ *
+ * <ul>
+ *   <li>Document integrity - the document's contents have not been altered (because the signature will not match).</li>
+ *   <li>Proof-of-authorship - The author of the document held the private signing key associated with the given public key
+ *       when the document was created.</li>
+ * </ul>
+ *
+ * <p>Use the {@link #sign(Signable)} method to sign a document. Note that {@link Record}, {@link LocalEncryptedRecord}, and {@link LocalRecord}
+ * all implement the {@link Signable} interface, and thus can be signed.
+ *
+ * To verify a signed document, use the {@link #verify(SignedDocument, String)} method. Note that the {@link LocalEncryptedRecord} class
+ * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
  */
 public class  Client {
   private static final OkHttpClient anonymousClient;
@@ -415,7 +462,7 @@ public class  Client {
       this.type = type;
     }
 
-    public static EAKCacheKey fromRecord(ClientMeta meta) {
+    public static EAKCacheKey fromMeta(ClientMeta meta) {
       return new EAKCacheKey(meta.writerId(), meta.userId(), meta.type());
     }
 
@@ -480,7 +527,7 @@ public class  Client {
     if(Client.this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key to encrypt locally.");
 
-    byte[] ak = getCachedAccessKey(eakInfo, clientMeta);
+    byte[] ak = getCachedAccessKey(clientMeta, eakInfo);
     return new LocalEncryptedRecord(encryptObject(ak, data), clientMeta, sign(new LocalRecord(data, clientMeta)).signature());
   }
 
@@ -595,11 +642,11 @@ public class  Client {
     }
   }
 
-  private static Record makeLocal(JsonNode rawMeta) throws ParseException {
+  private static Record makeR(JsonNode rawMeta) throws ParseException {
     return R.makeLocal(rawMeta);
   }
 
-  private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
+  private static Record makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
     return R.makeLocal(accessKey, rawMeta, fields, signature, publicSigningKey);
   }
 
@@ -726,7 +773,7 @@ public class  Client {
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
-        record = makeLocal(Platform.crypto.decryptBox(
+        record = makeR(Platform.crypto.decryptBox(
                 CipherWithNonce.decode(access_key.get("eak").asText()),
                 decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
                 privateEncryptionKey),
@@ -737,7 +784,7 @@ public class  Client {
         );
       }
       else {
-        record = makeLocal(queryRecord.get("meta"));
+        record = makeR(queryRecord.get("meta"));
       }
       records.add(record);
     }
@@ -863,8 +910,8 @@ public class  Client {
     eakCache.put(cacheEntry, new EAKEntry(ak, new LocalEAKInfo(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
   }
 
-  private byte[] getCachedAccessKey(LocalEAKInfo eakInfo, ClientMeta meta) {
-    EAKCacheKey key = EAKCacheKey.fromRecord(meta);
+  private byte[] getCachedAccessKey(ClientMeta meta, LocalEAKInfo eakInfo) {
+    EAKCacheKey key = EAKCacheKey.fromMeta(meta);
     EAKEntry entry = eakCache.get(key);
     if(entry == null) {
       entry = new EAKEntry(Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
@@ -875,7 +922,14 @@ public class  Client {
   }
 
   private static ClientMeta clientMeta(RecordMeta meta) {
-    throw new IllegalStateException();
+    return new LocalMeta(meta.writerId(), meta.userId(), meta.type(), meta.plain());
+  }
+
+  private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
+    if(eakInfo instanceof LocalEAKInfo)
+      return (LocalEAKInfo) eakInfo;
+    else
+      return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
   }
 
   /**
@@ -1102,7 +1156,7 @@ public class  Client {
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                    makeLocal(
+                    makeR(
                             ownAK,
                             result.get("meta"),
                             result.get("data"),
@@ -1121,7 +1175,7 @@ public class  Client {
   /**
    * Replace the given record with new data and plaintext metadata.
    *
-   * <p>The {@code recordMeta} argument is only used to obtain
+   * <p>The {@code updateMeta} argument is only used to obtain
    * information about the record to replace. No metadata updates by
    * the client are allowed.
    * @param updateMeta Metadata describing the record to update. Can be obtained
@@ -1175,7 +1229,7 @@ public class  Client {
           } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                    makeLocal(ownAK,
+                    makeR(ownAK,
                             result.get("meta"),
                             result.get("data"),
                             null,
@@ -1257,7 +1311,7 @@ public class  Client {
           }
 
           uiValue(handleResult,
-                  makeLocal(eak.ak, meta, result.get("data"), null, null));
+                  makeR(eak.ak, meta, result.get("data"), null, null));
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }
@@ -1292,7 +1346,6 @@ public class  Client {
       }
     });
   }
-
   /**
    * Give another client the ability to read records.
    *
@@ -1348,6 +1401,7 @@ public class  Client {
       }
     });
   }
+
   /**
    * Remove permission for another client to read records.
    *
@@ -1529,7 +1583,7 @@ public class  Client {
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
       throw new IllegalStateException("localEakInfo cannot be used to verify the record as it has no public signing key");
 
-    byte[] ak = getCachedAccessKey(toLocalEAK(eakInfo), record.document().meta());
+    byte[] ak = getCachedAccessKey(record.document().meta(), toLocalEAK(eakInfo));
 
     Map<String, String> plainRecord = decryptObject(ak, record.document().data());
 
@@ -1538,13 +1592,6 @@ public class  Client {
       throw new E3DBVerificationException(record.document().meta());
 
     return new LocalRecord(plainRecord, record.document().meta());
-  }
-
-  private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
-    if(eakInfo instanceof LocalEAKInfo)
-      return (LocalEAKInfo) eakInfo;
-    else
-      return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
   }
 
   /**

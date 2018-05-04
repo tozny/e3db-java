@@ -25,7 +25,7 @@ import java.util.UUID;
 
 /**
  * Immutable information about a locally stored record (a subset
- * of {@link RecordMeta}.
+ * of {@link RecordMeta}).
  *
  * <p>Consider using the {@link LocalMeta} implementation.
  */

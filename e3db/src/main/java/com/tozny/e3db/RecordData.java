@@ -27,7 +27,7 @@ import static com.tozny.e3db.Checks.*;
  * Specifies the unencrypted data for a record.
  *
  * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(RecordMeta, RecordData, Map, ResultHandler)}).
+ * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
  */
 public class RecordData {
   private final Map<String, String> cleartext;

@@ -286,9 +286,9 @@ lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
 lyric.put("artist", "They Might Be Giants");
 
-String type = "lyric";
+String recordType = "lyric";
 
-client.write(type, new RecordData(lyric), null, new ResultHandler<Record>() {
+client.write(recordType, new RecordData(lyric), null, new ResultHandler<Record>() {
     @Override
     public void handle(Result<Record> r) {
       if(! r.isError()) {
@@ -486,15 +486,15 @@ lyric.put("line", "Say I'm the only bee in your bonnet");
 lyric.put("song", "Birdhouse in Your Soul");
 lyric.put("artist", "They Might Be Giants");
 
-String type = "lyric";
-client.createWriterKey(type, new ResultHandler<EAKInfo>() {
+String recordType = "lyric";
+client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
     @Override
     public void handle(Result<EAKInfo> r) {
         if(r.isError())
             throw new Error(r.asError().other());
 
         EAKInfo key = r.asValue();
-        Record encrypted = client.encryptRecord(type, new RecordData(lyric), null, key);
+        Record encrypted = client.encryptRecord(recordType, new RecordData(lyric), null, key);
         // Write record to storage in suitable format.
     }
 });
@@ -523,9 +523,9 @@ Client reader = ...; // Get a client instance
 
 Record encrypted = ...; // read encrypted record from local storage
 UUID writerID = ...; // ID of writer that produced record
-String type = "lyric";
+String recordType = "lyric";
 
-reader.getReaderKey(writerID, writerID, reader.clientId(), type, new ResultHandler<EAKInfo>() {
+reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<EAKInfo>() {
     @Override
     public void handle(Result<EAKInfo> r) {
         if(r.isError())
@@ -554,7 +554,7 @@ To create a signature, use the `sign` method:
 ```java
 Client client = ...; // Get a client instance
 
-final String type = "lyric";
+final String recordType = "lyric";
 final Map<String, String> plain = new HashMap<>();
 plain.put("frabjous", "Filibuster vigilantly");
 final Map<String, String> data = new HashMap<>();
@@ -562,7 +562,7 @@ data.put("Jabberwock", "Not to put too fine a point on it");
 UUID writerId = client.clientId();
 UUID userId = client.clientId();
 
-Record local = new LocalRecord(data, new LocalMeta(writerId, userId, type, plain));
+Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
 SignedDocument<Record> signed = client.sign(local);
 ```
 
@@ -570,7 +570,8 @@ To verify a document, use the `verify` method. Here, we use the same `signed` in
 that wrote the record):
 
 ```java
-if(! client.verify(signed, client.getPublicSigningKey)) {
+Config clientConfig = ...; // Retriec config for client
+if(! client.verify(signed, clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
 ```

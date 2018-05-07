@@ -1573,14 +1573,13 @@ public class  Client {
    * Decrypt a locally-encrypted record.
    *
    * @param record The record to decrypt.
-   * @param eakInfo The key to use for encrypting.
-   * @throws E3DBException Thrown when the signature is not present, the localEakInfo does not include a
-   * public signing key, or when verification of the signature fails.
+   * @param eakInfo The key to use for decrypting.
+   * @throws E3DBVerificationException Thrown when verification of the signature fails.
    * @return The decrypted record.
    */
-  public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBException {
+  public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBVerificationException {
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
-      throw new IllegalStateException("localEakInfo cannot be used to verify the record as it has no public signing key");
+      throw new IllegalStateException("eakInfo cannot be used to verify the record as it has no public signing key.");
 
     byte[] ak = getCachedAccessKey(record.document().meta(), toLocalEAK(eakInfo));
 

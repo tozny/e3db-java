@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * An implementation of {@link EAKInfo} to can persist to storage (using {@link #encode()}
- * and load from storage (using {@link #decode(String)}.
+ * An implementation of {@link EAKInfo} that can persist to a string  (using {@link #encode()}
+ * and load from a string (using {@link #decode(String)}.
  */
 public class LocalEAKInfo implements EAKInfo {
   private static final ObjectMapper mapper = new ObjectMapper();

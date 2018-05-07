@@ -63,7 +63,7 @@ class SecureStringManager {
         try {
           cipherOutputStream.close();
         } catch (IOException e) {
-
+          Log.d(TAG, e.getMessage(), e);
         }
       }
     }
@@ -102,7 +102,7 @@ class SecureStringManager {
       try {
         cipherInputStream.close();
       } catch (IOException e) {
-
+        Log.d(TAG, e.getMessage(), e);
       }
     }
   }

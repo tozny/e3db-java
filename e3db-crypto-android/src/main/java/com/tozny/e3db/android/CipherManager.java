@@ -22,6 +22,7 @@ package com.tozny.e3db.android;
 
 import android.content.Context;
 import android.os.Build;
+import android.util.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
@@ -36,6 +37,8 @@ import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 
 class CipherManager {
+
+  private static final String TAG = "CipherManager";
 
   private static void saveInitializationVector(Context context, String fileName, byte[] bytes) {
     FileOutputStream fos = null;
@@ -52,7 +55,7 @@ class CipherManager {
         try {
           fos.close();
         } catch (IOException e) {
-
+          Log.d(TAG, e.getMessage(), e);
         }
       }
     }
@@ -76,7 +79,7 @@ class CipherManager {
         try {
           fis.close();
         } catch (IOException e) {
-
+          Log.d(TAG, e.getMessage(), e);
         }
       }
     }

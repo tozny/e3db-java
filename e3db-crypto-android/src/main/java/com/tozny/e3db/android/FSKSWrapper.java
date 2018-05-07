@@ -74,7 +74,7 @@ class FSKSWrapper {
           try {
             output.close();
           } catch (IOException e) {
-
+            Log.d(TAG, e.getMessage(), e);
           }
         }
 
@@ -98,7 +98,7 @@ class FSKSWrapper {
           try {
             input.close();
           } catch (IOException e) {
-
+            Log.d(TAG, e.getMessage(), e);
           }
         }
 
@@ -146,7 +146,7 @@ class FSKSWrapper {
                   Log.d(TAG, "closing existing keystore");
                   kstore.close();
                 } catch (IOException e) {
-
+                  Log.d(TAG, e.getMessage(), e);
                 }
               }
             } else {
@@ -161,7 +161,7 @@ class FSKSWrapper {
                   Log.d(TAG, "closing new keystore");
                   out.close();
                 } catch (IOException e) {
-
+                  Log.d(TAG, e.getMessage(), e);
                 }
               }
             }
@@ -191,7 +191,7 @@ class FSKSWrapper {
             try {
               output.close();
             } catch (IOException e) {
-
+              Log.d(TAG, e.getMessage(), e);
             }
           }
         } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {

@@ -114,7 +114,7 @@ import static com.tozny.e3db.Checks.*;
  * <h1>Write, Update and Delete Records</h1>
  *
  * Records can be written with the {@link #write(String, RecordData, Map, ResultHandler)} method,
- * updated with {@link #update(RecordMeta, RecordData, Map, ResultHandler)}, and deleted with {@link #delete(UUID, String, ResultHandler)}.
+ * updated with {@link #update(UpdateMeta, RecordData, Map, ResultHandler)}, and deleted with {@link #delete(UUID, String, ResultHandler)}.
  *
  * <h1>Reading &amp; Querying Records</h1>
  *
@@ -135,6 +135,52 @@ import static com.tozny.e3db.Checks.*;
  *
  * <p>To share records, use the {@link #share(String, UUID, ResultHandler)} method. To remove sharing access, use the {@link #revoke(String, UUID, ResultHandler)}} method.
  *
+ * <h1>Local Encryption &amp; Decryption</h1>
+ * The client instance has the ability to encrypt records for local storage, and to decrypt locally-stored records. Locally-encrypted records are
+ * always encrypted with a key that can be shared with other clients via E3DB's sharing mechanism.
+ *
+ * <p>Local encryption (and decryption) requires two steps:
+ *
+ * <oL>
+ *   <li>Create a 'writer key' (for encryption) or obtain a 'reader key' (for decryption).</li>
+ *  <li>Call {@link #encryptRecord(String, RecordData, Map, EAKInfo)} (for a new document) or {@link #encryptExisting(LocalRecord, EAKInfo)}
+ *  (for an existing {@link LocalRecord} instance); for decryption, call {@link #decryptExisting(EncryptedRecord, EAKInfo)}.</li>
+ * </ol>
+ *
+ * <h1>Obtaining A Key for Local Encryption &amp; Decryption</h1>
+ *
+ * A writer key can be created by calling {@link #createWriterKey(String, ResultHandler)}; a 'reader key' can be obtained by calling
+ * {@link #getReaderKey(UUID, UUID, String, ResultHandler)}. (Note that the client calling {@code getReaderKey} will only receive a key if the writer
+ * of those records has given access to the calling client through the `share` operation.)
+ *
+ * <p>The 'writer key' and 'reader key' returned from the client are both {@link LocalEAKInfo} objects (an implementation of the {@link EAKInfo} interface), which can be persisted to storage via the {@link LocalEAKInfo#encode()}
+ * method. Previously-persisted keys can be parsed using the {@link LocalEAKInfo#decode(String)} method.
+ *
+ * <p>However, note that {@code EAKInfo} objects are encrypted with the client's private key, meaning they cannot be decoded by any other client.
+ *
+ * <h1>Storing Encrypted Records Locally</h1>
+ *
+ * Use the {@link LocalEncryptedRecord#encode()} method to convert an encrypted record to a string for storage. You can use
+ * the {@link LocalEncryptedRecord#decode(String)} method to convert an encoded record back to an {@code EncryptedRecord}
+ * instance.
+ *
+ * <h1>Document Signing &amp; Verification</h1>
+ *
+ * <p>Every E3DB client created with this SDK is capable of signing
+ * documents and verifying the signature associated with a document.
+ * By attaching signatures to documents, clients can be confident in:
+ *
+ * <ul>
+ *   <li>Document integrity - the document's contents have not been altered (because the signature will not match).</li>
+ *   <li>Proof-of-authorship - The author of the document held the private signing key associated with the given public key
+ *       when the document was created.</li>
+ * </ul>
+ *
+ * <p>Use the {@link #sign(Signable)} method to sign a document. Note that {@link Record}, {@link LocalEncryptedRecord}, and {@link LocalRecord}
+ * all implement the {@link Signable} interface, and thus can be signed.
+ *
+ * To verify a signed document, use the {@link #verify(SignedDocument, String)} method. Note that the {@link LocalEncryptedRecord} class
+ * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
  */
 public class  Client {
   private static final OkHttpClient anonymousClient;
@@ -307,7 +353,6 @@ public class  Client {
     return client;
   }
 
-
   Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
@@ -405,84 +450,6 @@ public class  Client {
 
   }
 
-  private static class M implements RecordMeta {
-    private final UUID recordId;
-    private final UUID writerId;
-    private final UUID userId;
-    private final String version;
-    private final Date created;
-    private final Date lastModified;
-    private final String type;
-    private final JsonNode plain;
-
-    private volatile Map<String, String> plainMap = null;
-
-    private M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
-      this.recordId = recordId;
-      this.writerId = writerId;
-      this.userId = userId;
-      this.version = version;
-      this.created = created;
-      this.lastModified = lastModified;
-      this.type = type;
-      this.plain = plain;
-    }
-
-    public UUID recordId() {
-      return recordId;
-    }
-
-    public UUID writerId() {
-      return writerId;
-    }
-
-    public UUID userId() {
-      return userId;
-    }
-
-    public String version() {
-      return version;
-    }
-
-    public Date created() {
-      return created;
-    }
-
-    public Date lastModified() {
-      return lastModified;
-    }
-
-    public String type() {
-      return type;
-    }
-    public Map<String, String> plain() {
-      // Source: Effective Java, 2nd edition.
-      // From http://www.oracle.com/technetwork/articles/java/bloch-effective-08-qa-140880.html ("More Effective Java With Google's Joshua Bloch")
-      Map<String, String> result = plainMap;
-      if (result == null) {
-        synchronized (this) {
-          result = plainMap;
-          if (result == null) {
-            result = new HashMap<>();
-            if (plain != null) {
-              Iterable<Map.Entry<String, JsonNode>> entries = new Iterable<Map.Entry<String, JsonNode>>() {
-                @Override
-                public Iterator<Map.Entry<String, JsonNode>> iterator() {
-                  return plain.fields();
-                }
-              };
-              for (Map.Entry<String, JsonNode> entry : entries) {
-                result.put(entry.getKey(), entry.getValue().asText());
-              }
-            }
-            plainMap = result;
-          }
-        }
-      }
-      return result;
-    }
-  }
-
   private static class EAKCacheKey {
     private final UUID writerId;
     private final UUID userId;
@@ -494,8 +461,8 @@ public class  Client {
       this.type = type;
     }
 
-    public static EAKCacheKey fromRecord(Record r) {
-      return new EAKCacheKey(r.meta().writerId(), r.meta().userId(), r.meta().type());
+    public static EAKCacheKey fromMeta(ClientMeta meta) {
+      return new EAKCacheKey(meta.writerId(), meta.userId(), meta.type());
     }
 
     @Override
@@ -523,17 +490,18 @@ public class  Client {
 
   private static class EAKEntry {
     private final byte[] ak;
-    private final EAKInfo eakInfo;
+    private final LocalEAKInfo eakInfo;
 
-    private EAKEntry(byte[] ak, EAKInfo eakInfo) {
+    private EAKEntry(byte[] ak, LocalEAKInfo eakInfo) {
       this.ak = ak;
       this.eakInfo = eakInfo;
     }
+
     public byte[] getAk() {
       return ak;
     }
 
-    public EAKInfo getEAK() {
+    public LocalEAKInfo getEAK() {
       return eakInfo;
     }
   }
@@ -552,6 +520,14 @@ public class  Client {
 
   private void onBackground(Runnable runnable) {
     backgroundExecutor.execute(runnable);
+  }
+
+  private LocalEncryptedRecord makeEncryptedRecord(LocalEAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) {
+    if(Client.this.privateSigningKey == null)
+      throw new IllegalStateException("Client must have a signing key to encrypt locally.");
+
+    byte[] ak = getCachedAccessKey(clientMeta, eakInfo);
+    return new LocalEncryptedRecord(encryptObject(ak, data), clientMeta, sign(new LocalRecord(data, clientMeta)).signature());
   }
 
   private static <R> void executeError(Executor executor, final ResultHandler<R> handler, final Throwable e) {
@@ -597,42 +573,80 @@ public class  Client {
       });
   }
 
-  private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
-    UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
-    UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
-    UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
-    Date created = iso8601.parse(rawMeta.get("created").asText());
-    Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
-    String version = rawMeta.get("version").asText();
-    String type = rawMeta.get("type").asText();
-    JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
-    return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
-  }
+  private static class R implements Record {
+    private final Map<String, String> data;
+    private final RecordMeta meta;
 
-  private static Record makeLocal(JsonNode rawMeta) throws ParseException {
-    return new LocalRecord(new HashMap<String, String>(), getRecordMeta(rawMeta));
-  }
-
-  private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
-    RecordMeta meta = getRecordMeta(rawMeta);
-    Map<String, String> encryptedFields = new HashMap<>();
-    Iterator<String> keys = fields.fieldNames();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      encryptedFields.put(key, fields.get(key).asText());
+    public R(Map<String, String> data, RecordMeta meta) {
+      this.data = data;
+      this.meta = meta;
     }
 
-    Map<String, String> results = decryptObject(accessKey, encryptedFields);
-    if (signature != null && publicSigningKey != null) {
-      boolean verified = signature == null || Platform.crypto.verify(new Signature(signature),
-              new LocalRecord(results, meta).toSerialized().getBytes(UTF8),
-              publicSigningKey);
-
-      if (!verified)
-        throw new E3DBVerificationException(meta);
+    private static RecordMeta getRecordMeta(JsonNode rawMeta) throws ParseException {
+      UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
+      UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
+      UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
+      Date created = iso8601.parse(rawMeta.get("created").asText());
+      Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
+      String version = rawMeta.get("version").asText();
+      String type = rawMeta.get("type").asText();
+      JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
+      return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
     }
 
-    return new LocalRecord(results, meta);
+    public static R makeLocal(JsonNode rawMeta) {
+      try {
+        return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
+      } catch (ParseException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, E3DBVerificationException {
+      RecordMeta meta = getRecordMeta(rawMeta);
+      Map<String, String> encryptedFields = new HashMap<>();
+      Iterator<String> keys = fields.fieldNames();
+      while (keys.hasNext()) {
+        String key = keys.next();
+        encryptedFields.put(key, fields.get(key).asText());
+      }
+
+      R record = new R(decryptObject(accessKey, encryptedFields), meta);
+
+      if (signature != null && publicSigningKey != null) {
+        boolean verified = Platform.crypto.verify(new Signature(signature),
+            record.toSerialized().getBytes(UTF8),
+            publicSigningKey);
+
+        if (!verified)
+          throw new E3DBVerificationException(clientMeta(meta));
+      }
+
+      return record;
+    }
+
+    @Override
+    public RecordMeta meta() {
+      return meta;
+    }
+
+    @Override
+    public Map<String, String> data() {
+      return data;
+    }
+
+    @Override
+    public String toSerialized() {
+      return new LocalRecord(data, clientMeta(meta)).toSerialized();
+    }
+  }
+
+  private static Record makeR(JsonNode rawMeta) throws ParseException {
+    return R.makeLocal(rawMeta);
+  }
+
+  private static Record makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
+    return R.makeLocal(accessKey, rawMeta, fields, signature, publicSigningKey);
   }
 
   private static class QR implements QueryResponse {
@@ -691,47 +705,6 @@ public class  Client {
 
         return chain.proceed(req.newBuilder().addHeader("Authorization", "Bearer " + token).build());
       }
-    }
-  }
-
-  private static class EAKImpl implements EAKInfo {
-    private final String key;
-    private final String publicKey;
-    private final UUID authorizerId;
-    private final UUID signerId;
-    private final String signerSigningKey;
-
-    public EAKImpl(String key, String publicKey, UUID authorizerId, UUID signerId, String signerSigningKey) {
-      this.key = key;
-      this.publicKey = publicKey;
-      this.authorizerId = authorizerId;
-      this.signerId = signerId;
-      this.signerSigningKey = signerSigningKey;
-    }
-
-    @Override
-    public String getKey() {
-      return key;
-    }
-
-    @Override
-    public String getPublicKey() {
-      return publicKey;
-    }
-
-    @Override
-    public UUID getAuthorizerId() {
-      return authorizerId;
-    }
-
-    @Override
-    public UUID getSignerId() {
-      return signerId;
-    }
-
-    @Override
-    public String getSignerSigningKey() {
-      return signerSigningKey;
     }
   }
 
@@ -799,7 +772,7 @@ public class  Client {
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
-        record = makeLocal(Platform.crypto.decryptBox(
+        record = makeR(Platform.crypto.decryptBox(
                 CipherWithNonce.decode(access_key.get("eak").asText()),
                 decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
                 privateEncryptionKey),
@@ -810,7 +783,7 @@ public class  Client {
         );
       }
       else {
-        record = makeLocal(queryRecord.get("meta"));
+        record = makeR(queryRecord.get("meta"));
       }
       records.add(record);
     }
@@ -839,7 +812,7 @@ public class  Client {
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws UnsupportedEncodingException {
+  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) {
     Map<String, String> decryptedFields = new HashMap<>();
     for(Map.Entry<String,String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
@@ -912,7 +885,7 @@ public class  Client {
         byte[] ak = Platform.crypto.decryptBox(CipherWithNonce.decode(eak),
           decodeURL(publicKey),
           this.privateEncryptionKey);
-        EAKEntry entry = new EAKEntry(ak, new EAKImpl(eak, publicKey, authorizerId, signerId, signerPublicKey));
+        EAKEntry entry = new EAKEntry(ak, new LocalEAKInfo(eak, publicKey, authorizerId, signerId, signerPublicKey));
         eakCache.put(cacheEntry, entry);
         return entry;
       }
@@ -933,11 +906,11 @@ public class  Client {
       throw E3DBException.find(response.code(), response.message());
     }
 
-    eakCache.put(cacheEntry, new EAKEntry(ak, new EAKImpl(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
+    eakCache.put(cacheEntry, new EAKEntry(ak, new LocalEAKInfo(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
   }
 
-  private byte[] getCachedAccessKey(Record record, EAKInfo eakInfo) {
-    EAKCacheKey key = EAKCacheKey.fromRecord(record);
+  private byte[] getCachedAccessKey(ClientMeta meta, LocalEAKInfo eakInfo) {
+    EAKCacheKey key = EAKCacheKey.fromMeta(meta);
     EAKEntry entry = eakCache.get(key);
     if(entry == null) {
       entry = new EAKEntry(Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
@@ -945,6 +918,17 @@ public class  Client {
     }
 
     return entry.getAk();
+  }
+
+  private static ClientMeta clientMeta(RecordMeta meta) {
+    return new LocalMeta(meta.writerId(), meta.userId(), meta.type(), meta.plain());
+  }
+
+  private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
+    if(eakInfo instanceof LocalEAKInfo)
+      return (LocalEAKInfo) eakInfo;
+    else
+      return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
   }
 
   /**
@@ -1171,7 +1155,7 @@ public class  Client {
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                    makeLocal(
+                    makeR(
                             ownAK,
                             result.get("meta"),
                             result.get("data"),
@@ -1190,13 +1174,11 @@ public class  Client {
   /**
    * Replace the given record with new data and plaintext metadata.
    *
-   * <p>The {@code recordMeta} argument is only used to obtain
+   * <p>The {@code updateMeta} argument is only used to obtain
    * information about the record to replace. No metadata updates by
    * the client are allowed.
-   *
-   * @param recordMeta Metadata for the record being replaced
-   *                   (obtained from a previous {@code write} or
-   *                   {@code query} call).
+   * @param updateMeta Metadata describing the record to update. Can be obtained
+   *                   from an existing {@link RecordMeta} instance using {@link LocalUpdateMeta#fromRecordMeta(RecordMeta)}.
    * @param fields Field names and values. Wrapped in a {@link
    *               RecordData} instance to prevent confusing with the
    *               {@code plain} parameter.
@@ -1210,8 +1192,8 @@ public class  Client {
    *                     an instance of {@link E3DBVersionException}
    *                     when {@code asError().error()} is called.
    */
-  public void update(final RecordMeta recordMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
-    checkNotNull(recordMeta, "recordMeta");
+  public void update(final UpdateMeta updateMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
+    checkNotNull(updateMeta, "updateMeta");
     checkNotNull(fields, "fields");
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
@@ -1220,28 +1202,33 @@ public class  Client {
       @Override
       public void run() {
         try {
-          final byte[] ownAK = getOwnAccessKey(recordMeta.type());
+          String type = updateMeta.getType();
+          UUID id = updateMeta.getRecordId();
+          String v = updateMeta.getVersion();
+
+          final byte[] ownAK = getOwnAccessKey(updateMeta.getType());
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
 
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
           meta.put("user_id", clientId.toString());
-          meta.put("type", recordMeta.type().trim());
+          meta.put("type", updateMeta.getType().trim());
 
-          if (plain != null)
+          if (plain != null) {
             meta.put("plain", plain);
+          }
 
           Map<String, Object> fields = new HashMap<>();
           fields.put("meta", meta);
           fields.put("data", encFields);
 
-          retrofit2.Response<ResponseBody> response = storageClient.updateRecord(recordMeta.recordId().toString(), recordMeta.version(), RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(fields))).execute();
+          retrofit2.Response<ResponseBody> response = storageClient.updateRecord(id.toString(), updateMeta.getVersion(), RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(fields))).execute();
           if (response.code() == 409) {
-            uiError(handleResult, new E3DBVersionException(recordMeta.recordId(), recordMeta.version()));
+            uiError(handleResult, new E3DBVersionException(id, updateMeta.getVersion()));
           } else if (response.code() == 200) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                    makeLocal(ownAK,
+                    makeR(ownAK,
                             result.get("meta"),
                             result.get("data"),
                             null,
@@ -1323,7 +1310,7 @@ public class  Client {
           }
 
           uiValue(handleResult,
-                  makeLocal(eak.ak, meta, result.get("data"), null, null));
+                  makeR(eak.ak, meta, result.get("data"), null, null));
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }
@@ -1358,7 +1345,6 @@ public class  Client {
       }
     });
   }
-
   /**
    * Give another client the ability to read records.
    *
@@ -1451,6 +1437,7 @@ public class  Client {
       }
     });
   }
+
   /**
    * Get a list of record types shared with this client.
    *
@@ -1529,9 +1516,9 @@ public class  Client {
    * Creates (or retrieves) a key that can be used to locally encrypt records.
    *
    * @param type Type of the records to encrypt.
-   * @param handleResult Handle the EAKInfo object retrieved.
+   * @param handleResult Handle the LocalEAKInfo object retrieved.
    */
-  public void createWriterKey(final String type, final ResultHandler<EAKInfo> handleResult) {
+  public void createWriterKey(final String type, final ResultHandler<LocalEAKInfo> handleResult) {
     onBackground(new Runnable() {
       @Override
       public void run() {
@@ -1545,7 +1532,6 @@ public class  Client {
             // no-op
           }
 
-          String encryptedAk = Platform.crypto.encryptBox(ak, publicKey, Client.this.privateEncryptionKey).toMessage();
           EAKEntry eak = getEAK(Client.this.clientId, Client.this.clientId, Client.this.clientId, type);
           if(eak == null)
             uiError(handleResult, new RuntimeException("Can't create writer key for " + type));
@@ -1560,19 +1546,19 @@ public class  Client {
 
   /**
    * Retrieve a key for reading a shared record.
-   *  @param writerId ID of the client that wrote the record.
+   * @param writerId ID of the client that wrote the record.
    * @param userId ID of the user associated with the record (normally equal to {@code writerId}).
    * @param type Type of record that was shared.
-   * @param handleResult Handle the EAKInfo object retrieved.
+   * @param handleResult Handle the LocalEAKInfo object retrieved.
    */
-  public void getReaderKey(final UUID writerId, final UUID userId, final String type, final ResultHandler<EAKInfo> handleResult) {
+  public void getReaderKey(final UUID writerId, final UUID userId, final String type, final ResultHandler<LocalEAKInfo> handleResult) {
     onBackground(new Runnable() {
       @Override
       public void run() {
         try {
           EAKEntry eak = getEAK(writerId, userId, Client.this.clientId, type);
           if(eak == null)
-            uiError(handleResult, new E3DBException("Access key not not found."));
+            uiError(handleResult, new E3DBException("Access key not found."));
           else
             uiValue(handleResult, eak.eakInfo);
         }
@@ -1586,84 +1572,59 @@ public class  Client {
   /**
    * Decrypt a locally-encrypted record.
    *
-   * @param record The record to encrypt.
+   * @param record The record to decrypt.
    * @param eakInfo The key to use for encrypting.
-   * @throws E3DBException An E3DB-specific error occurred.
-   * @return The deccrypted record.
+   * @throws E3DBException Thrown when the signature is not present, the localEakInfo does not include a
+   * public signing key, or when verification of the signature fails.
+   * @return The decrypted record.
    */
-  public Record decryptExisting(Record record, EAKInfo eakInfo) throws E3DBException {
-    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty()) {
-      throw new E3DBException("EAKInfo has no signing key");
-    }
+  public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBException {
+    if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
+      throw new IllegalStateException("localEakInfo cannot be used to verify the record as it has no public signing key");
 
-    if (record.signature() == null) {
-      throw new E3DBVerificationException(record.meta());
-    }
+    byte[] ak = getCachedAccessKey(record.document().meta(), toLocalEAK(eakInfo));
 
-    byte[] ak = getCachedAccessKey(record, eakInfo);
+    Map<String, String> plainRecord = decryptObject(ak, record.document().data());
 
-    try {
-      Map<String, String> plainRecord = decryptObject(ak, record.data());
+    if(!verify(new SD<>(new LocalRecord(plainRecord, record.document().meta()),
+        record.signature()), eakInfo.getSignerSigningKey()))
+      throw new E3DBVerificationException(record.document().meta());
 
-      Record decrypted = new LocalRecord(plainRecord, record.meta());
-      SignedDocument<Record> signed = new SD<Record>(decrypted, record.signature());
-
-      if(!verify(signed, eakInfo.getSignerSigningKey())) {
-        throw new E3DBVerificationException(record.meta());
-      }
-
-      return new LocalRecord(plainRecord, record.meta());
-    } catch (UnsupportedEncodingException e) {
-      throw new RuntimeException(e);
-    }
+    return new LocalRecord(plainRecord, record.document().meta());
   }
 
   /**
-   * Encrypt an existing record for local storage.
+   * Sign &amp; encrypt an existing record for local storage.
    *
    * @param record The record to encrypt.
    * @param eakInfo The key to use for encrypting.
-   * @return The encrypted record. Note that server-provided metadata values will not throw if accessed.
+   * @return The encrypted record.
    */
-  public Record encryptExisting(Record record, EAKInfo eakInfo) {
+  public LocalEncryptedRecord encryptExisting(LocalRecord record, EAKInfo eakInfo) {
     checkNotNull(record, "record");
     checkNotNull(eakInfo, "eak");
 
-    String signature = record.signature();
-    if (signature == null && Client.this.privateSigningKey != null) {
-      SignedDocument<Record> document = sign(record);
-      signature = document.signature();
-    }
-
-    byte[] ak = getCachedAccessKey(record, eakInfo);
-    return new LocalRecord(encryptObject(ak, record.data()), record.meta(), signature);
+    return makeEncryptedRecord(toLocalEAK(eakInfo), record.data(), record.meta());
   }
 
   /**
-   * Encrypt a record for local storage.
+   * Sign &amp; encrypt a record for local storage.
    *
    * @param type The type of the record.
    * @param data Fields to encrypt.
    * @param plain Plaintext metadata which will be stored with the record.
    * @param eakInfo The key to use for encrypting.
-   * @return The encrypted record. Note that server-provided metadata values ({@code recordId}, {@code createdd}, etc.)
-   * will throw if accessed.
+   * @return The encrypted record.
    */
-  public Record encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
+  public LocalEncryptedRecord encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
     checkNotNull(type, "type");
     checkNotNull(data, "data");
-    checkMap(data.getCleartext(), "data");
+    checkMap(data.getCleartext(), "data.getCleartext()");
 
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
-    String signature = null;
-    if (Client.this.privateSigningKey != null) {
-      SignedDocument<Record> document = sign((Record) new LocalRecord(data.getCleartext(), new LocalMeta(clientId, clientId, type.trim(), plain)));
-      signature = document.signature();
-    }
-
-    return encryptExisting(new LocalRecord(data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain), signature), eakInfo);
+    return makeEncryptedRecord(toLocalEAK(eakInfo), data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain));
   }
 
   /**
@@ -1677,9 +1638,10 @@ public class  Client {
    */
   public <T extends Signable> SignedDocument<T> sign(T document) {
     checkNotNull(document, "document");
-    checkNotNull(this.privateSigningKey, "signingKey");
+    if(this.privateSigningKey == null)
+      throw new IllegalStateException("Client must have a signing key.");
 
-    return new SD<T>(document, Base64.encodeURL(
+    return new SD<>(document, Base64.encodeURL(
       Platform.crypto.signature(
         document.toSerialized().getBytes(UTF8), this.privateSigningKey
       )
@@ -1710,5 +1672,88 @@ public class  Client {
     checkNotNull(document, "document");
 
     return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(UTF8), Base64.decodeURL(publicSigningKey));
+  }
+
+  /**
+   * Immutable information about a given record.
+   */
+  private static class M implements RecordMeta {
+
+    private final UUID recordId;
+    private final UUID writerId;
+    private final UUID userId;
+    private final String version;
+    private final Date created;
+    private final Date lastModified;
+    private final String type;
+    private final JsonNode plain;
+
+    private volatile Map<String, String> plainMap = null;
+
+    M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
+      this.recordId = recordId;
+      this.writerId = writerId;
+      this.userId = userId;
+      this.version = version;
+      this.created = created;
+      this.lastModified = lastModified;
+      this.type = type;
+      this.plain = plain;
+    }
+
+    public UUID recordId() {
+      return recordId;
+    }
+
+    public UUID writerId() {
+      return writerId;
+    }
+
+    public UUID userId() {
+      return userId;
+    }
+
+    public String version() {
+      return version;
+    }
+
+    public Date created() {
+      return created;
+    }
+
+    public Date lastModified() {
+      return lastModified;
+    }
+
+    public String type() {
+      return type;
+    }
+
+    public Map<String, String> plain() {
+      // Source: Effective Java, 2nd edition.
+      // From http://www.oracle.com/technetwork/articles/java/bloch-effective-08-qa-140880.html ("More Effective Java With Google's Joshua Bloch")
+      Map<String, String> result = plainMap;
+      if (result == null) {
+        synchronized (this) {
+          result = plainMap;
+          if (result == null) {
+            result = new HashMap<>();
+            if (plain != null) {
+              Iterable<Map.Entry<String, JsonNode>> entries = new Iterable<Map.Entry<String, JsonNode>>() {
+                @Override
+                public Iterator<Map.Entry<String, JsonNode>> iterator() {
+                  return plain.fields();
+                }
+              };
+              for (Map.Entry<String, JsonNode> entry : entries) {
+                result.put(entry.getKey(), entry.getValue().asText());
+              }
+            }
+            plainMap = result;
+          }
+        }
+      }
+      return result;
+    }
   }
 }

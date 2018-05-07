@@ -487,27 +487,32 @@ lyric.put("song", "Birdhouse in Your Soul");
 lyric.put("artist", "They Might Be Giants");
 
 String recordType = "lyric";
-client.createWriterKey(recordType, new ResultHandler<EAKInfo>() {
+client.createWriterKey(recordType, new ResultHandler<LocalEAKInfo>() {
     @Override
-    public void handle(Result<EAKInfo> r) {
+    public void handle(Result<LocalEAKInfo> r) {
         if(r.isError())
             throw new Error(r.asError().other());
 
-        EAKInfo key = r.asValue();
-        Record encrypted = client.encryptRecord(recordType, new RecordData(lyric), null, key);
-        // Write record to storage in suitable format.
+        LocalEAKInfo key = r.asValue();
+        LocalEncryptedRecord encrypted = client.encryptRecord(recordType, new RecordData(lyric), null, key);
+        String encodedRecord = encrypted.encode();
+        // Write `encodedRecord` to storage
     }
 });
 ```
 
-(Note that the `EAKInfo` instance is safe to store with the encrypted data, as it is also encrypted).
+Note that the `LocalEAKInfo` instance is safe to store with the
+encrypted data, as it is also encrypted. You can use the `encode` and
+`decode` methods to convert `LocalEAKInfo` instances to and from
+strings.
+
 The client can decrypt the given record as follows:
 
 ```java
-Record encrypted = ...; // read encrypted record from local storage
-EAKInfo writerKey = ...; // read stored EAKInfo instance from local storage
+LocalEncryptedRecord encrypted = LocalEncryptedRecord.decode(...); // decode encrypted record from a string
+LocalEAKInfo writerKey = LocalEAKInfo.decode(...); // decode LocalEAKInfo instance from a string
 
-Record decrypted = client.decryptExisting(encrypted, writerKey);
+LocalRecord decrypted = client.decryptExisting(encrypted, writerKey);
 ```
 
 ## Local Decryption of Shared Records
@@ -521,33 +526,33 @@ then decrypt any locally encrypted records as follows:
 ```java
 Client reader = ...; // Get a client instance
 
-Record encrypted = ...; // read encrypted record from local storage
+LocalEncryptedRecord encrypted = ...; // read encrypted record from local storage
 UUID writerID = ...; // ID of writer that produced record
 String recordType = "lyric";
 
-reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<EAKInfo>() {
+reader.getReaderKey(writerID, writerID, reader.clientId(), recordType, new ResultHandler<LocalEAKInfo>() {
     @Override
-    public void handle(Result<EAKInfo> r) {
+    public void handle(Result<LocalEAKInfo> r) {
         if(r.isError())
             throw new Error(r.asError().other());
 
-        EAKInfo readerKey = r.asValue();
-        Record decrypted = reader.decryptExisting(encrypted, readerKey);
-
+        LocalEAKInfo readerKey = r.asValue();
+        LocalRecord decrypted = reader.decryptExisting(encrypted, readerKey);
     }
 });
 ```
 
 ## Document Signing & Verification
 
-Every E3DB client created with this SDK is capable of signing documents and verifying the signature
-associated with a document. (Note that E3DB records are also stored with a signature attached, but
-verification of that is handled internally to the SDK.) By attaching signatures to documents, clients can
-be confident in:
+Every E3DB client created with this SDK is capable of signing
+documents and verifying the signature associated with a document. By
+attaching signatures to documents, clients can be confident in:
 
-  * Document integrity - the document's contents have not been altered (because the signature will not match).
-  * Proof-of-authorship - The author of the document held the private signing key associated with the given public key
-    when the document was created.
+  * Document integrity - the document's contents have not been altered
+    (because the signature will not match).
+  * Proof-of-authorship - The author of the document held the private
+    signing key associated with the given public key when the document
+    was created.
 
 To create a signature, use the `sign` method:
 
@@ -562,15 +567,17 @@ data.put("Jabberwock", "Not to put too fine a point on it");
 UUID writerId = client.clientId();
 UUID userId = client.clientId();
 
-Record local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
-SignedDocument<Record> signed = client.sign(local);
+LocalRecord local = new LocalRecord(data, new LocalMeta(writerId, userId, recordType, plain));
+SignedDocument<LocalRecord> signed = client.sign(local);
 ```
 
-To verify a document, use the `verify` method. Here, we use the same `signed` instance as above. (Note that, in general, `verify` requires the public signing key of the client
-that wrote the record):
+To verify a document, use the `verify` method. Here, we use the same
+`signed` instance as above. (Note that, in general, `verify` requires
+the public signing key of the client that wrote the record):
 
 ```java
-if(! client.verify(signed, client.getPublicSigningKey)) {
+Config clientConfig = ...; // Retrieve config for client
+if(! client.verify(signed, clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
 ```
@@ -591,4 +598,6 @@ The following E3DB-specific exceptions can be thrown:
 * `E3DBNotFoundException` - The requested item could not be retrieved.
 * `E3DBClientNotFoundException` - The given client (accessed via ID or
   email) could not be found.
+* `E3DBVerificationException` - Thrown when signature verification fails while
+  decrypting a locally-encrypted document.
 

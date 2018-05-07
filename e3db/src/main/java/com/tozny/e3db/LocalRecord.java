@@ -20,19 +20,18 @@
 
 package com.tozny.e3db;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
+
+import static com.tozny.e3db.Checks.checkNotNull;
 
 /**
  * Represents an E3DB record.
  */
-public class LocalRecord implements Record {
+public class LocalRecord implements Signable {
   private static final ObjectMapper mapper;
 
   static {
@@ -41,71 +40,35 @@ public class LocalRecord implements Record {
   }
 
   private final Map<String, String> data;
-  private final RecordMeta meta;
-
-  @JsonProperty("rec_sig")
-  private final String signature;
+  private final ClientMeta meta;
 
   /**
-   * Creates a representation of a Record suitable for signing or storing locally..
+   * Creates a representation of a Record suitable for signing or storing locally.
    *
-   * @param data Data contained in the record.
-   * @param meta Data about the record. Consider using {@link LocalMeta}.
+   * @param data Data contained in the record. Cannot be {@code null}.
+   * @param meta Data about the record. Cannot be {@code null}. Consider using {@link LocalMeta}.
    */
-  public LocalRecord(Map<String, String> data, RecordMeta meta) {
+  public LocalRecord(Map<String, String> data, ClientMeta meta) {
+    checkNotNull(data, "data");
+    checkNotNull(meta, "meta");
+
     this.data = data;
     this.meta = meta;
-    this.signature = null;
   }
 
-  /**
-   * Creates a record with an associated signature.
-   *
-   * @param data Data contained in the record.
-   * @param meta Data about the record. Consider using {@link LocalMeta}.
-   * @param signature Signature bytes, as a Base64URL encoded string.
-   */
-  public LocalRecord(Map<String, String> data, RecordMeta meta, String signature) {
-    this.data = data;
-    this.meta = meta;
-    this.signature = signature;
-  }
-
-  @Override
-  public RecordMeta meta() {
+  public ClientMeta meta() {
     return meta;
   }
 
-  @Override
   public Map<String, String> data() {
     return data;
   }
 
   @Override
-  public String signature() {
-    return signature;
-  }
-
-  @Override
-  public Record document() {
-    return this;
-  }
-
-  @Override
   public String toSerialized() {
     try {
-      SortedMap<String, Object> clientMeta = new TreeMap<>();
-      clientMeta.put("writer_id", meta().writerId().toString());
-      clientMeta.put("user_id", meta().userId().toString());
-      clientMeta.put("type", meta().type().toString());
-      Map<String, String> plain = meta().plain();
-      clientMeta.put("plain", plain == null ?
-          new TreeMap<String, String>() :
-          new TreeMap<String, String>(plain));
 
-      String clientMetaSerial = mapper.writeValueAsString(clientMeta);
-      String dataSerial = mapper.writeValueAsString(data());
-      return new StringBuffer(clientMetaSerial.length() + dataSerial.length()).append(clientMetaSerial).append(dataSerial).toString();
+      return meta.toSerialized() + mapper.writeValueAsString(data());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

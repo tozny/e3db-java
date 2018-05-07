@@ -23,6 +23,7 @@ package com.tozny.e3db.android;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 
 import android.support.v4.content.PermissionChecker;
@@ -121,10 +122,17 @@ public abstract class KeyAuthentication {
       case LOCK_SCREEN:
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
       case FINGERPRINT:
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                   PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
-                   FingerprintManagerCompat.from(ctx).isHardwareDetected() &&
-                   FingerprintManagerCompat.from(ctx).hasEnrolledFingerprints();
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+          // Some devices support fingerprint but the support library doesn't recognize it, so
+          // we use the actual FingerprintManager here. (https://stackoverflow.com/a/45181416/169359)
+          FingerprintManager mgr = ctx.getSystemService(FingerprintManager.class);
+          if (mgr != null) {
+            return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
+                       mgr.isHardwareDetected() &&
+                       mgr.hasEnrolledFingerprints();
+          }
+        }
+        return false;
       default:
         throw new IllegalStateException("Unhandled authentication type: " + authentication);
     }

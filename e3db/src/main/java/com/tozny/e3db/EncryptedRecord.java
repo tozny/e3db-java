@@ -17,43 +17,33 @@
  * All rights reserved.
  *
  */
-
 package com.tozny.e3db;
 
 import java.util.Map;
-import static com.tozny.e3db.Checks.*;
 
 /**
- * Specifies the unencrypted data for a record.
- *
- * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
+ * A record holding encrypted data, plus a signature. Consider using the {@link LocalEncryptedRecord}
+ * implementation.
  */
-public class RecordData {
-  private final Map<String, String> cleartext;
+public interface EncryptedRecord extends Signable, SignedDocument<EncryptedRecord> {
+  /**
+   * Metadata controlled by the client.
+   * @return metadata.
+   */
+  ClientMeta meta();
 
   /**
-   * Create a new instance using the provided {@code Map}.
-   * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
-   *
-   * @param cleartext cleartext.
+   * A map from field names to encrypted data.
+   * @return Encrypted data.
    */
-  public RecordData(Map<String, String> cleartext) {
-    if(cleartext == null)
-      throw new IllegalArgumentException("cleartext null");
+  Map<String, String> data();
 
-    checkMap(cleartext, "cleartext");
-    this.cleartext = cleartext;
-  }
+  @Override
+  String signature();
 
+  @Override
+  String toSerialized();
 
-  /**
-   * The unencrypted data that will be encrypted and written to E3DB.
-   *
-   * @return cleartext.
-   */
-  public Map<String, String> getCleartext() {
-    return cleartext;
-  }
-
+  @Override
+  EncryptedRecord document();
 }

@@ -21,39 +21,43 @@
 package com.tozny.e3db;
 
 import java.util.Map;
-import static com.tozny.e3db.Checks.*;
+import java.util.UUID;
 
 /**
- * Specifies the unencrypted data for a record.
+ * Immutable information about a locally stored record (a subset
+ * of {@link RecordMeta}).
  *
- * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
+ * <p>Consider using the {@link LocalMeta} implementation.
  */
-public class RecordData {
-  private final Map<String, String> cleartext;
+public interface ClientMeta extends Signable {
+  /**
+   * ID of client that wrote the record.
+   *
+   * @return writerId.
+   */
+  UUID writerId();
 
   /**
-   * Create a new instance using the provided {@code Map}.
-   * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
+   * ID of user associated with the record.
    *
-   * @param cleartext cleartext.
+   * This field is always equal to writer ID when records are written by this
+   * client.
+   *
+   * @return userId.
    */
-  public RecordData(Map<String, String> cleartext) {
-    if(cleartext == null)
-      throw new IllegalArgumentException("cleartext null");
-
-    checkMap(cleartext, "cleartext");
-    this.cleartext = cleartext;
-  }
-
+  UUID userId();
 
   /**
-   * The unencrypted data that will be encrypted and written to E3DB.
+   * The type given to the record.
    *
-   * @return cleartext.
+   * @return type.
    */
-  public Map<String, String> getCleartext() {
-    return cleartext;
-  }
+  String type();
 
+  /**
+   * Unencrypted, metadata values stored with the record. May be {@code null}.
+   *
+   * @return plain.
+   */
+  Map<String, String> plain();
 }

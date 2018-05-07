@@ -20,14 +20,28 @@
 
 package com.tozny.e3db;
 
-import java.util.Date;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
+
+import static com.tozny.e3db.Checks.checkNotNull;
 
 /**
  * Represents metadata about a record.
  */
-public class LocalMeta implements RecordMeta {
+public class LocalMeta implements ClientMeta {
+  private static final ObjectMapper mapper;
+
+  static {
+    mapper = new ObjectMapper();
+    mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+  }
+
   private final UUID writerId;
   private final UUID userId;
   private final String type;
@@ -42,15 +56,14 @@ public class LocalMeta implements RecordMeta {
    * @param plain Plaintext metadata about the record. Can be {@code null}.
    */
   public LocalMeta(UUID writerId, UUID userId, String type, Map<String, String> plain) {
+    checkNotNull(writerId, "writerId");
+    checkNotNull(userId, "userId");
+    checkNotNull(type, "type");
+
     this.writerId = writerId;
     this.userId = userId;
     this.type = type;
     this.plain = plain;
-  }
-
-  @Override
-  public UUID recordId() {
-    throw new IllegalStateException("recordId not defined");
   }
 
   @Override
@@ -64,26 +77,32 @@ public class LocalMeta implements RecordMeta {
   }
 
   @Override
-  public Date created() {
-    throw new IllegalStateException("created not defined");
-  }
-
-  @Override
-  public Date lastModified() {
-    throw new IllegalStateException("lastModified not defined");
-  }
-
-  @Override
-  public String version() {
-    throw new IllegalStateException("version not defined");
-  }
-
-  @Override
   public String type() {
     return type;
   }
   @Override
   public Map<String, String> plain() {
     return plain;
+  }
+
+  @Override
+  public String toSerialized() {
+    try {
+      SortedMap<String, Object> clientMeta = new TreeMap<>();
+      clientMeta.put("writer_id", writerId().toString());
+      clientMeta.put("user_id", userId().toString());
+      clientMeta.put("type", type());
+      clientMeta.put("plain", plain() == null ?
+                                  new TreeMap<String, String>() :
+                                  new TreeMap<>(plain()));
+
+      return mapper.writeValueAsString(clientMeta);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static LocalMeta fromRecordMeta(RecordMeta m) {
+    return new LocalMeta(m.writerId(), m.userId(), m.type(), m.plain());
   }
 }

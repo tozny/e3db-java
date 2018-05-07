@@ -17,15 +17,15 @@
  * All rights reserved.
  *
  */
-
 package com.tozny.e3db;
 
 import java.util.UUID;
 
 /**
- * An encrypted key, intended for a given
- * client, that can be used to encrypt or
+ * An encrypted key, intended for a given client, that can be used to encrypt or
  * decrypt documents.
+ *
+ * <p>Consider using the {@link LocalEAKInfo} implementation.
  */
 public interface EAKInfo {
   /**

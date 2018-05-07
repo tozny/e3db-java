@@ -20,40 +20,13 @@
 
 package com.tozny.e3db;
 
-import java.util.Map;
-import static com.tozny.e3db.Checks.*;
+import java.util.concurrent.CountDownLatch;
 
 /**
- * Specifies the unencrypted data for a record.
- *
- * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
+ * Represents an action that should execute asynchronously. The {@link wait}
+ * parameter is given so the action can indicate when it has completed (by calling
+ * {@link CountDownLatch#countDown()}.
  */
-public class RecordData {
-  private final Map<String, String> cleartext;
-
-  /**
-   * Create a new instance using the provided {@code Map}.
-   * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
-   *
-   * @param cleartext cleartext.
-   */
-  public RecordData(Map<String, String> cleartext) {
-    if(cleartext == null)
-      throw new IllegalArgumentException("cleartext null");
-
-    checkMap(cleartext, "cleartext");
-    this.cleartext = cleartext;
-  }
-
-
-  /**
-   * The unencrypted data that will be encrypted and written to E3DB.
-   *
-   * @return cleartext.
-   */
-  public Map<String, String> getCleartext() {
-    return cleartext;
-  }
-
+public interface AsyncAction {
+  void act(CountDownLatch wait) throws Exception;
 }

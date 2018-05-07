@@ -21,28 +21,31 @@
 package com.tozny.e3db.android;
 
 import android.content.Context;
+import android.util.Log;
 
 
 import javax.crypto.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.*;
 import java.util.ArrayList;
 
 class SecureStringManager {
+  private static final String TAG = "SecureStringManager";
 
-  static boolean secureStringExists(Context context, String fileName) throws Throwable {
+  static boolean secureStringExists(Context context, String fileName) {
     return new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists();
   }
 
-  static void deleteStringFromSecureStorage(Context context, String fileName) throws Throwable {
-    if (new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).exists()) {
-      File file = new File(FileSystemManager.getEncryptedDataFilePath(context, fileName));
-      file.delete();
+  static void deleteStringFromSecureStorage(Context context, String fileName) {
+    Log.d(TAG, "deleteStringFromSecureStorage " + fileName);
+    File f = new File(FileSystemManager.getEncryptedDataFilePath(context, fileName));
+    if (f.exists()) {
+      Log.d(TAG, "deleted file.");
+      f.delete();
     }
   }
 
-  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) throws Throwable {
+  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) {
+    Log.d(TAG, "saveStringToSecureStorage " + fileName + "; " + (string != null) + ";" + cipher.getAlgorithm());
     CipherOutputStream cipherOutputStream = null;
 
     try {
@@ -51,27 +54,57 @@ class SecureStringManager {
 
       cipherOutputStream.write(string.getBytes("UTF-8"));
 
+      Log.d(TAG, "Saved string");
+    } catch (IOException e) {
+      Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
+      throw new RuntimeException(e);
     } finally {
-      if (cipherOutputStream != null) cipherOutputStream.close();
+      if (cipherOutputStream != null) {
+        try {
+          cipherOutputStream.close();
+        } catch (IOException e) {
+          Log.d(TAG, e.getMessage(), e);
+        }
+      }
     }
   }
 
-  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) throws Throwable {
-    ArrayList<Byte> values = new ArrayList<>();
-
-    CipherInputStream cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
-
-    int nextByte;
-    while ((nextByte = cipherInputStream.read()) != -1) {
-      values.add((byte) nextByte);
+  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) {
+    Log.d(TAG, "loadStringFromSecureStorage " + fileName + "; " + cipher.getAlgorithm());
+    CipherInputStream cipherInputStream;
+    try {
+      cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
+    } catch (FileNotFoundException e) {
+      Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
+      throw new RuntimeException(e);
     }
 
-    byte[] bytes = new byte[values.size()];
-    for (int i = 0; i < values.size(); i++) {
-      bytes[i] = values.get(i);
-    }
+    try {
+      int nextByte;
+      ArrayList<Byte> values = new ArrayList<>();
+      while ((nextByte = cipherInputStream.read()) != -1) {
+        values.add((byte) nextByte);
+      }
 
-    return new String(bytes, "UTF-8");
+      byte[] bytes = new byte[values.size()];
+      for (int i = 0; i < values.size(); i++) {
+        bytes[i] = values.get(i);
+      }
+
+      String s = new String(bytes, "UTF-8");
+      Log.d(TAG, "returning: " + (s != null));
+      return s;
+    } catch (IOException e) {
+      Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
+      throw new RuntimeException(e);
+    }
+    finally {
+      try {
+        cipherInputStream.close();
+      } catch (IOException e) {
+        Log.d(TAG, e.getMessage(), e);
+      }
+    }
   }
 }
 

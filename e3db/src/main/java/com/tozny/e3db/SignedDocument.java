@@ -32,7 +32,7 @@ public interface SignedDocument<T extends Signable> {
    *
    * @return signature.
    */
-  public String signature();
+  String signature();
 
   /**
    * Returns the original document from which {@link #signature()} is
@@ -40,5 +40,5 @@ public interface SignedDocument<T extends Signable> {
    *
    * @return document.
    */
-  public T document();
+  T document();
 }

@@ -20,40 +20,32 @@
 
 package com.tozny.e3db;
 
-import java.util.Map;
-import static com.tozny.e3db.Checks.*;
+import java.util.UUID;
 
 /**
- * Specifies the unencrypted data for a record.
+ * Holds immutable metadata necessary to identify a record for
+ * updating.
  *
- * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
+ * <p>Consider using the {@link LocalUpdateMeta} implementation. To convert
+ * a {@link RecordMeta}, use the {@link LocalUpdateMeta#fromRecordMeta(RecordMeta)}
+ * method.
  */
-public class RecordData {
-  private final Map<String, String> cleartext;
+public interface UpdateMeta {
+  /**
+   * The type of the record.
+   * @return
+   */
+  String getType();
 
   /**
-   * Create a new instance using the provided {@code Map}.
-   * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
-   *
-   * @param cleartext cleartext.
+   * ID of the record.
+   * @return
    */
-  public RecordData(Map<String, String> cleartext) {
-    if(cleartext == null)
-      throw new IllegalArgumentException("cleartext null");
-
-    checkMap(cleartext, "cleartext");
-    this.cleartext = cleartext;
-  }
-
+  UUID getRecordId();
 
   /**
-   * The unencrypted data that will be encrypted and written to E3DB.
-   *
-   * @return cleartext.
+   * Version of the record.
+   * @return
    */
-  public Map<String, String> getCleartext() {
-    return cleartext;
-  }
-
+  String getVersion();
 }

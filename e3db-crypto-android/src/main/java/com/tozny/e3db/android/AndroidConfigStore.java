@@ -95,7 +95,7 @@ public class AndroidConfigStore implements ConfigStore {
     this.keyAuthenticator = keyAuthenticator;
   }
 
-  private static void checkIdentifier(String identifier) throws IllegalArgumentException {
+  private static void checkIdentifier(String identifier) {
     if(identifier == null || identifier.trim().isEmpty())
       throw new IllegalArgumentException("identifier cannot be null or blank.");
     if (!identifier.matches(pattern)) {
@@ -151,7 +151,7 @@ public class AndroidConfigStore implements ConfigStore {
 
       KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.SaveCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
         @Override
-        public void onAuthenticated(Cipher cipher) throws Throwable {
+        public void onAuthenticated(Cipher cipher) {
           SecureStringManager.saveStringToSecureStorage(context, fullIdentifier, config, cipher);
 
           SaveHandler.saveConfigDidSucceed();
@@ -187,7 +187,7 @@ public class AndroidConfigStore implements ConfigStore {
       } else {
         KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.LoadCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
           @Override
-          public void onAuthenticated(Cipher cipher) throws Throwable {
+          public void onAuthenticated(Cipher cipher) {
             String configString = SecureStringManager.loadStringFromSecureStorage(context, fullIdentifier, cipher);
 
             LoadHandler.loadConfigDidSucceed(configString);

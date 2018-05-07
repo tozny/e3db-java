@@ -22,14 +22,18 @@ and Java, and tests.
 * e3db-crypto-plain - Implements crypto operations for plain Java programs.
 * publish/android & publish/plain - Contains gradle scripts for publishing our library as an AAR (for
   Android) and as a JAR (for plain Java).
-
+* common-test - Tests that can be run on both Android and using plain java. This directory does not hold a project
+that can be executed independently.
 * androidtest - Android-specific tests.
 * plaintest - Plain java integration tests.
 
-Plain Java Testing
+Plain Java & Android Testing
 ====
 
-The plaintest/src/test directory contains a set of integration tests that cover
+The `common-test` directory holds tests that can be run on Android and using "plain" Java. These tests are
+not executed independently, but as part of the `plaintest` and `androidtest` projects.
+
+The common-test/src/test directory contains a set of integration tests that cover
 basic functionality: register, read, write, query, and sharing.
 
 The tests use a hard-coded registration token (which is safe to use and distribute). However,
@@ -38,6 +42,12 @@ you can replace the token via System properies:
 * e3db.host - The host to test against (e.g., `https://staging.e3db.com`). By default, tests against
   our dev environment.
 * e3db.token - Token to use for client registration.
+
+Plain Java Testing
+====
+
+The `plaintest` directory contains test specific to the crypto libraries used on the plain Java platform. You
+can run these test from the command line using teh command `gradlew :plaintest:test`.
 
 Android Testing
 ====
@@ -54,15 +64,30 @@ testing.
 
 Note that to run the app, you must publish the SDK locally
 
-Testing Single Methods
+Running a Subset of Tests
 ----
 
-The android gradle plugin supports testing single classes and methods using a system property. For
+`plaintest` and `androidtest` allow you to run a subset of the test suite, but they differ in how you specify the test
+to run:
+
+* plain -- Use the `--tests` argument at the command line to specify a set (or a wildcard pattern matching any given
+tests). For example, to test the `testEncodeDecodeLocal` method in the `ClientTest` class:
+
+```
+> ./gradlew :plaintest:test --tests *testEncodeDecodeLocal
+```
+
+(The `*` is necessary as the fully-qualified name of the test is actually `com.tozny.e3db.ClientTest.testEncodeDecodeLocal`.)
+
+* android - The android gradle plugin supports testing single classes and methods using a system property. For
 example, to test the `testValidSignature` method in the `com.tozny.e3db.crypto.AndroidCryptoTest` class, use:
 
 ```
 > gradlew '-Pandroid.testInstrumentationRunnerArguments.class=com.tozny.e3db.crypto.AndroidCryptoTest#testValidSignature' :androidtest:connectedAndroidTest
 ```
+
+For the ability to run a subset of the test suite, use `adb`, as documented in
+the article "Test from the Command Line" at https://developer.android.com/studio/test/command-line.
 
 Creating Javadocs
 =====

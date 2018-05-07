@@ -20,40 +20,44 @@
 
 package com.tozny.e3db;
 
-import java.util.Map;
-import static com.tozny.e3db.Checks.*;
+import java.util.UUID;
 
 /**
- * Specifies the unencrypted data for a record.
- *
- * <p>This class is only used when creating a record via {@link Client#write(String, RecordData, Map, ResultHandler)}
- * or updating an existing record using {@link Client#update(UpdateMeta, RecordData, Map, ResultHandler)}).
+ * Holds immutable metadata necessary to identify a record for
+ * updating.
  */
-public class RecordData {
-  private final Map<String, String> cleartext;
+public class LocalUpdateMeta implements UpdateMeta {
+  private final String type;
+  private final UUID recordId;
+  private final String version;
 
   /**
-   * Create a new instance using the provided {@code Map}.
-   * The {@code cleartext} parameter must contain at least one non-blank entry (with a non-blank key).
-   *
-   * @param cleartext cleartext.
+   * @param type
+   * @param recordId
+   * @param version
    */
-  public RecordData(Map<String, String> cleartext) {
-    if(cleartext == null)
-      throw new IllegalArgumentException("cleartext null");
-
-    checkMap(cleartext, "cleartext");
-    this.cleartext = cleartext;
+  public LocalUpdateMeta(String type, UUID recordId, String version) {
+    this.type = type;
+    this.recordId = recordId;
+    this.version = version;
   }
 
-
-  /**
-   * The unencrypted data that will be encrypted and written to E3DB.
-   *
-   * @return cleartext.
-   */
-  public Map<String, String> getCleartext() {
-    return cleartext;
+  public static LocalUpdateMeta fromRecordMeta(RecordMeta meta) {
+    return new LocalUpdateMeta(meta.type(), meta.recordId(), meta.version());
   }
 
+  @Override
+  public String getType() {
+    return type;
+  }
+
+  @Override
+  public UUID getRecordId() {
+    return recordId;
+  }
+
+  @Override
+  public String getVersion() {
+    return version;
+  }
 }

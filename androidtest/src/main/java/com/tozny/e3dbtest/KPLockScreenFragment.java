@@ -55,7 +55,7 @@ public class KPLockScreenFragment extends BaseFragment {
 
     @Override
     public KeyAuthentication keyProtection() {
-        return KeyAuthentication.withLockScreen();
+        return KeyAuthentication.withLockScreen(5);
     }
 
     @Override

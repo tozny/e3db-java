@@ -570,7 +570,8 @@ To verify a document, use the `verify` method. Here, we use the same `signed` in
 that wrote the record):
 
 ```java
-if(! client.verify(signed, client.getPublicSigningKey)) {
+Config clientConfig = ...; // Retriec config for client
+if(! client.verify(signed, clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
 ```

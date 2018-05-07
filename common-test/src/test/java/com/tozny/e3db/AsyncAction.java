@@ -18,12 +18,15 @@
  *
  */
 
-apply plugin: 'java'
+package com.tozny.e3db;
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compileOnly project(':e3db-crypto-interface')
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Represents an action that should execute asynchronously. The {@link wait}
+ * parameter is given so the action can indicate when it has completed (by calling
+ * {@link CountDownLatch#countDown()}.
+ */
+public interface AsyncAction {
+  void act(CountDownLatch wait) throws Exception;
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"

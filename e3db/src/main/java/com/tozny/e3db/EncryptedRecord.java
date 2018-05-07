@@ -17,13 +17,33 @@
  * All rights reserved.
  *
  */
+package com.tozny.e3db;
 
-apply plugin: 'java'
+import java.util.Map;
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compileOnly project(':e3db-crypto-interface')
+/**
+ * A record holding encrypted data, plus a signature. Consider using the {@link LocalEncryptedRecord}
+ * implementation.
+ */
+public interface EncryptedRecord extends Signable, SignedDocument<EncryptedRecord> {
+  /**
+   * Metadata controlled by the client.
+   * @return metadata.
+   */
+  ClientMeta meta();
+
+  /**
+   * A map from field names to encrypted data.
+   * @return Encrypted data.
+   */
+  Map<String, String> data();
+
+  @Override
+  String signature();
+
+  @Override
+  String toSerialized();
+
+  @Override
+  EncryptedRecord document();
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"

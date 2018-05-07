@@ -18,12 +18,34 @@
  *
  */
 
-apply plugin: 'java'
+package com.tozny.e3db;
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compileOnly project(':e3db-crypto-interface')
+import java.util.UUID;
+
+/**
+ * Holds immutable metadata necessary to identify a record for
+ * updating.
+ *
+ * <p>Consider using the {@link LocalUpdateMeta} implementation. To convert
+ * a {@link RecordMeta}, use the {@link LocalUpdateMeta#fromRecordMeta(RecordMeta)}
+ * method.
+ */
+public interface UpdateMeta {
+  /**
+   * The type of the record.
+   * @return
+   */
+  String getType();
+
+  /**
+   * ID of the record.
+   * @return
+   */
+  UUID getRecordId();
+
+  /**
+   * Version of the record.
+   * @return
+   */
+  String getVersion();
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"

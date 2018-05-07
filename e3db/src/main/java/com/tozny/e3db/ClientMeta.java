@@ -18,12 +18,46 @@
  *
  */
 
-apply plugin: 'java'
+package com.tozny.e3db;
 
-dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    compileOnly project(':e3db-crypto-interface')
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Immutable information about a locally stored record (a subset
+ * of {@link RecordMeta}).
+ *
+ * <p>Consider using the {@link LocalMeta} implementation.
+ */
+public interface ClientMeta extends Signable {
+  /**
+   * ID of client that wrote the record.
+   *
+   * @return writerId.
+   */
+  UUID writerId();
+
+  /**
+   * ID of user associated with the record.
+   *
+   * This field is always equal to writer ID when records are written by this
+   * client.
+   *
+   * @return userId.
+   */
+  UUID userId();
+
+  /**
+   * The type given to the record.
+   *
+   * @return type.
+   */
+  String type();
+
+  /**
+   * Unencrypted, metadata values stored with the record. May be {@code null}.
+   *
+   * @return plain.
+   */
+  Map<String, String> plain();
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"

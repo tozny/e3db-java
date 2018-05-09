@@ -80,10 +80,10 @@ tests). For example, to test the `testEncodeDecodeLocal` method in the `ClientTe
 (The `*` is necessary as the fully-qualified name of the test is actually `com.tozny.e3db.ClientTest.testEncodeDecodeLocal`.)
 
 * android - The android gradle plugin supports testing single classes and methods using a system property. For
-example, to test the `testValidSignature` method in the `com.tozny.e3db.crypto.AndroidCryptoTest` class, use:
+example, to test the `testValidSignature` method in the `com.tozny.e3db.AndroidCryptoTest` class, use:
 
 ```
-> gradlew '-Pandroid.testInstrumentationRunnerArguments.class=com.tozny.e3db.crypto.AndroidCryptoTest#testValidSignature' :androidtest:connectedAndroidTest
+> gradlew '-Pandroid.testInstrumentationRunnerArguments.class=com.tozny.e3db.AndroidCryptoTest#testValidSignature' :androidtest:connectedAndroidTest
 ```
 
 For the ability to run a subset of the test suite, use `adb`, as documented in

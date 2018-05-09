@@ -229,8 +229,7 @@ class FSKSWrapper {
         Log.d(TAG, "Creating key.");
 
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        SecureRandom random = new SecureRandom();
-        keyGen.init(random);
+        keyGen.init(256);
         SecretKey secretKey = keyGen.generateKey();
 
         keyStore.setEntry(alias, new KeyStore.SecretKeyEntry(secretKey), getProtectionParameter(protection, password));

@@ -24,6 +24,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import android.util.Log;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -245,15 +246,8 @@ public class  Client {
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-
-    if (Platform.isAndroid()) {
-      anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
-    } else {
-      anonymousClient = new OkHttpClient.Builder().build();
-    }
+    anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
   }
-
-
 
   /**
    * Enables TLS v1.2 when creating SSLSockets.
@@ -321,7 +315,7 @@ public class  Client {
 
   // From https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
   private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
+    if (Platform.isAndroid() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
       try {
         // From javadoc for okhttp3.OkHttpClient.Builder.sslSocketFactory(javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager)
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
@@ -364,24 +358,13 @@ public class  Client {
     else
       publicSigningKey = null;
 
-    Retrofit build;
-    if (Platform.isAndroid()) {
-      build = new Retrofit.Builder()
-        .callbackExecutor(uiExecutor)
-        .client(enableTLSv12(new OkHttpClient.Builder()
-          .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host)))
-          .build())
-        .baseUrl(host.resolve("/").toString())
-        .build();
-    } else {
-      build = new Retrofit.Builder()
-        .callbackExecutor(uiExecutor)
-        .client(new OkHttpClient.Builder()
-          .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host))
-          .build())
-        .baseUrl(host.resolve("/").toString())
-        .build();
-    }
+    Retrofit build = new Retrofit.Builder()
+      .callbackExecutor(uiExecutor)
+      .client(enableTLSv12(new OkHttpClient.Builder()
+                              .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host)))
+                 .build())
+      .baseUrl(host.resolve("/").toString())
+      .build();
 
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
@@ -679,7 +662,8 @@ public class  Client {
     private TokenInterceptor(String apiKey, String apiSecret, URI host) {
       this.host = host;
       this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(UTF8)).base64()).toString();
-      authClient = new Retrofit.Builder()
+      this.authClient = new Retrofit.Builder()
+        .client(enableTLSv12(new OkHttpClient.Builder()).build())
         .baseUrl(host.resolve("/").toString())
         .build()
         .create(AuthAPI.class);

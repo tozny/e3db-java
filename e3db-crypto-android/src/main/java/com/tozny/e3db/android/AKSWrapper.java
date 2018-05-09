@@ -46,6 +46,7 @@ class AKSWrapper {
         Log.d(TAG, "Creating key.");
         KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
                                                   .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                                                  .setKeySize(256)
                                                   .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

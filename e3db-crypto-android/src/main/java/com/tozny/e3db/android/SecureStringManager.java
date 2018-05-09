@@ -62,14 +62,15 @@ class SecureStringManager {
       if (cipherOutputStream != null) {
         try {
           cipherOutputStream.close();
-        } catch (IOException e) {
+        } catch (Throwable e) {
           Log.d(TAG, e.getMessage(), e);
         }
+        Log.d(TAG, "Encrypted string is: " + new File(FileSystemManager.getEncryptedDataFilePath(context, fileName)).length() + " bytes.");
       }
     }
   }
 
-  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) {
+  static String loadStringFromSecureStorage(Context context, String fileName, Cipher cipher) throws IOException {
     Log.d(TAG, "loadStringFromSecureStorage " + fileName + "; " + cipher.getAlgorithm());
     CipherInputStream cipherInputStream;
     try {
@@ -94,15 +95,13 @@ class SecureStringManager {
       String s = new String(bytes, "UTF-8");
       Log.d(TAG, "returning: " + (s != null));
       return s;
-    } catch (IOException e) {
-      Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
-      throw new RuntimeException(e);
     }
     finally {
       try {
         cipherInputStream.close();
-      } catch (IOException e) {
+      } catch(Throwable e) {
         Log.d(TAG, e.getMessage(), e);
+
       }
     }
   }

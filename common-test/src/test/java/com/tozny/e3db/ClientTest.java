@@ -26,10 +26,18 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import org.junit.*;
 
+import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
+
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

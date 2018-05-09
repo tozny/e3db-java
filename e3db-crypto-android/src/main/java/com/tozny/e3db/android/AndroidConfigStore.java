@@ -24,6 +24,7 @@ import android.content.Context;
 import com.tozny.e3db.ConfigStore;
 
 import javax.crypto.Cipher;
+import java.io.IOException;
 
 /**
  * Implements secure configuration storage. Uses the Android Key Store or a filesystem-based
@@ -188,9 +189,14 @@ public class AndroidConfigStore implements ConfigStore {
         KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.LoadCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
           @Override
           public void onAuthenticated(Cipher cipher) {
-            String configString = SecureStringManager.loadStringFromSecureStorage(context, fullIdentifier, cipher);
+            String configString = null;
+            try {
+              configString = SecureStringManager.loadStringFromSecureStorage(context, fullIdentifier, cipher);
+              LoadHandler.loadConfigDidSucceed(configString);
+            } catch (IOException e) {
+              LoadHandler.loadConfigDidFail(e);
+            }
 
-            LoadHandler.loadConfigDidSucceed(configString);
           }
 
           @Override

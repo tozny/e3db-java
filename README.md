@@ -239,6 +239,21 @@ class provides static methods for other authentication types, as well methods fo
 is supported by the device. The `KeyAuthenticator` interface can be used to provide a custom UI for gathering fingerprint, password, and
 lock screen PIN if desired. It also provides the static method `defaultAuthenticator` which gives a default UI.
 
+## Updating `android` packaging options
+
+Some of the libraries that the SDK depends on contain duplicate, but non-essential, files. If you do not exclude them,
+your Android build will fail with an error similar to `com.android.build.api.transform.TransformException: com.android.builder.packaging.DuplicateFileException`.
+In order to avoid this error add the following `packagingOptions` block to the `android` section of your Gradle build file:
+
+```groovy
+android {
+  ...
+  packagingOptions {
+    exclude 'META-INF/LICENSE'
+  }
+}
+```
+
 ## A note about "`allowBackup`" (`AndroidManifest.xml`)
 
 If your `AndroidManifest.xml` specifies `allowBackup="true"`, your app will fail to compile as one of E3DB's dependencies

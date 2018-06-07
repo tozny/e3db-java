@@ -117,13 +117,13 @@ publishing {
 }
 
 dependencies {
-    implementation 'com.squareup.retrofit2:retrofit:2.3.0'
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-    implementation 'com.squareup.okio:okio:1.13.0'
-    implementation 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
-    implementation 'com.android.support:support-annotations:27.1.0'
-    implementation 'com.android.support:support-compat:26.0.1'
-    implementation 'com.android.support:support-core-utils:26.0.1'
+  implementation 'com.squareup.retrofit2:retrofit:2.3.0'
+  implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
+  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+  implementation 'com.squareup.okio:okio:1.13.0'
+  implementation 'com.github.joshjdevl.libsodiumjni:libsodium-jni-aar:1.0.7'
+  implementation 'com.android.support:support-annotations:27.1.0'
+  implementation 'com.android.support:support-compat:26.0.1'
+  implementation 'com.android.support:support-core-utils:26.0.1'
 }

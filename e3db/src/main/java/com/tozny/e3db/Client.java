@@ -907,35 +907,6 @@ public class  Client {
       return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
   }
 
-  private void postEncryptedRecord(byte[] ownAK, Map<String, String> encFields, String type, Map<String, String> plain, ResultHandler<Record> handleResult) throws IOException, ParseException, E3DBVerificationException {
-    Map<String, Object> meta = new HashMap<>();
-    meta.put("writer_id", clientId.toString());
-    meta.put("user_id", clientId.toString());
-    meta.put("type", type.trim());
-
-    if (plain != null)
-      meta.put("plain", plain);
-
-    Map<String, Object> record = new HashMap<>();
-    record.put("meta", meta);
-    record.put("data", encFields);
-
-    String content = mapper.writeValueAsString(record);
-    final retrofit2.Response<ResponseBody> response = storageClient.writeRecord(RequestBody.create(APPLICATION_JSON, content)).execute();
-    if (response.code() == 201) {
-      JsonNode result = mapper.readTree(response.body().string());
-      uiValue(handleResult,
-          makeR(
-              ownAK,
-              result.get("meta"),
-              result.get("data"),
-              null,
-              Client.this.publicSigningKey));
-    } else {
-      uiError(handleResult, E3DBException.find(response.code(), response.message()));
-    }
-  }
-
   /**
    * @deprecated Use {@link #generateKey()}  instead.
    *
@@ -1122,22 +1093,6 @@ public class  Client {
     });
   }
 
-  public void write(final EncryptedRecord record, final ResultHandler<Record> handleResult) {
-    checkNotNull(record, "record");
-
-    onBackground(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          byte[] ownAK = getOwnAccessKey(record.meta().type());
-          postEncryptedRecord(ownAK, record.data(), record.meta().type(), record.meta().plain(), handleResult);
-        } catch (Throwable e) {
-          uiError(handleResult, e);
-        }
-      }
-    });
-  }
-
   /**
    * Write a new record.
    *
@@ -1158,8 +1113,32 @@ public class  Client {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
+          Map<String, Object> meta = new HashMap<>();
+          meta.put("writer_id", clientId.toString());
+          meta.put("user_id", clientId.toString());
+          meta.put("type", type.trim());
 
-          postEncryptedRecord(ownAK, encFields, type, plain, handleResult);
+          if (plain != null)
+            meta.put("plain", plain);
+
+          Map<String, Object> record = new HashMap<>();
+          record.put("meta", meta);
+          record.put("data", encFields);
+
+          String content = mapper.writeValueAsString(record);
+          final retrofit2.Response<ResponseBody> response = storageClient.writeRecord(RequestBody.create(APPLICATION_JSON, content)).execute();
+          if (response.code() == 201) {
+            JsonNode result = mapper.readTree(response.body().string());
+            uiValue(handleResult,
+                makeR(
+                    ownAK,
+                    result.get("meta"),
+                    result.get("data"),
+                    null,
+                    Client.this.publicSigningKey));
+          } else {
+            uiError(handleResult, E3DBException.find(response.code(), response.message()));
+          }
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }

@@ -24,7 +24,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
-import android.util.Log;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -194,7 +193,6 @@ public class  Client {
   private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
   private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
-  private final ConcurrentMap<UUID, String> signingKeyCache = new ConcurrentHashMap<>();
   private final String apiKey;
   private final String apiSecret;
   private final UUID clientId;
@@ -505,11 +503,11 @@ public class  Client {
     backgroundExecutor.execute(runnable);
   }
 
-  private LocalEncryptedRecord makeEncryptedRecord(LocalEAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) {
+  private LocalEncryptedRecord makeEncryptedRecord(EAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) {
     if(Client.this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key to encrypt locally.");
 
-    byte[] ak = getCachedAccessKey(clientMeta, eakInfo);
+    byte[] ak = decryptLocalEAKInfo(eakInfo);
     return new LocalEncryptedRecord(encryptObject(ak, data), clientMeta, sign(new LocalRecord(data, clientMeta)).signature());
   }
 
@@ -808,21 +806,23 @@ public class  Client {
   }
 
   private byte[] getOwnAccessKey(String type) throws E3DBException, IOException {
-    byte[] ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
-    if (ak == null) {
-      // Write new AK
-      ak = Platform.crypto.newSecretKey();
-      try {
-        setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), ak, this.clientId, this.publicSigningKey);
-      }
-      catch(E3DBConflictException ex) {
-        ak = getAccessKey(this.clientId, this.clientId, this.clientId, type);
-        if(ak == null)
-          throw new RuntimeException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
-      }
+    byte[] existingAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
+    if(existingAK != null) {
+      return existingAK;
     }
+    else {
+      // Create new AK
+      try {
+        setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), Platform.crypto.newSecretKey(), this.clientId, this.publicSigningKey);
+      }
+      catch(E3DBConflictException ex) { }
 
-    return ak;
+      byte[] newAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
+      if(newAK == null)
+        throw new RuntimeException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
+
+      return newAK;
+    }
   }
 
   private void removeAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException {
@@ -879,7 +879,6 @@ public class  Client {
   private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak, UUID signerId, byte[] signerPublicKey) throws E3DBException, IOException {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
     String encryptedAk = Platform.crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
-    eakCache.remove(cacheEntry);
 
     Map<String, String> doc = new HashMap<>();
     doc.put("eak", encryptedAk);
@@ -893,15 +892,8 @@ public class  Client {
     eakCache.put(cacheEntry, new EAKEntry(ak, new LocalEAKInfo(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
   }
 
-  private byte[] getCachedAccessKey(ClientMeta meta, LocalEAKInfo eakInfo) {
-    EAKCacheKey key = EAKCacheKey.fromMeta(meta);
-    EAKEntry entry = eakCache.get(key);
-    if(entry == null) {
-      entry = new EAKEntry(Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey), eakInfo);
-      eakCache.putIfAbsent(key, entry);
-    }
-
-    return entry.getAk();
+  private byte[] decryptLocalEAKInfo(EAKInfo eakInfo) {
+    return Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey);
   }
 
   private static ClientMeta clientMeta(RecordMeta meta) {
@@ -1121,7 +1113,6 @@ public class  Client {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
-
           Map<String, Object> meta = new HashMap<>();
           meta.put("writer_id", clientId.toString());
           meta.put("user_id", clientId.toString());
@@ -1139,12 +1130,12 @@ public class  Client {
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                    makeR(
-                            ownAK,
-                            result.get("meta"),
-                            result.get("data"),
-                            null,
-                            Client.this.publicSigningKey));
+                makeR(
+                    ownAK,
+                    result.get("meta"),
+                    result.get("data"),
+                    null,
+                    Client.this.publicSigningKey));
           } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
@@ -1507,17 +1498,21 @@ public class  Client {
       @Override
       public void run() {
         try {
-          byte[] publicKey = Platform.crypto.getPublicKey(Client.this.privateEncryptionKey);
-          byte[] ak = Platform.crypto.newSecretKey();
-
           try {
-            setAccessKey(Client.this.clientId, Client.this.clientId, Client.this.clientId, type, publicKey, ak, Client.this.clientId, Client.this.publicSigningKey);
+            setAccessKey(Client.this.clientId,
+                Client.this.clientId,
+                Client.this.clientId,
+                type,
+                Platform.crypto.getPublicKey(Client.this.privateEncryptionKey),
+                Platform.crypto.newSecretKey(),
+                Client.this.clientId,
+                Client.this.publicSigningKey);
           } catch (E3DBConflictException e) {
             // no-op
           }
 
           EAKEntry eak = getEAK(Client.this.clientId, Client.this.clientId, Client.this.clientId, type);
-          if(eak == null)
+          if (eak == null)
             uiError(handleResult, new RuntimeException("Can't create writer key for " + type));
           else
             uiValue(handleResult, eak.eakInfo);
@@ -1565,7 +1560,7 @@ public class  Client {
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
       throw new IllegalStateException("eakInfo cannot be used to verify the record as it has no public signing key.");
 
-    byte[] ak = getCachedAccessKey(record.document().meta(), toLocalEAK(eakInfo));
+    byte[] ak = decryptLocalEAKInfo(eakInfo);
 
     Map<String, String> plainRecord = decryptObject(ak, record.document().data());
 
@@ -1585,9 +1580,9 @@ public class  Client {
    */
   public LocalEncryptedRecord encryptExisting(LocalRecord record, EAKInfo eakInfo) {
     checkNotNull(record, "record");
-    checkNotNull(eakInfo, "eak");
+    checkNotNull(eakInfo, "eakInfo");
 
-    return makeEncryptedRecord(toLocalEAK(eakInfo), record.data(), record.meta());
+    return makeEncryptedRecord(eakInfo, record.data(), record.meta());
   }
 
   /**
@@ -1602,12 +1597,13 @@ public class  Client {
   public LocalEncryptedRecord encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
     checkNotNull(type, "type");
     checkNotNull(data, "data");
+    checkNotNull(eakInfo, "eakInfo");
     checkMap(data.getCleartext(), "data.getCleartext()");
 
     if(plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
-    return makeEncryptedRecord(toLocalEAK(eakInfo), data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain));
+    return makeEncryptedRecord(eakInfo, data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain));
   }
 
   /**

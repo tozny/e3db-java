@@ -1030,7 +1030,7 @@ public class ClientTest {
     EAKInfo readerKey = readerKeyRef.get();
     assertNotNull("EAK not returned", readerKey);
     
-    LocalRecord decrypted = client2.decryptExisting(encrypted, writerKey);
+    LocalRecord decrypted = client2.decryptExisting(encrypted, readerKey);
     assertEquals("Writer ID not equal to client ID", decrypted.meta().writerId(), client1.clientId());
     assertEquals("User ID not equal to client ID", decrypted.meta().userId(), client1.clientId());
     assertEquals("Types not equal", decrypted.meta().type(), type);

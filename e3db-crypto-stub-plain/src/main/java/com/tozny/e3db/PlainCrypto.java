@@ -22,7 +22,10 @@ package com.tozny.e3db;
 
 import com.tozny.e3db.crypto.*;
 
-class KaliumCrypto implements Crypto {
+import java.io.File;
+import java.io.IOException;
+
+class PlainCrypto implements Crypto {
   @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
     throw new IllegalStateException();
@@ -75,6 +78,22 @@ class KaliumCrypto implements Crypto {
 
   @Override
   public byte[] getPublicSigningKey(byte[] privateKey) {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public File encryptFile(File file, byte[] secretKey) throws IOException {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public void decryptFile(File file, byte[] secretKey, File dest) throws IOException {
+    throw new IllegalStateException();
+
+  }
+
+  @Override
+  public int getBlockSize() {
     throw new IllegalStateException();
   }
 }

@@ -28,7 +28,7 @@ final class Platform {
     if (Platform.isAndroid()) {
       crypto = new AndroidCrypto();
     } else {
-      crypto = new KaliumCrypto();
+      crypto = new PlainCrypto();
     }
   }
 

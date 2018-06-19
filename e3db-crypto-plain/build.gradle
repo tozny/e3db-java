@@ -23,7 +23,8 @@ apply plugin: 'java'
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compileOnly project(':e3db-crypto-interface')
-    compile 'org.abstractj.kalium:kalium:0.7.0'
+    compile "com.goterl.lazycode:lazysodium-java:2.5.0"
+    compile 'net.java.dev.jna:jna:4.5.1@aar'
 }
 
 sourceCompatibility = "1.7"

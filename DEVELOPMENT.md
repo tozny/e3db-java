@@ -43,6 +43,19 @@ you can replace the token via System properies:
   our dev environment.
 * e3db.token - Token to use for client registration.
 
+"FileNotFoundException" When Testing
+====
+
+The lazysodium library attempts to delete the libsodium.dll (or .so) file that it unpacks when the JVM
+exits. On Windows, this results in a number of errors printed to the console such as:
+
+```
+ java.io.FileNotFoundException: C:\<...>\Temp\nativeutils11369415283358\libsodium.dll
+ (The process cannot access the file because it is being used by another process)
+```
+
+These errors are *benign* and can be ignored.
+
 Plain Java Testing
 ====
 

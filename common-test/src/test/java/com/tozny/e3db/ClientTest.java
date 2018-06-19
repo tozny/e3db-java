@@ -32,8 +32,11 @@ import javax.crypto.spec.IvParameterSpec;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -54,6 +57,7 @@ public class ClientTest {
   private static final Map<String, String> profiles = new HashMap<>();
   private static final boolean INFINITE_WAIT = false;
   private static final int TIMEOUT = 5;
+  private static final Charset UTF8 = Charset.forName("UTF-8");
 
   private static final String FIELD = "line";
   private static final String TYPE = "stuff";
@@ -1501,5 +1505,45 @@ public class ClientTest {
 
     LocalRecord decoded = client.decryptExisting(LocalEncryptedRecord.decode(localEncryptedRecord), localEAK);
     assertEquals("Decrypted record not equal to original.", data.get("vorpal"), decoded.data().get("vorpal"));
+  }
+
+  @Test
+  public void testWriteFile() throws Throwable {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String type = UUID.randomUUID().toString();
+    final File plain = File.createTempFile("clientTest", ".txt");
+    plain.deleteOnExit();
+    String message = "Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
+                         "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
+                         "ungirdled, was sustained gently behind him on the mild morning air.";
+    FileOutputStream out = new FileOutputStream(plain);
+    try {
+      out.write(message.getBytes(UTF8));
+    }
+    finally {
+      out.close();
+    }
+
+    final AtomicReference<Result> resultRef = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            if(r.isError())
+              resultRef.set(new ErrorResult(new RuntimeException("Failed to write file.")));
+            else
+              resultRef.set(r);
+          }
+        }));
+      }
+    });
+
+    if(resultRef.get().isError()) {
+      resultRef.get().asError().other().printStackTrace();
+      fail(resultRef.get().asError().other().getMessage());
+    }
   }
 }

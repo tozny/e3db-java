@@ -23,6 +23,9 @@ package com.tozny.e3db.crypto;
 import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.Signature;
 
+import java.io.File;
+import java.io.IOException;
+
 /**
  * Provides cryptographic operations necessary for interacting with E3DB. Android and
  * plain Java implementations of this class are automatically included in each respective
@@ -124,4 +127,34 @@ public interface Crypto {
    * associated with the public key given. {@code false} otherwise.
    */
   boolean verify(Signature signature, byte[] message, byte[] publicSigningKey);
+
+  /**
+   * Encrypt the given file, using the key given, and return a
+   * reference to the encrypted file.
+   *
+   * Enough temporary space must be available on the device to store
+   * the encrypted file.
+   *
+   * @param file File to encrypt.
+   * @param secretKey Key to enrypt with.
+   * @return The encrypted file.
+   */
+  File encryptFile(File file, byte[] secretKey) throws IOException;
+
+  /**
+   * Decrypts the given file, assuming it was encrypted with the
+   * given secret key.
+   *
+   * @param file Location of file to decrypt
+   * @param secretKey Key to use when decrypting.
+   * @param dest The destination to write the decrypted contents to. If this file exists, it will be truncated.
+   * @throws IOException
+   */
+  void decryptFile(File file, byte[] secretKey, File dest) throws IOException;
+
+  /**
+   * Size of the block used when encrypting files.
+   * @return block size.
+   */
+  int getBlockSize();
 }

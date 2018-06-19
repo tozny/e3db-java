@@ -28,17 +28,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -186,6 +187,7 @@ public class  Client {
   private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
+  private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
@@ -200,7 +202,6 @@ public class  Client {
   private final byte[] privateSigningKey;
   private final byte[] publicSigningKey;
   private final StorageAPI storageClient;
-
   private final ShareAPI shareClient;
 
   private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -572,7 +573,9 @@ public class  Client {
       String version = rawMeta.get("version").asText();
       String type = rawMeta.get("type").asText();
       JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
-      return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
+      boolean isFile = rawMeta.has("file") && rawMeta.get("file").asBoolean();
+
+      return new M(recordId, writerId, userId, version, created, lastModified, type, plain, isFile);
     }
 
     public static R makeLocal(JsonNode rawMeta) {
@@ -907,6 +910,26 @@ public class  Client {
       return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
   }
 
+  private Map<String,Object> makeFileMeta(File encryptedFile) throws IOException, NoSuchAlgorithmException {
+    Map<String, Object> fileMeta = new HashMap<>();
+    fileMeta.put("compression", "raw");
+    MessageDigest digest = MessageDigest.getInstance("MD5");
+    FileChannel channel = new FileInputStream(encryptedFile).getChannel();
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[Platform.crypto.getBlockSize()]);
+    try {
+      for (int amt = channel.read(buffer); amt != -1; amt = channel.read(buffer)) {
+        buffer.flip();
+        digest.update(buffer);
+        buffer.clear();
+      }
+    } finally {
+      channel.close();
+    }
+
+    fileMeta.put("checksum", Base64.encodeURL(digest.digest()));
+    return fileMeta;
+  }
+
   /**
    * @deprecated Use {@link #generateKey()}  instead.
    *
@@ -1094,6 +1117,83 @@ public class  Client {
   }
 
   /**
+   * Write the given file to E3DB. Intended for files from 5MB up to 5GB in size. The contents of the file are
+   * encrypted before being uploaded.
+   *
+   * @param type Type of the record. Cannot be {@code null} or blank.
+   * @param file Path to the file to upload. Cannot be {@code null}.
+   * @param plain Plaintext meta associated with the file. Can be {@code null}.
+   * @param handleResult Handles the result of the write.
+   */
+  public void writeFile(final String type, final File file, final Map<String, String> plain, final ResultHandler<RecordMeta> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(file, "file");
+    if(plain != null && plain.size() > 0)
+      checkMap(plain, "plain");
+
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          final byte[] ownAK = getOwnAccessKey(type);
+          Map<String, Object> meta = makeRecordMetaMap(type, plain);
+          File encryptedFile = Platform.crypto.encryptFile(file, ownAK);
+          Map<String, Object> fileMeta = makeFileMeta(encryptedFile);
+
+          Map<String, Object> record = new HashMap<>();
+          record.put("meta", meta);
+          record.put("file", fileMeta);
+
+          EXIT: {
+            retrofit2.Response<ResponseBody> postResponse = storageClient.writeFile(RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(record))).execute();
+            if (postResponse.code() != 202) {
+              uiError(handleResult, E3DBException.find(postResponse.code(), postResponse.message()));
+              break EXIT;
+            }
+
+            final JsonNode pendingFile = mapper.readTree(postResponse.body().string());
+            UUID pendingFileID = UUID.fromString(pendingFile.get("id").asText());
+            String destURL = pendingFile.get("signed_url").asText();
+
+            try {
+              Request postFile = new Request.Builder().url(destURL).post(RequestBody.create(APPLICATION_OCTET, encryptedFile)).build();
+              Response postFileResponse = anonymousClient.newCall(postFile).execute();
+              if (postFileResponse.code() != 200) {
+                uiError(handleResult, E3DBException.find(postFileResponse.code(), postFileResponse.message()));
+                break EXIT;
+              }
+
+              retrofit2.Response<ResponseBody> commitResponse = storageClient.commitFile(pendingFileID.toString()).execute();
+              if (commitResponse.code() != 201) {
+                uiError(handleResult, E3DBException.find(commitResponse.code(), commitResponse.message()));
+                break EXIT;
+              }
+
+              uiValue(handleResult, R.getRecordMeta(mapper.readTree(commitResponse.body().string()).get("meta")));
+            } finally {
+              encryptedFile.delete();
+            }
+          }
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Read the file associated with the given record from the server.
+   *
+   * @param recordId ID of the record. Cannot be {@code null}.
+   * @param dest Destination to write the decrypted file to. If the file exists, it will be truncated.
+   * @param handleResult Handles the result of the operation. If the operation completes successfully, the
+   *                     destination will hold the contents of the unencrypted file.
+   */
+  public void readFile(UUID recordId, File dest, ResultHandler<RecordMeta> handleResult) {
+    throw new IllegalStateException("Not yet implemented.");
+  }
+
+  /**
    * Write a new record.
    *
    * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
@@ -1113,13 +1213,7 @@ public class  Client {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
-          Map<String, Object> meta = new HashMap<>();
-          meta.put("writer_id", clientId.toString());
-          meta.put("user_id", clientId.toString());
-          meta.put("type", type.trim());
-
-          if (plain != null)
-            meta.put("plain", plain);
+          Map<String, Object> meta = makeRecordMetaMap(type, plain);
 
           Map<String, Object> record = new HashMap<>();
           record.put("meta", meta);
@@ -1144,6 +1238,17 @@ public class  Client {
         }
       }
     });
+  }
+
+  private Map<String, Object> makeRecordMetaMap(String type, Map<String, String> plain) {
+    Map<String, Object> meta = new HashMap<>();
+    meta.put("writer_id", clientId.toString());
+    meta.put("user_id", clientId.toString());
+    meta.put("type", type.trim());
+
+    if (plain != null)
+      meta.put("plain", plain);
+    return meta;
   }
 
   /**
@@ -1177,21 +1282,10 @@ public class  Client {
       @Override
       public void run() {
         try {
-          String type = updateMeta.getType();
           UUID id = updateMeta.getRecordId();
-          String v = updateMeta.getVersion();
-
           final byte[] ownAK = getOwnAccessKey(updateMeta.getType());
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
-
-          Map<String, Object> meta = new HashMap<>();
-          meta.put("writer_id", clientId.toString());
-          meta.put("user_id", clientId.toString());
-          meta.put("type", updateMeta.getType().trim());
-
-          if (plain != null) {
-            meta.put("plain", plain);
-          }
+          Map<String, Object> meta = makeRecordMetaMap(updateMeta.getType(), plain);
 
           Map<String, Object> fields = new HashMap<>();
           fields.put("meta", meta);
@@ -1666,10 +1760,11 @@ public class  Client {
     private final Date lastModified;
     private final String type;
     private final JsonNode plain;
+    private final boolean isFile;
 
     private volatile Map<String, String> plainMap = null;
 
-    M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
+    M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain, boolean isFile) {
       this.recordId = recordId;
       this.writerId = writerId;
       this.userId = userId;
@@ -1678,6 +1773,7 @@ public class  Client {
       this.lastModified = lastModified;
       this.type = type;
       this.plain = plain;
+      this.isFile = isFile;
     }
 
     public UUID recordId() {
@@ -1733,6 +1829,11 @@ public class  Client {
         }
       }
       return result;
+    }
+
+    @Override
+    public boolean isFile() {
+      return isFile;
     }
   }
 }

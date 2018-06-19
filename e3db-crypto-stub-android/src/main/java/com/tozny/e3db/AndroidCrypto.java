@@ -22,6 +22,9 @@ package com.tozny.e3db;
 
 import com.tozny.e3db.crypto.*;
 
+import java.io.File;
+import java.io.IOException;
+
 class AndroidCrypto implements Crypto {
   @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
@@ -75,6 +78,21 @@ class AndroidCrypto implements Crypto {
 
   @Override
   public byte[] getPublicSigningKey(byte[] privateKey) {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public File encryptFile(File file, byte[] secretKey) throws IOException {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public void decryptFile(File file, byte[] secretKey, File dest) throws IOException {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public int getBlockSize() {
     throw new IllegalStateException();
   }
 }

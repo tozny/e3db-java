@@ -23,12 +23,7 @@ package com.tozny.e3db;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.DELETE;
-import retrofit2.http.GET;
-import retrofit2.http.POST;
-import retrofit2.http.PUT;
-import retrofit2.http.Path;
+import retrofit2.http.*;
 
 interface StorageAPI {
   @GET("/v1/storage/records/{record_ids}")
@@ -54,4 +49,10 @@ interface StorageAPI {
 
   @DELETE("/v1/storage/access_keys/{writer_id}/{user_id}/{reader_id}/{record_type}")
   Call<ResponseBody> deleteAccessKey(@Path("writer_id") String writerId, @Path("user_id") String userId, @Path("reader_id") String readerId, @Path("record_type") String recordType);
+
+  @POST("/v1/storage/files")
+  Call<ResponseBody> writeFile(@Body RequestBody record);
+
+  @PATCH("/v1/storage/files/{pending_file_id")
+  Call<ResponseBody> commitFile(@Path("pending_file_id") String pendingFileId);
 }

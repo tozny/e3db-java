@@ -123,6 +123,61 @@ called on the same background thread used for E3DB interactions.
 E3DB operations do not have timeouts defined -- you will have to
 manage those within your own application.
 
+# Certificate Pinning
+
+In some situations, you might want to pin a specific certificate or set
+of certificates as trusted entities for SSL collections - this is not a
+typical need, but does arise from time to time.
+
+To pin certificates, instantiate an OkHttp `CertificatePinner` object and
+add the certificates you want your application to explicitly trust.
+
+The [OkHttp documentation](http://square.github.io/okhttp/3.x/okhttp/okhttp3/CertificatePinner.html)
+has detailed examples for what the pinner object should look like and how
+to specify the various certificates. Once instantiated, pass the object in
+when registering a new client:
+
+```java
+import com.tozny.e3db.*;
+// ...
+
+String token = "<registration token>";
+String host = "https://api.e3db.com";
+
+CertificatePinner pinner = new CertificatePinner.Builder()
+    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
+    .build()
+
+Client.register(token, "client1", host, pinner, new ResultHandler<Config>() {
+  @Override
+  public void handle(Result<Config> r) {
+    if(! r.isError()) {
+      Config info = r.asValue();
+      // write credentials to secure storage ...
+    }
+    else {
+      // throw to indicate registration error
+      throw new RuntimeException(r.asError().other());
+    }
+  }
+});
+```
+
+Or when constructing a client:
+
+```java
+String storedCredentials = ...; // Read from secure storage
+
+CertificatePinner pinner = new CertificatePinner.Builder()
+    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
+    .build()
+
+Client client = new ClientBuilder()
+  .fromConfig(Config.fromJson(storedCredentials))
+  .setCertificatePinner(pinner)
+  .build();
+```
+
 # Registering a Client
 
 Registering creates a new client that can be used to interact with

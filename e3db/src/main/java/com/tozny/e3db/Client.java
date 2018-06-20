@@ -183,7 +183,6 @@ import static com.tozny.e3db.Checks.*;
  * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
  */
 public class  Client {
-  private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
@@ -244,7 +243,6 @@ public class  Client {
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-    anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
   }
 
   /**
@@ -345,7 +343,7 @@ public class  Client {
     return client;
   }
 
-  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey, CertificatePinner certificatePinner) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.clientId = clientId;
@@ -356,16 +354,25 @@ public class  Client {
     else
       publicSigningKey = null;
 
+    OkHttpClient.Builder clientBuilder = enableTLSv12(new OkHttpClient.Builder()
+            .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host, certificatePinner)));
+
+    if (certificatePinner != null)
+      clientBuilder.certificatePinner(certificatePinner);
+
     Retrofit build = new Retrofit.Builder()
-      .callbackExecutor(uiExecutor)
-      .client(enableTLSv12(new OkHttpClient.Builder()
-                              .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host)))
-                 .build())
-      .baseUrl(host.resolve("/").toString())
-      .build();
+            .callbackExecutor(uiExecutor)
+            .client(clientBuilder.build())
+            .baseUrl(host.resolve("/").toString())
+            .build();
 
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
+
+  }
+
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
+    this(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, null);
   }
 
   private static class CC implements ClientCredentials {
@@ -658,10 +665,21 @@ public class  Client {
     private Date replaceAfter = new Date(0L);
 
     private TokenInterceptor(String apiKey, String apiSecret, URI host) {
+      this(apiKey, apiSecret, host, null);
+    }
+
+    private TokenInterceptor(String apiKey, String apiSecret, URI host, CertificatePinner certificatePinner) {
       this.host = host;
       this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(UTF8)).base64()).toString();
+
+      OkHttpClient.Builder clientBuilder = enableTLSv12(new OkHttpClient.Builder());
+
+      if (certificatePinner != null) {
+        clientBuilder.certificatePinner(certificatePinner);
+      }
+
       this.authClient = new Retrofit.Builder()
-        .client(enableTLSv12(new OkHttpClient.Builder()).build())
+        .client(clientBuilder.build())
         .baseUrl(host.resolve("/").toString())
         .build()
         .create(AuthAPI.class);
@@ -993,10 +1011,11 @@ public class  Client {
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param certificatePinner OkHttp CertificatePinner instance to restrict which certificates and authorities are trusted.
    * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
    *                     a secure location, and loaded later.
    */
-  public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
+  public static void register(final String token, final String clientName, final String host, final CertificatePinner certificatePinner, final ResultHandler<Config> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(host, "host");
@@ -1007,7 +1026,7 @@ public class  Client {
     final byte[] privateSigningKey = Platform.crypto.newPrivateSigningKey();
     final String publicSigningKey = encodeURL(Platform.crypto.getPublicSigningKey(privateSigningKey));
 
-    register(token, clientName, publicKey, publicSigningKey, host, new ResultHandler<ClientCredentials>() {
+    ResultHandler<ClientCredentials> resultHandler = new ResultHandler<ClientCredentials>() {
       @Override
       public void handle(Result<ClientCredentials> r) {
         if (r.isError()) {
@@ -1016,11 +1035,30 @@ public class  Client {
         else {
           final ClientCredentials credentials = r.asValue();
           Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
-            encodeURL(privateSigningKey));
+                  encodeURL(privateSigningKey));
           executeValue(uiExecutor, handleResult, info);
         }
       }
-    });
+    };
+
+    if (certificatePinner == null)
+      register(token, clientName, publicKey, publicSigningKey, host, resultHandler);
+    else
+      register(token, clientName, publicKey, publicSigningKey, host, certificatePinner, resultHandler);
+  }
+
+  /**
+   * Registers a new client. This method creates a new public/private key pair for the client
+   * to use when encrypting and decrypting records.
+   *
+   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName Name of the client; for informational purposes only.
+   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
+   *                     a secure location, and loaded later.
+   */
+  public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
+    register(token, clientName, host, null, handleResult);
   }
 
   /**
@@ -1039,6 +1077,51 @@ public class  Client {
    * @param handleResult Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).build();
+
+    register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
+  }
+
+  /**
+   * Registers a new client with a given public key.
+   *
+   * <p>This method does not create a private/public key pair; rather, the public key should be provided
+   * by the caller.
+   *
+   * <p>This method does not create a certificate pin collectionl rather, the implementing application should
+   * <a href="https://github.com/square/okhttp/wiki/HTTPS#certificate-pinning">implement</a> a {@code CertificatePinner}
+   * instance and pass it.
+   *
+   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName Name of the client; for informational purposes only.
+   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                  private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
+   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param certificatePinner OkHttp CertificatePinner instance to restrict which certificates and authorities are trusted.
+   * @param handleResult Handles the result of registration.
+   */
+  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).certificatePinner(certificatePinner).build();
+
+    register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
+  }
+
+  /**
+   * Abstract helper method to enable registration with a pre-configured client instance.
+   *
+   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName Name of the client; for informational purposes only.
+   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                  private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
+   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param anonymousClient OkHttpClient instance for making anonymous requests against the server.
+   * @param handleResult Handles the result of registration.
+   */
+  private static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final OkHttpClient anonymousClient, final ResultHandler<ClientCredentials> handleResult) {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(publicKey, "publicKey");
@@ -1046,10 +1129,10 @@ public class  Client {
     checkNotEmpty(host, "host");
 
     final RegisterAPI registerClient = new Retrofit.Builder()
-      .callbackExecutor(uiExecutor)
-      .client(anonymousClient)
-      .baseUrl(URI.create(host).resolve("/").toString())
-      .build().create(RegisterAPI.class);
+            .callbackExecutor(uiExecutor)
+            .client(anonymousClient)
+            .baseUrl(URI.create(host).resolve("/").toString())
+            .build().create(RegisterAPI.class);
 
     backgroundExecutor.execute(new Runnable() {
       @Override

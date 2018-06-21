@@ -903,16 +903,7 @@ public class  Client {
     return new LocalMeta(meta.writerId(), meta.userId(), meta.type(), meta.plain());
   }
 
-  private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
-    if(eakInfo instanceof LocalEAKInfo)
-      return (LocalEAKInfo) eakInfo;
-    else
-      return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
-  }
-
-  private Map<String,Object> makeFileMeta(File encryptedFile) throws IOException, NoSuchAlgorithmException {
-    Map<String, Object> fileMeta = new HashMap<>();
-    fileMeta.put("compression", "raw");
+  private static String getMD5(File encryptedFile) throws NoSuchAlgorithmException, IOException {
     MessageDigest digest = MessageDigest.getInstance("MD5");
     FileChannel channel = new FileInputStream(encryptedFile).getChannel();
     ByteBuffer buffer = ByteBuffer.wrap(new byte[Platform.crypto.getBlockSize()]);
@@ -926,7 +917,21 @@ public class  Client {
       channel.close();
     }
 
-    fileMeta.put("checksum", Base64.encodeURL(digest.digest()));
+    return Base64.encode(digest.digest());
+  }
+
+  private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
+    if(eakInfo instanceof LocalEAKInfo)
+      return (LocalEAKInfo) eakInfo;
+    else
+      return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
+  }
+
+  private Map<String,Object> makeFileMeta(String md5) throws IOException, NoSuchAlgorithmException {
+    Map<String, Object> fileMeta = new HashMap<>();
+    fileMeta.put("compression", "raw");
+    String checkSum = md5;
+    fileMeta.put("checksum", checkSum);
     return fileMeta;
   }
 
@@ -1138,7 +1143,8 @@ public class  Client {
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, Object> meta = makeRecordMetaMap(type, plain);
           File encryptedFile = Platform.crypto.encryptFile(file, ownAK);
-          Map<String, Object> fileMeta = makeFileMeta(encryptedFile);
+          String md5 = getMD5(encryptedFile);
+          Map<String, Object> fileMeta = makeFileMeta(md5);
 
           Map<String, Object> record = new HashMap<>();
           record.put("meta", meta);
@@ -1156,7 +1162,11 @@ public class  Client {
             String destURL = pendingFile.get("signed_url").asText();
 
             try {
-              Request postFile = new Request.Builder().url(destURL).post(RequestBody.create(APPLICATION_OCTET, encryptedFile)).build();
+              Request postFile = new Request.Builder()
+                                     .url(destURL)
+                                     .header("Content-MD5", md5)
+                                     .post(RequestBody.create(APPLICATION_OCTET, encryptedFile))
+                                     .build();
               Response postFileResponse = anonymousClient.newCall(postFile).execute();
               if (postFileResponse.code() != 200) {
                 uiError(handleResult, E3DBException.find(postFileResponse.code(), postFileResponse.message()));

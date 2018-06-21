@@ -1088,10 +1088,6 @@ public class  Client {
    * <p>This method does not create a private/public key pair; rather, the public key should be provided
    * by the caller.
    *
-   * <p>This method does not create a certificate pin collectionl rather, the implementing application should
-   * <a href="https://github.com/square/okhttp/wiki/HTTPS#certificate-pinning">implement</a> a {@code CertificatePinner}
-   * instance and pass it.
-   *
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
@@ -1103,6 +1099,7 @@ public class  Client {
    * @param handleResult Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
+    checkNotNull(certificatePinner, "certificatePinner");
     OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).certificatePinner(certificatePinner).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);

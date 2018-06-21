@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.UUID;
 
+import okhttp3.CertificatePinner;
 import okio.ByteString;
 
 import static com.tozny.e3db.Checks.*;
@@ -56,6 +57,7 @@ public class ClientBuilder {
   private String apiSecret;
   private UUID clientId;
   private URI host = URI.create("https://api.e3db.com");
+  private CertificatePinner certificatePinner = null;
   private byte[] privateKey;
   private byte[] privateSigningKey;
 
@@ -151,6 +153,18 @@ public class ClientBuilder {
   }
 
   /**
+   * Configure a certificate pinner for this instance.
+   *
+   * @param certificatePinner OkHttp CertificatePinner instance.
+   *
+   * @return This instance.
+   */
+  public ClientBuilder setCertificatePinner(CertificatePinner certificatePinner) {
+    this.certificatePinner = certificatePinner;
+    return this;
+  }
+
+  /**
    * Configure the private key for this instance
    *
    * @param privateKey A Base64URL-encoded string representing a Curve25519 private key.
@@ -173,6 +187,9 @@ public class ClientBuilder {
    */
   public Client build() {
     checkState();
-    return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);
+    if (certificatePinner == null)
+      return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);
+    else
+      return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, certificatePinner);
   }
 }

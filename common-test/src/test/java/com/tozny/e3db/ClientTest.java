@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import okhttp3.CertificatePinner;
 import org.junit.*;
 
 import javax.crypto.*;
@@ -179,6 +180,61 @@ public class ClientTest {
   @BeforeClass
   public static void registerDefault() throws Exception {
     registerProfile("default", null);
+  }
+
+  @Test
+  public void testValidCertificatePin() throws IOException {
+    final String clientName = UUID.randomUUID().toString();
+    final String host = System.getProperty("e3db.host", "https://dev.e3db.com");
+    final String token = System.getProperty("e3db.token", "1f991d79091ba4aaa1f333bef1929a10ed8c3f426fb6d3b1340a1157950d5bce");
+
+    final CertificatePinner certificatePinner = new CertificatePinner.Builder()
+            .add("dev.e3db.com", "sha256/YLh1dUR9y6Kja30RrAn7JKnbQG/uEtLMkBgFF2Fuihg=")
+            .build();
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(final CountDownLatch wait) throws Exception {
+        Client.register(
+                token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+                  @Override
+                  public void handle(Result<Config> r) {
+                    if (!r.isError()) assertTrue(true);
+
+                    if (r.isError()) {
+                      fail("Invalid certificate pin");
+                      throw new Error(r.asError().other());
+                    }
+                  }}));
+      }
+    });
+  }
+
+  @Test
+  public void testInValidCertificatePin() throws IOException {
+    final String clientName = UUID.randomUUID().toString();
+    final String host = System.getProperty("e3db.host", "https://dev.e3db.com");
+    final String token = System.getProperty("e3db.token", "1f991d79091ba4aaa1f333bef1929a10ed8c3f426fb6d3b1340a1157950d5bce");
+
+    final CertificatePinner certificatePinner = new CertificatePinner.Builder()
+            .add("dev.e3db.com", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+            .build();
+
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(final CountDownLatch wait) throws Exception {
+        Client.register(
+                token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+                  @Override
+                  public void handle(Result<Config> r) {
+                    if (!r.isError()) fail("Certificate pin should have been invalid!");
+
+                    if (r.isError()) {
+                      assertTrue(true);
+                    }
+                  }}));
+      }
+    });
   }
 
   @Test

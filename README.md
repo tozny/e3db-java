@@ -47,8 +47,8 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [3.1.1](https://tozny.github.io/e3db-java/docs/3.1.1/) - The most recently released version of the client.
-* Older versions: [3.1.0](https://tozny.github.io/e3db-java/docs/3.1.0/), [3.0.0](https://tozny.github.io/e3db-java/docs/3.0.0/), [2.3.0](https://tozny.github.io/e3db-java/docs/2.3.0/), [2.2.0](https://tozny.github.io/e3db-java/docs/2.2.0/), [2.0.0](https://tozny.github.io/e3db-java/docs/2.0.0/).
+* [3.2.0](https://tozny.github.io/e3db-java/docs/3.2.0/) - The most recently released version of the client.
+* All versions: https://tozny.github.io/e3db-java/docs
 
 Code examples for the most common operations can be found below.
 
@@ -62,7 +62,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-implementation ('com.tozny.e3db:e3db-client-android:3.1.1@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:3.2.0@aar') {
     transitive = true
 }
 ```
@@ -87,7 +87,7 @@ For use with Maven, declare the following repository and dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>3.1.1</version>
+    <version>3.2.0</version>
   </dependency>
 </dependencies>
 ```

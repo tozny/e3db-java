@@ -48,7 +48,7 @@ Full API documentation for various versions can be found at the
 following locations:
 
 * [3.2.0](https://tozny.github.io/e3db-java/docs/3.2.0/) - The most recently released version of the client.
-* All versions: https://tozny.github.io/e3db-java/docs
+* All versions: https://tozny.github.io/e3db-java
 
 Code examples for the most common operations can be found below.
 

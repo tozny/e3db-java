@@ -1585,11 +1585,12 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+          client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
-            if(r.isError())
-              resultRef.set(new ErrorResult(new RuntimeException("Failed to write file.")));
+            if(r.isError()) {
+              resultRef.set(new ErrorResult(new RuntimeException("Failed to write file.", r.asError().other())));
+            }
             else
               resultRef.set(r);
           }

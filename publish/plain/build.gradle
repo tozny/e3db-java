@@ -66,10 +66,10 @@ publishing {
   
 dependencies {
   compile files("${project(":e3db").projectDir}/compileLibs/android-4.1.1.4.jar")
-  compile 'com.squareup.retrofit2:retrofit:2.3.0'
+  compile 'com.squareup.retrofit2:retrofit:2.4.0'
   compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
   compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
   compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-  compile 'com.squareup.okio:okio:1.13.0'
-  implementation "com.goterl.lazycode:lazysodium-java:2.5.0"
+  compile "com.goterl.lazycode:lazysodium-java:2.5.0"
+  compile 'com.squareup.okhttp3:okhttp:3.10.0'
 }

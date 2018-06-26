@@ -53,6 +53,6 @@ interface StorageAPI {
   @POST("/v1/storage/files")
   Call<ResponseBody> writeFile(@Body RequestBody record);
 
-  @PATCH("/v1/storage/files/{pending_file_id")
+  @PATCH("/v1/storage/files/{pending_file_id}")
   Call<ResponseBody> commitFile(@Path("pending_file_id") String pendingFileId);
 }

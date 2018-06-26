@@ -91,9 +91,8 @@ public interface RecordMeta {
   Map<String, String> plain();
 
   /**
-   * If true, then this record is associated with a large file, and the
-   * data should be retrieved via {@link Client#readFile}.
-   * @return
+   * Holds info about a file associated with this record, if any. May be {@code null}.
+   * @return file.
    */
-  boolean isFile();
+  FileMeta file();
 }

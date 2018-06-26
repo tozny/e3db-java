@@ -388,6 +388,7 @@ public class  Client {
 
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
+
   }
 
   Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
@@ -1173,6 +1174,7 @@ public class  Client {
    * @param handleResult Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
+    checkNotNull(certificatePinner, "certificatePinner");
     OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).certificatePinner(certificatePinner).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);

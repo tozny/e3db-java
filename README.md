@@ -664,7 +664,7 @@ To write a file, use the `writeFile` method. For example, assuming the program c
 File readmeFile = new File("README.md");
 String recordType = "docs";
 
-client.write(recordType, readmeFile, null, new ResultHandler<RecordMeta>() {
+client.writeFile(recordType, readmeFile, null, new ResultHandler<RecordMeta>() {
     @Override
     public void handle(Result<RecordMeta> r) {
       if(! r.isError()) {

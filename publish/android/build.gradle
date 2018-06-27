@@ -52,6 +52,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_7
         targetCompatibility JavaVersion.VERSION_1_7
     }
+    lintOptions {
+      disable 'InvalidPackage' // jna package used by libsodium references some sun packages, but those will never be called.
+    }
 }
 
 evaluationDependsOn(':publish')

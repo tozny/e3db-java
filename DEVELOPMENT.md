@@ -116,6 +116,18 @@ created, containing the generated javadocs.
 
 Please ensure that the `javadoc` task does not generate any warnings or errors.
 
+Lint
+====
+
+Linting over the Android source ensures that the library stays compatible with the SDKs it targets. Prior
+to publishing, run lint like so:
+
+```
+$ ./gradlew :publish:android:lint
+```
+
+(We use the `publish` project to ensure we only lint over Android-specific and common sources.)
+
 Publishing
 ====
 

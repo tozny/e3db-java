@@ -28,10 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -183,7 +180,7 @@ import static com.tozny.e3db.Checks.*;
  * To verify a signed document, use the {@link #verify(SignedDocument, String)} method. Note that the {@link LocalEncryptedRecord} class
  * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
  *
- * <h1>Reading &amp; Writing Large Files<h1>
+ * <h1>Reading &amp; Writing Large Files</h1>
  *
  * E3DB can compress and encrypt files for storage. Files are treated much like records, except the data for the file is
  * not included inline when downloading a record. Instead, a separate request for each file must be made to the {@link #readFile(UUID, File, ResultHandler)}

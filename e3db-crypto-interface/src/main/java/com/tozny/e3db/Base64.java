@@ -56,4 +56,29 @@ public class Base64 {
     else
       return byteString.toByteArray();
   }
+
+  /**
+   * Encode the given bytes using Base64 encoding.
+   * @param bytes Ibid.
+   * @return Ibid.
+   */
+  public static String encode(byte[] bytes) {
+    checkNotEmpty(bytes, "bytes");
+    return ByteString.of(bytes).base64();
+  }
+
+  /**
+   * Decode the given Base64-encoded string into a byte array.
+   * @param encoded Ibid.
+   * @return Ibid.
+   */
+  public static byte[] decode(String encoded) {
+    checkNotEmpty(encoded, "encoded");
+    final ByteString byteString = ByteString.decodeBase64(encoded);
+    if(byteString == null)
+      return null;
+    else
+      return byteString.toByteArray();
+  }
 }
+

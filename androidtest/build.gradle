@@ -63,11 +63,15 @@ dependencies {
 
     androidTestImplementation project(path: ':e3db')
     androidTestImplementation project(path: ':e3db-crypto-interface')
-    androidTestImplementation(project(path: ':e3db-crypto-android'))
+    androidTestImplementation(project(path: ':e3db-crypto-android')) {
+        transitive = true
+    }
 
     implementation project(path: ':e3db')
     implementation project(path: ':e3db-crypto-interface')
-    implementation(project(path: ':e3db-crypto-android'))
+    implementation(project(path: ':e3db-crypto-android')) {
+        transitive = true
+    }
 }
 
 tasks.withType(Test) {

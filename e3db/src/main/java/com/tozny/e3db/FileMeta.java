@@ -20,25 +20,37 @@
 
 package com.tozny.e3db;
 
-import com.tozny.e3db.crypto.Crypto;
+/**
+ * Represents information about an encrypted file stored by E3DB.
+ */
+public interface FileMeta {
+  /**
+   * URL where the file can be downloaded. May be {@code null}.
+   * @return URL.
+   */
+  String fileUrl();
 
-final class Platform {
-  public static final Crypto crypto;
-  static {
-    if (Platform.isAndroid()) {
-      crypto = new AndroidCrypto();
-    } else {
-      crypto = new PlainCrypto();
-    }
-  }
+  /**
+   * Name of the file. May be {@code null}.
+   * @return fileName.
+   */
+  String fileName();
 
-  static boolean isAndroid() {
-    boolean isAndroid = false;
-    try {
-      Class.forName("android.os.Build");
-      isAndroid = true;
-    } catch (ClassNotFoundException ignored) {
-    }
-    return isAndroid;
-  }
+  /**
+   * MD5 checksum for the file, as a Base64 encoded string. Cannot be {@code null}.
+   * @return checksum.
+   */
+  String checksum();
+
+  /**
+   * Compression used for the plaintext contents of the file. Cannot be {@code null}.
+   * @return compression.
+   */
+  Compression compression();
+
+  /**
+   * Size of the encrypted file. Cannot be {@code null}.
+   * @return size.
+   */
+  Long size();
 }

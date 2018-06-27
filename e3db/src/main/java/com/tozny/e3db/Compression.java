@@ -20,25 +20,44 @@
 
 package com.tozny.e3db;
 
-import com.tozny.e3db.crypto.Crypto;
+/**
+ * Represents the different types of compression E3DB supports.
+ */
+public enum Compression {
+  /**
+   * Plaintext contents were gzip-compressed prior to encryption.
+   */
+  GZIP("gzip"),
+  /**
+   * Plaintext contents were not compressed prior to encryption.
+   */
+  RAW("raw");
 
-final class Platform {
-  public static final Crypto crypto;
-  static {
-    if (Platform.isAndroid()) {
-      crypto = new AndroidCrypto();
-    } else {
-      crypto = new PlainCrypto();
-    }
+  private final String type;
+
+  Compression(String type) {
+    this.type = type;
   }
 
-  static boolean isAndroid() {
-    boolean isAndroid = false;
-    try {
-      Class.forName("android.os.Build");
-      isAndroid = true;
-    } catch (ClassNotFoundException ignored) {
-    }
-    return isAndroid;
+  /**
+   * The compression type.
+   * @return Ibid.
+   */
+  public String getType() {
+    return type;
+  }
+
+  /**
+   * Given a compression type, retrieve the associated enum.
+   * @param type Compression type.
+   * @return Ibid.
+   */
+  public static Compression fromType(String type) {
+    if(type.equalsIgnoreCase(GZIP.getType()))
+      return GZIP;
+    else if(type.equalsIgnoreCase(RAW.getType()))
+      return RAW;
+    else
+      throw new RuntimeException("Unknown compression type: " + type);
   }
 }

@@ -35,7 +35,9 @@ dependencies {
   testCompile("junit:junit:[4,)")
   testCompile project(path: ':e3db')
   testCompile project(path: ':e3db-crypto-interface')
-  testCompile(project(path: ':e3db-crypto-plain'))
+  testCompile(project(path: ':e3db-crypto-plain')) {
+    transitive = true
+  }
   testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
   testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
   testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'

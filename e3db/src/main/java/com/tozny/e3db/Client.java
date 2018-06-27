@@ -28,17 +28,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -181,10 +179,27 @@ import static com.tozny.e3db.Checks.*;
  *
  * To verify a signed document, use the {@link #verify(SignedDocument, String)} method. Note that the {@link LocalEncryptedRecord} class
  * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
+ *
+ * <h1>Reading &amp; Writing Large Files</h1>
+ *
+ * E3DB can compress and encrypt files for storage. Files are treated much like records, except the data for the file is
+ * not included inline when downloading a record. Instead, a separate request for each file must be made to the {@link #readFile(UUID, File, ResultHandler)}
+ * method.
+ *
+ * To write a file, use the {@link #writeFile(String, File, Map, ResultHandler)} method. The record type and plaintext meta
+ * arguments behave the same as with normal records. The SDK will compress and encrypt the record in the same directory
+ * that stores the plaintext file and will need at least twice as much free space as the size of the plaintext file. The
+ * temporary encrypted file will always be deleted the upload finishes (or if an error occurs).
+ *
+ * To read a file, use the {@link #readFile(UUID, File, ResultHandler)} method (which is as yet not implemented). The SDK will
+ * download the encrypted file to the same directory as the destination given. It will decrypt and decompress in-place, and write
+ * the result to the destination file. Afterwards, the temporary encrypted file is deleted.
  */
 public class  Client {
+  private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
+  private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
@@ -199,27 +214,29 @@ public class  Client {
   private final byte[] privateSigningKey;
   private final byte[] publicSigningKey;
   private final StorageAPI storageClient;
-
   private final ShareAPI shareClient;
 
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
   static {
+    anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
+
     backgroundExecutor = new ThreadPoolExecutor(1,
-      Runtime.getRuntime().availableProcessors(),
-      30,
-      TimeUnit.SECONDS,
-      new LinkedBlockingQueue<Runnable>(10),
-      new ThreadFactory() {
-        private int threadCount = 1;
-        @Override
-        public Thread newThread(Runnable runnable) {
-          final Thread thread = Executors.defaultThreadFactory().newThread(runnable);
-          thread.setDaemon(true);
-          thread.setName("E3DB background "+ threadCount++);
-          return thread;
-        }
-      });
+        Runtime.getRuntime().availableProcessors(),
+        30,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<Runnable>(10),
+        new ThreadFactory() {
+          private int threadCount = 1;
+
+          @Override
+          public Thread newThread(Runnable runnable) {
+            final Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+            thread.setDaemon(true);
+            thread.setName("E3DB background " + threadCount++);
+            return thread;
+          }
+        });
 
     if (Platform.isAndroid()) {
       // Post results to UI thread
@@ -579,7 +596,17 @@ public class  Client {
       String version = rawMeta.get("version").asText();
       String type = rawMeta.get("type").asText();
       JsonNode plain = rawMeta.has("plain") ? rawMeta.get("plain") : mapper.createObjectNode();
-      return new M(recordId, writerId, userId, version, created, lastModified, type, plain);
+      FileMeta file = rawMeta.has("file_meta") ? getFileMeta(rawMeta.get("file_meta")) : null;
+
+      return new M(recordId, writerId, userId, version, created, lastModified, type, plain, file);
+    }
+
+    private static FM getFileMeta(JsonNode fileMeta) {
+      return new FM(fileMeta.has("size") ? fileMeta.get("size").asLong() : null,
+          fileMeta.has("file_url") ? fileMeta.get("file_url").asText() : null,
+          fileMeta.has("file_name") ? fileMeta.get("file_name").asText() : null,
+          fileMeta.has("checksum") ? fileMeta.get("checksum").asText() : null,
+          fileMeta.has("compression") ? Compression.fromType(fileMeta.get("compression").asText()) : null);
     }
 
     public static R makeLocal(JsonNode rawMeta) {
@@ -918,11 +945,52 @@ public class  Client {
     return new LocalMeta(meta.writerId(), meta.userId(), meta.type(), meta.plain());
   }
 
+  private static String getMD5(File encryptedFile) throws NoSuchAlgorithmException, IOException {
+    MessageDigest digest = MessageDigest.getInstance("MD5");
+    FileChannel channel = new FileInputStream(encryptedFile).getChannel();
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[Platform.crypto.getBlockSize()]);
+    try {
+      for (int amt = channel.read(buffer); amt != -1; amt = channel.read(buffer)) {
+        buffer.flip();
+        digest.update(buffer);
+        buffer.clear();
+      }
+    } finally {
+      channel.close();
+    }
+
+    return Base64.encode(digest.digest());
+  }
+
   private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
     if(eakInfo instanceof LocalEAKInfo)
       return (LocalEAKInfo) eakInfo;
     else
       return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
+  }
+
+  private FileMeta makeFileMeta(String encryptedFileMD5, long encryptedFileSize, Compression compression, String fileName) {
+    return new FM(encryptedFileSize, null, fileName, encryptedFileMD5, compression);
+  }
+
+  private Map<String, Object> makeRecordMetaMap(String type, Map<String, String> plain, FileMeta fileMeta) {
+    Map<String, Object> meta = new HashMap<>();
+    meta.put("writer_id", clientId.toString());
+    meta.put("user_id", clientId.toString());
+    meta.put("type", type.trim());
+
+    if (plain != null)
+      meta.put("plain", plain);
+
+    if(fileMeta != null) {
+      HashMap<String, Object> fm = new HashMap<>();
+      fm.put("checksum", fileMeta.checksum());
+      fm.put("compression", fileMeta.compression().getType());
+      fm.put("size", fileMeta.size());
+      fm.put("file_name", fileMeta.fileName());
+      meta.put("file_meta", fm);
+    }
+    return meta;
   }
 
   /**
@@ -1088,6 +1156,10 @@ public class  Client {
    * <p>This method does not create a private/public key pair; rather, the public key should be provided
    * by the caller.
    *
+   * <p>This method does not create a certificate pin collectionl rather, the implementing application should
+   * <a href="https://github.com/square/okhttp/wiki/HTTPS#certificate-pinning">implement</a> a {@code CertificatePinner}
+   * instance and pass it.
+   *
    * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
    * @param clientName Name of the client; for informational purposes only.
    * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
@@ -1174,6 +1246,87 @@ public class  Client {
   }
 
   /**
+   * Write the given file to E3DB. Intended for files from 5MB up to 5GB in size. The contents of the file are
+   * encrypted before being uploaded.
+   *
+   * @param type Type of the record. Cannot be {@code null} or blank.
+   * @param file Path to the file to upload. Cannot be {@code null}.
+   * @param plain Plaintext meta associated with the file. Can be {@code null}.
+   * @param handleResult Handles the result of the write.
+   */
+  public void writeFile(final String type, final File file, final Map<String, String> plain, final ResultHandler<RecordMeta> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(file, "file");
+    if(plain != null && plain.size() > 0)
+      checkMap(plain, "plain");
+
+    final File absFile = file.getAbsoluteFile();
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          final byte[] ownAK = getOwnAccessKey(type);
+          File encryptedFile = Platform.crypto.encryptFile(absFile, ownAK);
+          FileMeta fileMeta = makeFileMeta(getMD5(encryptedFile), encryptedFile.length(), Compression.RAW, absFile.getName());
+          Map<String, Object> meta = makeRecordMetaMap(type, plain, fileMeta);
+
+          Map<String, Object> record = new HashMap<>();
+          record.put("meta", meta);
+          record.put("data", new HashMap<>());
+
+          EXIT: {
+            retrofit2.Response<ResponseBody> postResponse = storageClient.writeFile(RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(record))).execute();
+            if (postResponse.code() != 202) {
+              uiError(handleResult, E3DBException.find(postResponse.code(), postResponse.message()));
+              break EXIT;
+            }
+
+            final JsonNode pendingFile = mapper.readTree(postResponse.body().string());
+            UUID pendingFileID = UUID.fromString(pendingFile.get("id").asText());
+            String destURL = pendingFile.get("file_url").asText();
+
+            try {
+              Response putFileResponse = anonymousClient.newCall(new Request.Builder()
+                                     .url(destURL)
+                                     .header("Content-MD5", fileMeta.checksum())
+                                     .put(RequestBody.create(APPLICATION_OCTET, encryptedFile))
+                                     .build()).execute();
+              if (putFileResponse.code() != 200) {
+                uiError(handleResult, E3DBException.find(putFileResponse.code(), putFileResponse.body().string()));
+                break EXIT;
+              }
+
+              retrofit2.Response<ResponseBody> commitResponse = storageClient.commitFile(pendingFileID.toString()).execute();
+              if (commitResponse.code() != 201) {
+                uiError(handleResult, E3DBException.find(commitResponse.code(), commitResponse.message()));
+                break EXIT;
+              }
+
+              uiValue(handleResult, R.getRecordMeta(mapper.readTree(commitResponse.body().string()).get("meta")));
+            } finally {
+              encryptedFile.delete();
+            }
+          }
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Read the file associated with the given record from the server.
+   *
+   * @param recordId ID of the record. Cannot be {@code null}.
+   * @param dest Destination to write the decrypted file to. If the file exists, it will be truncated.
+   * @param handleResult Handles the result of the operation. If the operation completes successfully, the
+   *                     destination will hold the contents of the unencrypted file.
+   */
+  public void readFile(UUID recordId, File dest, ResultHandler<RecordMeta> handleResult) {
+    throw new IllegalStateException("Not yet implemented.");
+  }
+
+  /**
    * Write a new record.
    *
    * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
@@ -1193,13 +1346,7 @@ public class  Client {
         try {
           final byte[] ownAK = getOwnAccessKey(type);
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
-          Map<String, Object> meta = new HashMap<>();
-          meta.put("writer_id", clientId.toString());
-          meta.put("user_id", clientId.toString());
-          meta.put("type", type.trim());
-
-          if (plain != null)
-            meta.put("plain", plain);
+          Map<String, Object> meta = makeRecordMetaMap(type, plain, null);
 
           Map<String, Object> record = new HashMap<>();
           record.put("meta", meta);
@@ -1257,21 +1404,10 @@ public class  Client {
       @Override
       public void run() {
         try {
-          String type = updateMeta.getType();
           UUID id = updateMeta.getRecordId();
-          String v = updateMeta.getVersion();
-
           final byte[] ownAK = getOwnAccessKey(updateMeta.getType());
           Map<String, String> encFields = encryptObject(ownAK, fields.getCleartext());
-
-          Map<String, Object> meta = new HashMap<>();
-          meta.put("writer_id", clientId.toString());
-          meta.put("user_id", clientId.toString());
-          meta.put("type", updateMeta.getType().trim());
-
-          if (plain != null) {
-            meta.put("plain", plain);
-          }
+          Map<String, Object> meta = makeRecordMetaMap(updateMeta.getType(), plain, null);
 
           Map<String, Object> fields = new HashMap<>();
           fields.put("meta", meta);
@@ -1733,6 +1869,47 @@ public class  Client {
     return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(UTF8), Base64.decodeURL(publicSigningKey));
   }
 
+  private static class FM implements FileMeta {
+    private final Long size;
+    private final String fileUrl;
+    private final String fileName;
+    private final String checksum;
+    private final Compression compression;
+
+    private FM(Long size, String fileUrl, String fileName, String checksum, Compression compression) {
+      this.size = size;
+      this.fileUrl = fileUrl;
+      this.fileName = fileName;
+      this.checksum = checksum;
+      this.compression = compression;
+    }
+
+    @Override
+    public String fileUrl() {
+      return fileUrl;
+    }
+
+    @Override
+    public String fileName() {
+      return fileName;
+    }
+
+    @Override
+    public String checksum() {
+      return checksum;
+    }
+
+    @Override
+    public Compression compression() {
+      return compression;
+    }
+
+    @Override
+    public Long size() {
+      return size;
+    }
+  }
+
   /**
    * Immutable information about a given record.
    */
@@ -1746,10 +1923,11 @@ public class  Client {
     private final Date lastModified;
     private final String type;
     private final JsonNode plain;
+    private final FileMeta file;
 
     private volatile Map<String, String> plainMap = null;
 
-    M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain) {
+    M(UUID recordId, UUID writerId, UUID userId, String version, Date created, Date lastModified, String type, JsonNode plain, FileMeta file) {
       this.recordId = recordId;
       this.writerId = writerId;
       this.userId = userId;
@@ -1758,6 +1936,7 @@ public class  Client {
       this.lastModified = lastModified;
       this.type = type;
       this.plain = plain;
+      this.file = file;
     }
 
     public UUID recordId() {
@@ -1813,6 +1992,11 @@ public class  Client {
         }
       }
       return result;
+    }
+
+    @Override
+    public FileMeta file() {
+      return file;
     }
   }
 }

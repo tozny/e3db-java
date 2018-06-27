@@ -21,7 +21,8 @@
 package com.tozny.e3db;
 
 import com.goterl.lazycode.lazysodium.LazySodium;
-import com.goterl.lazycode.lazysodium.LazySodiumAndroid;
+import com.goterl.lazycode.lazysodium.LazySodiumJava;
+import com.goterl.lazycode.lazysodium.SodiumJava;
 import com.goterl.lazycode.lazysodium.exceptions.SodiumException;
 import com.goterl.lazycode.lazysodium.interfaces.Box;
 import com.goterl.lazycode.lazysodium.interfaces.SecretBox;
@@ -29,32 +30,31 @@ import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
 import com.goterl.lazycode.lazysodium.interfaces.Sign;
 import com.tozny.e3db.crypto.*;
 
-import static com.tozny.e3db.Checks.*;
-import com.goterl.lazycode.lazysodium.SodiumAndroid;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
-class AndroidCrypto implements Crypto {
-  private static final int BLOCK_SIZE = 65_536; // 2 ^ 16
+import static com.tozny.e3db.Checks.*;
 
+class PlainCrypto implements Crypto {
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
+  private static final int BLOCK_SIZE = 65_536;
   private final LazySodium lazySodium;
-  private static final Charset UTF8 = Charset.forName("UTF-8");
-  public AndroidCrypto() {
-    lazySodium = new LazySodiumAndroid(Init.sodium);
+
+  public PlainCrypto() {
+    lazySodium = new LazySodiumJava(Init.sodium);
   }
 
   private static class Init {
-
     // Static inner class as a singleton to make sure
-    public static final SodiumAndroid sodium;
     // Sodium library is initalized once and only once.
+    public static final SodiumJava sodium;
     static {
       try {
-         sodium = new SodiumAndroid();
+        sodium = new SodiumJava();
       }
       catch(Throwable ex) {
         ex.printStackTrace();
@@ -132,9 +132,9 @@ class AndroidCrypto implements Crypto {
 
   @Override
   public byte[] newSecretKey() {
-    byte [] key = new byte[SecretBox.KEYBYTES];
-    lazySodium.cryptoSecretBoxKeygen(key);
-    return key;
+    byte[] secretKey = new byte[SecretBox.KEYBYTES];
+    lazySodium.cryptoSecretBoxKeygen(secretKey);
+    return secretKey;
   }
 
   @Override
@@ -181,33 +181,31 @@ class AndroidCrypto implements Crypto {
     byte[] header = new byte[SecretStream.HEADERBYTES];
     SecretStream.State state = new SecretStream.State();
     if(! lazySodium.cryptoSecretStreamInitPush(state, header, dataKey))
-      throw new RuntimeException("Error initializing encryption operation.");
+      throw new RuntimeException("Error initializing encrypt operation.");
 
     CipherWithNonce edk = encryptSecretBox(dataKey, secretKey);
     String version = "1";
     String e3dbHeader = new StringBuilder()
-        .append(version)
-        .append(".")
-        .append(edk.toMessage())
-        .append(".")
-        .toString();
+                            .append(version)
+                            .append(".")
+                            .append(edk.toMessage())
+                            .append(".")
+                            .toString();
 
     File encryptedFile = File.createTempFile("e2e-", ".bin", new File(file.getParent()));
-    FileOutputStream out = new FileOutputStream(encryptedFile);
-    FileInputStream source = new FileInputStream(file);
-    try {
+    try (FileOutputStream out = new FileOutputStream(encryptedFile); FileInputStream source = new FileInputStream(file)) {
       out.write(e3dbHeader.getBytes(UTF8));
       out.write(header);
 
-      // Simulate a 2-element queue, which makes it
+      // Simulate a 2-element queue, which makes it pretty
       // easy to detect EOF.
-      byte[] head = new byte[BLOCK_SIZE];
+      byte[] head = new byte[BLOCK_SIZE]; // 2^16
       byte[] next = new byte[head.length];
       byte[] cipher = new byte[head.length + SecretStream.ABYTES];
 
-      for(int headAmt = source.read(head), nextAmt = source.read(next);
-          headAmt != -1;
-          headAmt = nextAmt, head = next, nextAmt = source.read(next)) {
+      for (int headAmt = source.read(head), nextAmt = source.read(next);
+           headAmt != -1;
+           headAmt = nextAmt, head = next, nextAmt = source.read(next)) {
 
         byte messageTag = headAmt == head.length ? SecretStream.TAG_MESSAGE : SecretStream.TAG_FINAL;
         if(! lazySodium.cryptoSecretStreamPush(state, cipher, head, headAmt, messageTag))
@@ -215,9 +213,6 @@ class AndroidCrypto implements Crypto {
 
         out.write(cipher, 0, headAmt + SecretStream.ABYTES);
       }
-    } finally {
-      out.close();
-      source.close();
     }
 
     return encryptedFile;
@@ -225,13 +220,10 @@ class AndroidCrypto implements Crypto {
 
   @Override
   public void decryptFile(File encrypted, byte[] secretKey, File dest) throws IOException {
-    FileOutputStream out = new FileOutputStream(dest, false);
-    FileInputStream in = new FileInputStream(encrypted);
-    try {
-
+    try (FileOutputStream out = new FileOutputStream(dest, false); FileInputStream in = new FileInputStream(encrypted)) {
       // Read version
       String v = new String(new byte[]{(byte) in.read()}, UTF8);
-      if (! v.equalsIgnoreCase("1"))
+      if (!v.equalsIgnoreCase("1"))
         throw new RuntimeException("Unknown version: " + v);
       in.read(); // "."
 
@@ -239,7 +231,7 @@ class AndroidCrypto implements Crypto {
       byte[] dataKey;
       {
         int separators = 0;
-        StringBuffer b = new StringBuffer();
+        StringBuilder b = new StringBuilder();
         while (separators < 2) {
           String c = new String(new byte[]{(byte) in.read()}, UTF8);
           if (c.equalsIgnoreCase("."))
@@ -260,29 +252,25 @@ class AndroidCrypto implements Crypto {
       {
         SecretStream.State state = new SecretStream.State();
         if(! lazySodium.cryptoSecretStreamInitPull(state, header, dataKey))
-          throw new RuntimeException("Error initializing decrypt operation.");
+          throw new RuntimeException("Error initializing decryption operation.");
 
         byte[] cipherBlock = new byte[BLOCK_SIZE + SecretStream.ABYTES];
         byte[] tag = new byte[1];
 
         for (int cipherAmt = in.read(cipherBlock); cipherAmt != -1; cipherAmt = in.read(cipherBlock)) {
           byte[] messageBlock = new byte[cipherAmt - SecretStream.ABYTES];
-          if(! lazySodium.cryptoSecretStreamPull(state, messageBlock, tag, cipherBlock, cipherAmt))
+          if (!lazySodium.cryptoSecretStreamPull(state, messageBlock, tag, cipherBlock, cipherAmt))
             throw new RuntimeException("Decryption error.");
 
-          if(tag[0] != SecretStream.TAG_MESSAGE && tag[0] != SecretStream.TAG_FINAL)
+          if (tag[0] != SecretStream.TAG_MESSAGE && tag[0] != SecretStream.TAG_FINAL)
             throw new RuntimeException("Invalid decryption.");
 
           out.write(messageBlock);
         }
 
-        if(tag[0] != SecretStream.TAG_FINAL)
+        if (tag[0] != SecretStream.TAG_FINAL)
           throw new RuntimeException("Invalid file.");
       }
-    }
-    finally {
-      in.close();
-      out.close();
     }
   }
 

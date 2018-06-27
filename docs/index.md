@@ -5,8 +5,9 @@ title: API Documentation
 Full API documentation for our Java libraries can be found at the
 following locations:
 
-* Latest Version - [3.2.0](https://tozny.github.io/e3db-java/docs/3.2.0/index.html)
+* [3.3.0-SNAPSHOT](https://tozny.github.io/e3db-java/docs/3.3.0-SNAPSHOT/) - The most recently released version of the client.
 * Older versions:
+  * [3.2.0](https://tozny.github.io/e3db-java/docs/3.2.0/)
   * [3.1.1](https://tozny.github.io/e3db-java/docs/3.1.1/)
   * [3.1.0](https://tozny.github.io/e3db-java/docs/3.1.0/)
   * [3.0.0](https://tozny.github.io/e3db-java/docs/3.0.0/)

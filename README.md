@@ -47,7 +47,7 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [3.2.0](https://tozny.github.io/e3db-java/docs/3.2.0/index.html) - The most recently released version of the client.
+* [3.3.0-SNAPSHOT](https://tozny.github.io/e3db-java/docs/3.3.0-SNAPSHOT/) - The most recently released version of the client.
 * All versions: https://tozny.github.io/e3db-java
 
 Code examples for the most common operations can be found below.
@@ -62,7 +62,7 @@ repositories {
   maven { url "https://maven.tozny.com/repo" }
 }
 
-implementation ('com.tozny.e3db:e3db-client-android:3.2.0@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:3.3.0-SNAPSHOT@aar') {
     transitive = true
 }
 ```
@@ -87,21 +87,10 @@ For use with Maven, declare the following repository and dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>3.2.0</version>
+    <version>3.3.0-SNAPSHOT</version>
   </dependency>
 </dependencies>
 ```
-
-## libsodium
-
-The plain Java SDK requires that the libsodium .so/.dll be on your
-path. On Linux or MacOS, use a package manager to install libsodium.
-
-Windows users should download a "MSVC" build of libsodium 1.0.14 from
-https://download.libsodium.org/libsodium/releases. Unzip the archive
-and find the most recent "Release" version of libsodium.dll
-for your architecture (32 or 64 bits), and copy that that file to a location
-on your PATH environment variable.
 
 # Asynchronous Result Handling
 
@@ -650,6 +639,47 @@ Config clientConfig = ...; // Retrieve config for client
 if(! client.verify(signed, clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
+```
+
+## Reading and Writing Large Files
+
+E3DB supports the storage of large encrypted files, using a similar interface for reading and writing records.
+The SDK will handle compression, encrypting and uploading the file. Similarly, it will download, decrypt and
+decompress files as well.
+
+When uploading a file, the SDK expects to be able to (temporarily) store an encrypted, compressed version of the plaintext
+file in the same directory. Once the upload finishes (with or without error), the temporary file will be deleted.
+
+When downloading a file, you must provide a location to which the file can be written. The SDK will save the encrypted
+file to storage in the same directory as to where the plaintext file will be written. The SDK will decrypt and decompress
+the encrypted file in that directory, ultimately writing the plaintext file to the destination given.
+
+In both cases, uploading and downloading, the SDK expects at least twice as much free storage as the size of the plaintext or
+encrypted file.
+
+To write a file, use the `writeFile` method. For example, assuming the program can read this file (`README.md`):
+
+```
+...
+File readmeFile = new File("README.md");
+String recordType = "docs";
+
+client.writeFile(recordType, readmeFile, null, new ResultHandler<RecordMeta>() {
+    @Override
+    public void handle(Result<RecordMeta> r) {
+      if(! r.isError()) {
+        // file written successfully
+        RecordMeta record = r.asValue();
+        // Log or print record ID, e.g.:
+        System.out.println("Record ID: " + record.meta().recordId());
+      }
+      else {
+        // an error occurred
+        throw new RuntimeException(r.asError().other());
+      }
+    }
+  }
+);
 ```
 
 ## Exceptions

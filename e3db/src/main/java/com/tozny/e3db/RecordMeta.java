@@ -89,4 +89,10 @@ public interface RecordMeta {
    * @return plain.
    */
   Map<String, String> plain();
+
+  /**
+   * Holds info about a file associated with this record, if any. May be {@code null}.
+   * @return file.
+   */
+  FileMeta file();
 }

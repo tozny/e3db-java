@@ -109,7 +109,7 @@ publishing {
   }
   repositories {
       maven {
-          // url should be of the form "s3://bucket.s3-<region>.amazonaws.com/<folders>"
+          // url should be of the form "s3://<bucket>.s3-<region>.amazonaws.com/<folder>"
           url "${System.getenv('REPO_URL')}"
           credentials(AwsCredentials) {
               accessKey "${System.getenv('AWS_KEY')}"

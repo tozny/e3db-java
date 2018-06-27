@@ -142,6 +142,27 @@ The published artifacts have different names, but should share versions. They ar
 
 (The version is specified in the file `./publish/build.gradle`.)
 
+Versioning
+====
+
+When preparing to publish:
+
+- Merge all changes that will be published into the master branch.
+- Change the version number in `./publish/build.gradle` to the version that will be published.
+- Make sure all Android lint checks pass (`./gradlew :publish:android:lint`)
+- Publish JARs to the remote repository (`./gradlew :publish:android:publishMavenPublicationToMavenRepository :publish:plain:publishMavenPublicationToMavenRepository`)
+- Tag the commit using the version number just published (`git tag -s -a -m "Release <version>" <version>`)
+- Generate javadocs (`./gradlew :e3db:javadoc`)
+- Commit the newly generated javadocs folder.
+- Search across all files in the repo for the previous version number, and replace it with the new version number. At least the following
+  files should be updated:
+  - README.md - links and version references.
+  - docs\index.md - Change link to latest version of docs; move link to previous version of docs to the list of previous versions.
+- Commit changes to documentation
+- Push changes and tags to remote
+
+Done!
+
 Writing Android Apps
 ====
 

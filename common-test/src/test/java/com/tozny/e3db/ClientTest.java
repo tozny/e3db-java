@@ -27,21 +27,13 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import okhttp3.CertificatePinner;
 import org.junit.*;
 
-import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
-
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +76,22 @@ public class ClientTest {
      catch(Exception e) {
        throw new Error(e);
      }
+  }
+
+  public static <R> ResultHandler<R> withResult(final AtomicReference<R> ref) {
+    return new ResultHandler<R>() {
+      @Override
+      public void handle(Result<R> r) {
+        if(r.isError()) {
+          if(r.asError().other() instanceof Error)
+            throw (Error) r.asError().other();
+          else
+            throw new Error(r.asError().other());
+        }
+
+        ref.set(r.asValue());
+      }
+    };
   }
 
   /**
@@ -1350,8 +1358,8 @@ public class ClientTest {
   public void testEncodeDecodeWrite() throws IOException, E3DBException {
     final AtomicReference<Client> client1 = new AtomicReference<>();
     final AtomicReference<Client> client2 = new AtomicReference<>();
-    final AtomicReference<EAKInfo> writerEak = new AtomicReference<>();
-    final AtomicReference<EAKInfo> readerEak = new AtomicReference<>();
+    final AtomicReference<LocalEAKInfo> writerEak = new AtomicReference<>();
+    final AtomicReference<LocalEAKInfo> readerEak = new AtomicReference<>();
     final String recordType = "signedLyric";
 
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
@@ -1377,43 +1385,21 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
-          @Override
-          public void handle(Result<LocalEAKInfo> result) {
-            if(result.isError())
-              throw new Error(result.asError().other());
-
-            writerEak.set(result.asValue());
-          }
-        }));
+        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, withResult(writerEak)));
       }
     });
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
-          @Override
-          public void handle(Result<Void> r) {
-            if(r.isError())
-              throw new Error(r.asError().other());
-          }
-        }));
+        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, withResult(new AtomicReference<Void>())));
       }
     });
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
-          @Override
-          public void handle(Result<LocalEAKInfo> result) {
-            if(result.isError())
-              throw new Error(result.asError().other());
-
-            readerEak.set(result.asValue());
-          }
-        }));
+        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, withResult(readerEak)));
       }
     });
 
@@ -1511,15 +1497,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
-          @Override
-          public void handle(Result<LocalEAKInfo> r) {
-            if (r.isError())
-              throw new RuntimeException(r.asError().other());
-
-            info.set(r.asValue());
-          }
-        }));
+        client.createWriterKey(type, new ResultWithWaiting<>(wait, withResult(info)));
       }
     });
 
@@ -1581,26 +1559,223 @@ public class ClientTest {
       out.close();
     }
 
-    final AtomicReference<Result> resultRef = new AtomicReference<>();
+    final AtomicReference<RecordMeta> result = new AtomicReference<>();
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-          client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
-          @Override
-          public void handle(Result<RecordMeta> r) {
-            if(r.isError()) {
-              resultRef.set(new ErrorResult(new RuntimeException("Failed to write file.", r.asError().other())));
-            }
-            else
-              resultRef.set(r);
-          }
-        }));
+          client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, withResult(result)));
       }
     });
 
-    if(resultRef.get().isError()) {
-      resultRef.get().asError().other().printStackTrace();
-      fail(resultRef.get().asError().other().getMessage());
+    if(result.get() == null) {
+      fail("Unable to write file.");
+    }
+  }
+
+  @Test
+  public void testAddAuthorizer() throws IOException {
+    final CI writer = getClient();
+    final String recordType = UUID.randomUUID().toString();
+    final CI authorizer;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      authorizer = getClient(profile);
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to add authorizer.");
+    }
+  }
+
+  @Test
+  public void testRemoveAuthorizer() throws IOException {
+    final CI writer = getClient();
+    final String recordType = UUID.randomUUID().toString();
+    final CI authorizer;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      authorizer = getClient(profile);
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to remove authorizer.");
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to remove authorizer.");
+    }
+  }
+
+  @Test
+  public void testShareOnBehalfOf() throws IOException {
+    final CI writer = getClient();
+    final String recordType = UUID.randomUUID().toString();
+    final CI reader;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      reader = getClient(profile);
+    }
+    final CI authorizer;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      authorizer = getClient(profile);
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to add authorizer.");
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to share with reader.");
+    }
+  }
+
+  @Test
+  public void testGetAuthorized() throws IOException {
+    final CI writer = getClient();
+    final String recordType = UUID.randomUUID().toString();
+    final CI authorizer;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      authorizer = getClient(profile);
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+            @Override
+            public void handle(Result r) {
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to add authorizer.");
+    }
+
+    {
+      final AtomicReference<List<AuthorizerPolicy>> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.getAuthorizers(new ResultWithWaiting(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() == null || result.get().size() == 0)
+        fail("Authorizer list is empty.");
+
+      boolean found = false;
+      for(AuthorizerPolicy policy : result.get()) {
+        found = found || policy.authorizerId().equals(authorizer.client.clientId()) && policy.recordType().equalsIgnoreCase(recordType);
+      }
+      if(! found)
+        fail("Authorizer not found in authorizer list.");
+    }
+
+    {
+      final AtomicReference<List<AuthorizerPolicy>> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          authorizer.client.getAuthorizedBy(new ResultWithWaiting(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() == null || result.get().size() == 0)
+        fail("Authorized by list is empty.");
+
+      boolean found = false;
+      for(AuthorizerPolicy policy : result.get()) {
+        found = found || policy.authorizedBy().equals(writer.client.clientId()) && policy.recordType().equalsIgnoreCase(recordType);
+      }
+      if(! found)
+        fail("Writer not found in authorized by list.");
     }
   }
 }

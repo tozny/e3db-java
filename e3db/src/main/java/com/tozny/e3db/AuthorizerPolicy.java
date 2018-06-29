@@ -18,20 +18,48 @@
  *
  */
 
-ext {
-  version = "4.0.0-RC2"
-  groupId = "com.tozny.e3db"
-  baseName = "e3db-client"
-}
+package com.tozny.e3db;
 
-task publishLocal(dependsOn: [":publish:android:publishToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
-  doLast {
-    println "Published local artifacts."
-  }
-}
+import java.util.UUID;
 
-task publishRemote(dependsOn: [":publish:android:publishMavenPublicationToMavenRepository", ":publish:plain:publishMavenPublicationToMavenRepository"]) {
-  doLast {
-    println "Published remote artifacts."
-  }
+/**
+ * Used for two purposes:
+ *
+ * <ul>
+ *   <li>When returned by {@link Client#getAuthorizedBy(ResultHandler)}, represents a writer that authorized
+ *   this client to share on its behalf.</li>
+ *   <li>When returned by {@link Client#getAuthorizers(ResultHandler)}, represents another client that this
+ *   client has authorized to share on its behalf.</li>
+*  </ul>
+ */
+public interface AuthorizerPolicy {
+  /**
+   * ID of the authorizer that can share on the writer's behalf.
+   * @return Ibid.
+   */
+  UUID authorizerId();
+
+  /**
+   * ID of the writer producing the records.
+   * @return Ibid.
+   */
+  UUID writerId();
+
+  /**
+   * ID of the user associated with the records.
+   * @return Ibid.
+   */
+  UUID userId();
+
+  /**
+   * Record type that can be shared.
+   * @return Ibid.
+   */
+  String recordType();
+
+  /**
+   * ID of the client that added the authorization.
+   * @return Ibid.
+   */
+  UUID authorizedBy();
 }

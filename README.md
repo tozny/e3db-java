@@ -60,6 +60,7 @@ app, add it as a dependency to your build. In Gradle, use:
 ```
 repositories {
   maven { url "https://maven.tozny.com/repo" }
+  maven { url "https://dl.bintray.com/terl/lazysodium-maven" }
 }
 
 implementation ('com.tozny.e3db:e3db-client-android:4.0.0-RC1@aar') {
@@ -112,61 +113,6 @@ called on the same background thread used for E3DB interactions.
 E3DB operations do not have timeouts defined -- you will have to
 manage those within your own application.
 
-# Certificate Pinning
-
-In some situations, you might want to pin a specific certificate or set
-of certificates as trusted entities for SSL collections - this is not a
-typical need, but does arise from time to time.
-
-To pin certificates, instantiate an OkHttp `CertificatePinner` object and
-add the certificates you want your application to explicitly trust.
-
-The [OkHttp documentation](http://square.github.io/okhttp/3.x/okhttp/okhttp3/CertificatePinner.html)
-has detailed examples for what the pinner object should look like and how
-to specify the various certificates. Once instantiated, pass the object in
-when registering a new client:
-
-```java
-import com.tozny.e3db.*;
-// ...
-
-String token = "<registration token>";
-String host = "https://api.e3db.com";
-
-CertificatePinner pinner = new CertificatePinner.Builder()
-    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
-    .build()
-
-Client.register(token, "client1", host, pinner, new ResultHandler<Config>() {
-  @Override
-  public void handle(Result<Config> r) {
-    if(! r.isError()) {
-      Config info = r.asValue();
-      // write credentials to secure storage ...
-    }
-    else {
-      // throw to indicate registration error
-      throw new RuntimeException(r.asError().other());
-    }
-  }
-});
-```
-
-Or when constructing a client:
-
-```java
-String storedCredentials = ...; // Read from secure storage
-
-CertificatePinner pinner = new CertificatePinner.Builder()
-    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
-    .build()
-
-Client client = new ClientBuilder()
-  .fromConfig(Config.fromJson(storedCredentials))
-  .setCertificatePinner(pinner)
-  .build();
-```
-
 # Registering a Client
 
 Registering creates a new client that can be used to interact with
@@ -195,7 +141,6 @@ Client.register(token, "client1", host, new ResultHandler<Config>() {
     }
   }
 });
-
 ```
 
 # Android-specific Features
@@ -331,6 +276,61 @@ Client client = new ClientBuilder()
 ```
 
 Now the `client` value can be used to interact with E3DB.
+
+## Certificate Pinning
+
+In some situations, you might want to pin a specific certificate or set
+of certificates as trusted entities for SSL collections - this is not a
+typical need, but does arise from time to time.
+
+To pin certificates, instantiate an OkHttp `CertificatePinner` object and
+add the certificates you want your application to explicitly trust.
+
+The [OkHttp documentation](http://square.github.io/okhttp/3.x/okhttp/okhttp3/CertificatePinner.html)
+has detailed examples for what the pinner object should look like and how
+to specify the various certificates. Once instantiated, pass the object in
+when registering a new client:
+
+```java
+import com.tozny.e3db.*;
+// ...
+
+String token = "<registration token>";
+String host = "https://api.e3db.com";
+
+CertificatePinner pinner = new CertificatePinner.Builder()
+    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
+    .build()
+
+Client.register(token, "client1", host, pinner, new ResultHandler<Config>() {
+  @Override
+  public void handle(Result<Config> r) {
+    if(! r.isError()) {
+      Config info = r.asValue();
+      // write credentials to secure storage ...
+    }
+    else {
+      // throw to indicate registration error
+      throw new RuntimeException(r.asError().other());
+    }
+  }
+});
+```
+
+Or when constructing a client:
+
+```java
+String storedCredentials = ...; // Read from secure storage
+
+CertificatePinner pinner = new CertificatePinner.Builder()
+    .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
+    .build()
+
+Client client = new ClientBuilder()
+  .fromConfig(Config.fromJson(storedCredentials))
+  .setCertificatePinner(pinner)
+  .build();
+```
 
 ## Write a record
 
@@ -514,6 +514,59 @@ client.revoke("lyric", readerId, new ResultHandler<Void>() {
 Note that the `Void` type means that the `Result` passed to `handle`
 represents whether an error occurred or not, and nothing else. Sharing
 operations do not return any useful information on success.
+
+## Authorizers
+
+Every E3DB client can authorize any other client to share data on their behalf. That is, the data producer
+does not need to be the sole entity that enables sharing with other clients. We call the client that is allowed to
+share data on a data producer's behalf the "authorizer".
+
+Just like `share`, authorization is granted based on record types. That is, a client can only authorize another client
+to share a specific record type. There is no mechanism to grant sharing of all record types (whether any exist or not).
+
+Note that the authorizer does *not* have permission to read the data shared themselves - they are only allowed to
+share data on behalf of the data producer.
+
+To add an authorizer, use the `addAuthorizer` method:
+
+```java
+UUID authorizerId = <ID of client to share on this data producer's behalf>;
+String recordType = <type of records to authorize>;
+
+client.addAuthorizer(authorizerId, recordType, new ResultHandler<Void>() {
+ @Override
+ public void handle(Result<Void> r) {
+   if(! r.isError()) {
+     // record shared
+   }
+ }
+});
+
+```
+
+Authorization can be removed with the `removeAuthorizer` methods. Authorization *can* be removed for all
+record types, or for a single record type.
+
+A client can list all clients that it has authorized to share on its behalf using the `getAuthorizers` method. Similarly,
+a client can determine all the data producers that it can share on behalf of using the `getAuthorizedBy` method.
+
+## Sharing as an Authorizer
+A client that has been given permission to share records on behalf of a writer can use the `shareOnBehalfOf` method:
+
+```java
+UUID writerId = <ID of data writer>;
+UUID readerId = <ID of client we are sharing with>;
+String recordType = <type of records to share>;
+
+client.shareOnBehalfOf(WriterId.writerId(writerId), recordType, readerId, new ResultHandler<Void>() {
+  @Override
+  public void handle(Result<Void> r) {
+    if(! r.isError()) {
+      // permission given to reader
+    }
+  }
+});
+```
 
 ## Local Encryption & Decryption
 

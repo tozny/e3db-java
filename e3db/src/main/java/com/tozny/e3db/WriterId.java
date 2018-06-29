@@ -18,20 +18,44 @@
  *
  */
 
-ext {
-  version = "4.0.0-RC2"
-  groupId = "com.tozny.e3db"
-  baseName = "e3db-client"
-}
+package com.tozny.e3db;
 
-task publishLocal(dependsOn: [":publish:android:publishToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
-  doLast {
-    println "Published local artifacts."
-  }
-}
+import java.util.UUID;
 
-task publishRemote(dependsOn: [":publish:android:publishMavenPublicationToMavenRepository", ":publish:plain:publishMavenPublicationToMavenRepository"]) {
-  doLast {
-    println "Published remote artifacts."
+import static com.tozny.e3db.Checks.checkNotNull;
+
+/**
+ * Represents a writer when calling {@link Client#shareOnBehalfOf(WriterId, String, UUID, ResultHandler)}.
+ */
+public final class WriterId {
+  private final UUID writerId;
+
+  private WriterId(UUID writerId) {
+    checkNotNull(writerId, "writerId");
+    this.writerId = writerId;
   }
+
+  public static WriterId writerId(UUID writerId) {
+    return new WriterId(writerId);
+  }
+
+  public UUID getWriterId() {
+    return writerId;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+
+    WriterId writerId1 = (WriterId) o;
+
+    return writerId != null ? writerId.equals(writerId1.writerId) : writerId1.writerId == null;
+  }
+
+  @Override
+  public int hashCode() {
+    return writerId != null ? writerId.hashCode() : 0;
+  }
+
 }

@@ -133,7 +133,7 @@ Publishing
 
 The SDK can be published for plain Java and for Android. To publish to your local Maven repository, run the following command:
 
-$ gradlew :publish:plain:publishToMavenLocal :publish:android:publishToMavenLocal
+$ gradlew :publish:publishLocal
 
 The published artifacts have different names, but should share versions. They are:
 
@@ -150,7 +150,7 @@ When preparing to publish:
 - Merge all changes that will be published into the master branch.
 - Change the version number in `./publish/build.gradle` to the version that will be published.
 - Make sure all Android lint checks pass (`./gradlew :publish:android:lint`)
-- Publish JARs to the remote repository (`./gradlew :publish:android:publishMavenPublicationToMavenRepository :publish:plain:publishMavenPublicationToMavenRepository`)
+- Publish JARs to the remote repository (`./gradlew :publish:publishRemote`)
 - Tag the commit using the version number just published (`git tag -s -a -m "Release <version>" <version>`)
 - Generate javadocs (`./gradlew :e3db:javadoc`)
 - Commit the newly generated javadocs folder.
@@ -160,6 +160,7 @@ When preparing to publish:
   - docs\index.md - Change link to latest version of docs; move link to previous version of docs to the list of previous versions.
 - Commit changes to documentation
 - Push changes and tags to remote
+
 
 Done!
 

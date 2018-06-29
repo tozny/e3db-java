@@ -25,11 +25,7 @@ import java.util.UUID;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.http.Body;
-import retrofit2.http.GET;
-import retrofit2.http.PUT;
-import retrofit2.http.Path;
-import retrofit2.http.Query;
+import retrofit2.http.*;
 
 interface ShareAPI {
   @GET("/v1/storage/clients/find")
@@ -41,9 +37,18 @@ interface ShareAPI {
   @PUT("/v1/storage/policy/{user_id}/{writer_id}/{reader_id}/{type}")
   Call<ResponseBody> putPolicy(@Path("user_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId, @Path("type") String type, @Body RequestBody policy);
 
+  @DELETE("/v1/storage/policy/{user_id}/{writer_id}/{reader_id}")
+  Call<ResponseBody> deletePolicy(@Path("user_id") String userId, @Path("writer_id") String writerId, @Path("reader_id") String readerId);
+
   @GET("/v1/storage/policy/incoming")
   Call<ResponseBody> getIncoming();
 
   @GET("/v1/storage/policy/outgoing")
   Call<ResponseBody> getOutgoing();
+
+  @GET("/v1/storage/policy/proxies")
+  Call<ResponseBody> getProxies();
+
+  @GET("/v1/storage/policy/granted")
+  Call<ResponseBody> getGranted();
 }

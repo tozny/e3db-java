@@ -133,6 +133,30 @@ import static com.tozny.e3db.Checks.*;
  *
  * <p>To share records, use the {@link #share(String, UUID, ResultHandler)} method. To remove sharing access, use the {@link #revoke(String, UUID, ResultHandler)}} method.
  *
+ * <h1>Authorizers</h1>
+ * This client can allow another client to share records on its behalf. That is, a client that writes records (the "writer") can allow
+ * another client (the "authorizer") to share those records with any other client (the "reader"). This de-couples the production of
+ * data from sharing the data.
+ *
+ * To grant authorizer permission, this client should call the {@link #addAuthorizer(UUID, String, ResultHandler)}) method. Permission is granted per record type; there is
+ * no facility for sharing all records written by a client. The writer <b>must</b> call {@code addAuthorizer} before the authorizer can share records
+ * on the writer's behalf.
+ *
+ * Permission to share records can be revoked by either of the {@code removeAuthorizer} methods. It is possible to remove permission for <b>all</b>
+ * record types written by this client.
+ *
+ * Use the {@link #getAuthorizers(ResultHandler)} method to see all the client's authorized to share records on behalf of this client. Similarly,
+ * as an authorizer, use the {@link #getAuthorizedBy(ResultHandler)} method to see all the writers that have given permission for this client
+ * to share records.
+ *
+ * <h1>Sharing, cont'd</h1>
+ * There is no difference between an authorizer sharing records on behalf of this client, or this client sharing records directly with
+ * a reader. Removing the authorizer's permission to share records does <b>not</b> remove any sharing relationships set up by that
+ * authorizer. The writer must remove each sharing relationship explicitly.
+ *
+ * To share records as an authorizer, use the {@link #shareOnBehalfOf(WriterId, String, UUID, ResultHandler)} method. Calling this method will grant permission
+ * to reader specified to read the records written by the writer, of the given type.
+ *
  * <h1>Local Encryption &amp; Decryption</h1>
  * The client instance has the ability to encrypt records for local storage, and to decrypt locally-stored records. Locally-encrypted records are
  * always encrypted with a key that can be shared with other clients via E3DB's sharing mechanism.
@@ -204,8 +228,10 @@ public class  Client {
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
   private static final Executor uiExecutor;
-  private static final String allow = "{\"allow\" : [ { \"read\": {} } ] }";
-  private static final String deny = "{\"deny\" : [ { \"read\": {} } ] }";
+  private static final String allowRead = "{\"allow\" : [ { \"read\": {} } ] }";
+  private static final String denyRead = "{\"deny\" : [ { \"read\": {} } ] }";
+  private static final String allowAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
+  private static final String denyAuthorizer = "{\"allow\" : [ { \"authorizer\": {} } ] }";
   private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
   private final String apiKey;
   private final String apiSecret;
@@ -219,6 +245,7 @@ public class  Client {
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
   static {
+
     anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
 
     backgroundExecutor = new ThreadPoolExecutor(1,
@@ -520,7 +547,47 @@ public class  Client {
       edk = CipherWithNonce.decode(quad.substring(0, split));
       ef = CipherWithNonce.decode(quad.substring(split + 1));
     }
+  }
 
+  private static class AP implements AuthorizerPolicy {
+    private final UUID authorizerId;
+    private final UUID writerId;
+    private final UUID userId;
+    private final String recordType;
+    private final UUID authorizedBy;
+
+    public AP(UUID authorizerId, UUID writerId, UUID userId, String recordType, UUID authorizedBy) {
+      this.authorizerId = authorizerId;
+      this.writerId = writerId;
+      this.userId = userId;
+      this.recordType = recordType;
+      this.authorizedBy = authorizedBy;
+    }
+
+    @Override
+    public UUID authorizerId() {
+      return authorizerId;
+    }
+
+    @Override
+    public UUID writerId() {
+      return writerId;
+    }
+
+    @Override
+    public UUID userId() {
+      return userId;
+    }
+
+    @Override
+    public String recordType() {
+      return recordType;
+    }
+
+    @Override
+    public UUID authorizedBy() {
+      return authorizedBy;
+    }
   }
 
   private void onBackground(Runnable runnable) {
@@ -850,6 +917,19 @@ public class  Client {
     return decryptedFields;
   }
 
+  private static List<AuthorizerPolicy> getAuthorizerPolicies(JsonNode list) {
+    List<AuthorizerPolicy> authorizers = new ArrayList<>(list.size());
+    for (int i = 0; i < list.size(); i += 1) {
+      JsonNode item = list.get(i);
+      authorizers.add(new AP(UUID.fromString(item.get("authorizer_id").asText()),
+          UUID.fromString(item.get("writer_id").asText()),
+          UUID.fromString(item.get("user_id").asText()),
+          item.get("record_type").asText(),
+          UUID.fromString(item.get("authorized_by").asText())));
+    }
+    return authorizers;
+  }
+
   private byte[] getOwnAccessKey(String type) throws E3DBException, IOException {
     byte[] existingAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
     if(existingAK != null) {
@@ -991,6 +1071,57 @@ public class  Client {
       meta.put("file_meta", fm);
     }
     return meta;
+  }
+
+  private byte[] getClientPublicKey(UUID clientId) throws IOException, E3DBException {
+    final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(clientId).execute();
+    if (clientInfo.code() == 404) {
+      throw new E3DBClientNotFoundException(clientId.toString());
+    } else if (clientInfo.code() != 200) {
+      throw E3DBException.find(clientInfo.code(), clientInfo.message());
+    }
+    return decodeURL(mapper.readTree(clientInfo.body().string()).get("public_key").get("curve25519").asText());
+  }
+
+  private void sharing(final String type, final UUID readerId, final UUID writerId, final ResultHandler<Void> handleResult) {
+    onBackground(new Runnable() {
+      public void run() {
+        try {
+          final byte[] readerKey = getClientPublicKey(readerId);
+          final byte[] writerPublicKey;
+          {
+            if(writerId.equals(Client.this.clientId)) {
+              writerPublicKey = Client.this.publicSigningKey;
+            }
+            else {
+              writerPublicKey = getClientPublicKey(writerId);
+            }
+          }
+
+          try {
+            byte[] ak = getOwnAccessKey(type);
+            setAccessKey(writerId, writerId, readerId, type, readerKey, ak, writerId, writerPublicKey);
+          } catch (E3DBConflictException ex) {
+            // no-op
+          }
+
+          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
+              writerId.toString(),
+              writerId.toString(),
+              readerId.toString(),
+              type,
+              RequestBody.create(APPLICATION_JSON, allowRead)).execute();
+
+          if (shareResponse.code() != 201)
+            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
+          else
+            uiValue(handleResult, null);
+        }
+        catch(Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
   }
 
   /**
@@ -1536,6 +1667,22 @@ public class  Client {
       }
     });
   }
+
+  /**
+   *
+   * @param writer
+   * @param type
+   * @param readerId
+   * @param handleResult
+   */
+  public void shareOnBehalfOf(final WriterId writer, final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
+    checkNotNull(writer, "writer");
+    checkNotNull(readerId, "readerId");
+    checkNotEmpty(type, "type");
+
+    sharing(type, readerId, writer.getWriterId(), handleResult);
+  }
+
   /**
    * Give another client the ability to read records.
    *
@@ -1551,45 +1698,7 @@ public class  Client {
     checkNotEmpty(type, "type");
     checkNotNull(readerId, "readerId");
 
-    onBackground(new Runnable() {
-      public void run() {
-        try {
-            final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(readerId).execute();
-            if (clientInfo.code() == 404) {
-              uiError(handleResult, new E3DBClientNotFoundException(readerId.toString()));
-              return;
-            } else if (clientInfo.code() != 200) {
-              uiError(handleResult, E3DBException.find(clientInfo.code(), clientInfo.message()));
-              return;
-            }
-
-            try {
-              byte[] ak = getOwnAccessKey(type);
-              JsonNode info = mapper.readTree(clientInfo.body().string());
-              byte[] readerKey = decodeURL(info.get("public_key").get("curve25519").asText());
-              setAccessKey(Client.this.clientId, Client.this.clientId, readerId, type, readerKey, ak, Client.this.clientId, Client.this.publicSigningKey);
-            }
-            catch(E3DBConflictException ex) {
-              // no-op
-            }
-
-          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-            clientId.toString(),
-            clientId.toString(),
-            readerId.toString(),
-            type,
-            RequestBody.create(APPLICATION_JSON, allow)).execute();
-
-          if(shareResponse.code() != 201)
-            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
-          else
-            uiValue(handleResult, null);
-        }
-        catch(Throwable e) {
-          uiError(handleResult, e);
-        }
-      }
-    });
+    sharing(type, readerId, Client.this.clientId, handleResult);
   }
 
   /**
@@ -1616,7 +1725,7 @@ public class  Client {
             clientId.toString(),
             readerId.toString(),
             type,
-            RequestBody.create(APPLICATION_JSON, deny)).execute();
+            RequestBody.create(APPLICATION_JSON, denyRead)).execute();
 
           if(shareResponse.code() != 201)
             uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
@@ -1867,6 +1976,177 @@ public class  Client {
     checkNotNull(document, "document");
 
     return Platform.crypto.verify(new Signature(Base64.decodeURL(signature)), document.toSerialized().getBytes(UTF8), Base64.decodeURL(publicSigningKey));
+  }
+
+  /**
+   * Adds an authorizer for records written by this client.
+   *
+   * <p>Calling this method will grant permission for the "{@code authorizer}" client to allow
+   * <b>other</b> clients to read records of the given type, written by this client.
+   *
+   * <p>The authorizer client itself will not be able to read records; it will only be able to grant
+   * permission for other clients to do so.
+   *
+   * @param authorizer ID of the authorizer. Canot be {@code null}.
+   * @param recordType Record type to give authorizer ability to share. Canot be {@code null}.
+   * @param handler Handles result of the call.
+   */
+  public void addAuthorizer(final UUID authorizer, final String recordType, final ResultHandler<Void> handler) {
+    checkNotNull(authorizer, "authorizer");
+    checkNotEmpty(recordType, "recordType");
+
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
+              Client.this.clientId.toString(),
+              authorizer.toString(),
+              recordType,
+              RequestBody.create(APPLICATION_JSON, allowAuthorizer)
+          ).execute();
+
+          if(putResponse.code() != 201)
+            throw E3DBException.find(putResponse.code(), putResponse.message() + ": unable to write policy: ");
+
+          uiValue(handler, null);
+        }
+        catch(Throwable e) {
+          uiError(handler, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Remove the given client's ability to share any record type written by this client.
+   *
+   * <p>This method removes the permission granted by {@link #addAuthorizer(UUID, String, ResultHandler)},
+   * for all record types written by this client.
+   *
+   * <p>No error occurs if the client did not have permission in the first place.
+   *
+   * @param authorizer ID of the authorizer. Cannot be {@code null}.
+   * @param handler Handles the result of the operation.
+   */
+  public void removeAuthorizer(final UUID authorizer, final ResultHandler<Void> handler) {
+    checkNotNull(authorizer, "authorizer");
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> deleteResponse = shareClient.deletePolicy(Client.this.clientId.toString(),
+              Client.this.clientId.toString(),
+              authorizer.toString()
+          ).execute();
+
+          if(deleteResponse.code() != 200)
+            throw E3DBException.find(deleteResponse.code(), deleteResponse.message() + ": could not remove authorizer.");
+
+          uiValue(handler, null);
+        }
+        catch(Throwable e) {
+          uiError(handler, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Remove the given client's ability to share the specific type of record given.
+   *
+   * <p>This method removes the permission granted by {@link #addAuthorizer(UUID, String, ResultHandler)},
+   * for the specific record type identified.
+   *
+   * <p>No error occurs if the client did not have permission in the first place.
+   *
+   * @param authorizer ID of the authorizer. Cannot be {@code null}.
+   * @param recordType Type of record. Cannot be blank or {@code null}.
+   * @param handler Handles the result of the operation.
+   */
+  public void removeAuthorizer(final UUID authorizer, final String recordType, final ResultHandler<Void> handler) {
+    checkNotNull(authorizer, "authorizer");
+    checkNotEmpty(recordType, "recordType");
+
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
+              Client.this.clientId.toString(),
+              authorizer.toString(),
+              recordType,
+              RequestBody.create(APPLICATION_JSON, denyAuthorizer)
+          ).execute();
+
+          if(putResponse.code() != 201)
+            throw E3DBException.find(putResponse.code(), putResponse.message() + ": could not remove authorizer.");
+
+          uiValue(handler, null);
+        }
+        catch(Throwable e) {
+          uiError(handler, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Lists all the clients (and associated record types) that this client has authorized
+   * to share on its behalf.
+   *
+   * <p>This method allows the client to inspect all other clients that have permission to
+   * share records on this client's behalf.
+   *
+   * @param handler Handles result of the call.
+   */
+  public void getAuthorizers(final ResultHandler<List<AuthorizerPolicy>> handler) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> getResponse = shareClient.getProxies().execute();
+          if(getResponse.code() != 200)
+            throw E3DBException.find(getResponse.code(), getResponse.message() + ": unable to get authorizers.");
+
+          uiValue(handler, getAuthorizerPolicies(
+              mapper.readTree(getResponse.body().byteStream())
+          ));
+        }
+        catch(Throwable e) {
+          uiError(handler, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Lists all writers (and associated record types) that have authorized this client to
+   * share data on their behalf.
+   *
+   * <p>This method allows the client to inspect the list of data producer's that have
+   * authorized the client to share records on their behalf.
+   *
+   * @param handler Handles result of the call.
+   */
+  public void getAuthorizedBy(final ResultHandler<List<AuthorizerPolicy>> handler) {
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<ResponseBody> getResponse = shareClient.getGranted().execute();
+          if(getResponse.code() != 200)
+            throw E3DBException.find(getResponse.code(), getResponse.message() + ": unable to get authorized by list.");
+
+          uiValue(handler, getAuthorizerPolicies(
+              mapper.readTree(getResponse.body().byteStream())
+          ));
+        }
+        catch(Throwable e) {
+          uiError(handler, e);
+        }
+      }
+    });
   }
 
   private static class FM implements FileMeta {

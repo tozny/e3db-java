@@ -222,6 +222,7 @@ import static com.tozny.e3db.Checks.*;
 public class  Client {
   private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
+//  private static final okhttp3.logging.HttpLoggingInterceptor loggingInterceptor;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
@@ -230,8 +231,8 @@ public class  Client {
   private static final Executor uiExecutor;
   private static final String allowRead = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String denyRead = "{\"deny\" : [ { \"read\": {} } ] }";
-  private static final String allowAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
-  private static final String denyAuthorizer = "{\"allow\" : [ { \"authorizer\": {} } ] }";
+  private static final String denyAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
+  private static final String allowAuthorizer = "{\"allow\" : [ { \"authorizer\": {} } ] }";
   private final ConcurrentMap<EAKCacheKey, EAKEntry> eakCache = new ConcurrentHashMap<>();
   private final String apiKey;
   private final String apiSecret;
@@ -245,8 +246,15 @@ public class  Client {
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
   static {
-
-    anonymousClient = enableTLSv12(new OkHttpClient.Builder()).build();
+//    loggingInterceptor = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
+//      @Override
+//      public void log(String message) {
+//        System.out.println(message);
+//      }
+//    }).setLevel(HttpLoggingInterceptor.Level.BODY);
+    anonymousClient = enableTLSv12(new OkHttpClient.Builder()
+//      .addInterceptor(loggingInterceptor)
+    ).build();
 
     backgroundExecutor = new ThreadPoolExecutor(1,
         Runtime.getRuntime().availableProcessors(),
@@ -399,6 +407,7 @@ public class  Client {
       publicSigningKey = null;
 
     OkHttpClient.Builder clientBuilder = enableTLSv12(new OkHttpClient.Builder()
+//            .addInterceptor(loggingInterceptor)
             .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host, certificatePinner)));
 
     if (certificatePinner != null)

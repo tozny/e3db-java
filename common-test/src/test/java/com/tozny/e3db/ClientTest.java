@@ -723,6 +723,7 @@ public class ClientTest {
   public void testSharing() throws Exception {
     // create a client to share with
     final String shareProfile = UUID.randomUUID().toString();
+    final String fromProfile = UUID.randomUUID().toString();
     final String recordType = "lyric";
     final Map<String, String> cleartext = new HashMap<>();
     cleartext.put("song", "triangle man");
@@ -730,8 +731,9 @@ public class ClientTest {
     final AtomicReference<UUID> recordIdRef = new AtomicReference<>();
 
     registerProfile(shareProfile, null);
+    registerProfile(fromProfile, null);
 
-    final CI from = getClient();
+    final CI from = getClient(fromProfile);
     final CI to = getClient(shareProfile);
 
     withTimeout(new AsyncAction() {
@@ -1589,7 +1591,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1620,7 +1622,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1638,7 +1640,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new ResultWithWaiting(wait, new ResultHandler() {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1655,7 +1657,7 @@ public class ClientTest {
   @Test
   public void testShareOnBehalfOf() throws IOException {
     final CI writer = getClient();
-    final String recordType = UUID.randomUUID().toString();
+    final String recordType = UUID.randomUUID().toString().substring(0, 8);
     final CI reader;
     {
       final AtomicReference<Config> result = new AtomicReference<>();
@@ -1676,9 +1678,11 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
               result.set(! r.isError());
             }
           }));
@@ -1694,9 +1698,11 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting(wait, new ResultHandler() {
+          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
               result.set(! r.isError());
             }
           }));
@@ -1725,7 +1731,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting(wait, new ResultHandler() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1743,7 +1749,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.getAuthorizers(new ResultWithWaiting(wait, withResult(result)));
+          writer.client.getAuthorizers(new ResultWithWaiting<>(wait, withResult(result)));
         }
       });
 
@@ -1763,7 +1769,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.getAuthorizedBy(new ResultWithWaiting(wait, withResult(result)));
+          authorizer.client.getAuthorizedBy(new ResultWithWaiting<>(wait, withResult(result)));
         }
       });
 

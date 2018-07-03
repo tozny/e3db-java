@@ -27,6 +27,7 @@ dependencies {
     compileOnly project(':e3db-crypto-stub-android')
 
     compile 'com.squareup.retrofit2:retrofit:2.4.0'
+//    compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
     compile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
     compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
     compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'

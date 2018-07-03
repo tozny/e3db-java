@@ -73,4 +73,5 @@ dependencies {
   compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
   compile "com.goterl.lazycode:lazysodium-java:2.5.0"
   compile 'com.squareup.okhttp3:okhttp:3.10.0'
+//  compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
 }

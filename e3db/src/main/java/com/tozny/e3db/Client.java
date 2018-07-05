@@ -246,12 +246,12 @@ public class  Client {
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
   static {
-//    loggingInterceptor = new HttpLoggingInterceptor(new HttpLoggingInterceptor.Logger() {
+//    loggingInterceptor = new okhttp3.logging.HttpLoggingInterceptor(new okhttp3.logging.HttpLoggingInterceptor.Logger() {
 //      @Override
 //      public void log(String message) {
 //        System.out.println(message);
 //      }
-//    }).setLevel(HttpLoggingInterceptor.Level.BODY);
+//    }).setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BODY);
     anonymousClient = enableTLSv12(new OkHttpClient.Builder()
 //      .addInterceptor(loggingInterceptor)
     ).build();
@@ -1082,34 +1082,74 @@ public class  Client {
     return meta;
   }
 
-  private byte[] getClientPublicKey(UUID clientId) throws IOException, E3DBException {
+  private static class ClientInfo {
+    private final byte[] curve25519;
+    private final byte[] ed25519;
+    private final UUID clientId;
+
+
+    public ClientInfo(byte[] curve25519, byte[] ed25519, UUID clientId) {
+      this.curve25519 = curve25519;
+      this.ed25519 = ed25519;
+      this.clientId = clientId;
+    }
+
+    public byte[] getCurve25519() {
+      return curve25519;
+    }
+
+    public byte[] getEd25519() {
+      return ed25519;
+    }
+
+    public UUID getClientId() {
+      return clientId;
+    }
+  }
+
+  private ClientInfo getClientInfo(UUID clientId) throws IOException, E3DBException {
     final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(clientId).execute();
     if (clientInfo.code() == 404) {
       throw new E3DBClientNotFoundException(clientId.toString());
     } else if (clientInfo.code() != 200) {
       throw E3DBException.find(clientInfo.code(), clientInfo.message());
     }
-    return decodeURL(mapper.readTree(clientInfo.body().string()).get("public_key").get("curve25519").asText());
+    JsonNode info = mapper.readTree(clientInfo.body().string());
+    String curve25519 = info.get("public_key").get("curve25519").asText();
+    String ed25519;
+    {
+      if(info.has("signing_key"))
+        ed25519 = info.get("signing_key").get("ed25519").asText();
+      else
+        ed25519 = null;
+    }
+    String cId = info.get("client_id").asText();
+    return new ClientInfo(Base64.decodeURL(curve25519), ed25519 == null ? null : Base64.decodeURL(ed25519), UUID.fromString(cId));
   }
 
   private void sharing(final String type, final UUID readerId, final UUID writerId, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       public void run() {
         try {
-          final byte[] readerKey = getClientPublicKey(readerId);
-          final byte[] writerPublicKey;
+          final byte[] readerKey = getClientInfo(readerId).getCurve25519();
+          final byte[] writerSigningKey;
           {
             if(writerId.equals(Client.this.clientId)) {
-              writerPublicKey = Client.this.publicSigningKey;
+              writerSigningKey = Client.this.publicSigningKey;
             }
             else {
-              writerPublicKey = getClientPublicKey(writerId);
+              ClientInfo writerInfo = getClientInfo(writerId);
+              writerSigningKey = writerInfo.getEd25519();
             }
           }
 
           try {
-            byte[] ak = getOwnAccessKey(type);
-            setAccessKey(writerId, writerId, readerId, type, readerKey, ak, writerId, writerPublicKey);
+            byte[] ak = getAccessKey(writerId, writerId, Client.this.clientId, type);
+            if(ak == null) {
+              setAccessKey(writerId, writerId, Client.this.clientId, type, readerKey, Platform.crypto.newSecretKey(), writerId, writerSigningKey);
+              ak = getAccessKey(writerId, writerId, Client.this.clientId, type);
+            }
+            setAccessKey(writerId, writerId, readerId, type, readerKey, ak, writerId, writerSigningKey);
           } catch (E3DBConflictException ex) {
             // no-op
           }
@@ -1127,6 +1167,29 @@ public class  Client {
             uiValue(handleResult, null);
         }
         catch(Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  private void revoking(final String type, final UUID writerId, final UUID readerId, final ResultHandler<Void> handleResult) {
+    onBackground(new Runnable() {
+      public void run() {
+        try {
+          removeAccessKey(writerId, writerId, readerId, type);
+          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
+              writerId.toString(),
+              writerId.toString(),
+              readerId.toString(),
+              type,
+              RequestBody.create(APPLICATION_JSON, denyRead)).execute();
+
+          if(shareResponse.code() != 201)
+            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
+          else
+            uiValue(handleResult, null);
+        } catch (Throwable e) {
           uiError(handleResult, e);
         }
       }
@@ -1678,11 +1741,15 @@ public class  Client {
   }
 
   /**
+   * Share records written by the given writer with the given reader.
    *
-   * @param writer
-   * @param type
-   * @param readerId
-   * @param handleResult
+   * <p>This method should be called by a client authorized to share on behalf of the given writer.</p>
+   *
+   * @param writer ID of the client that produces the records.
+   * @param type The type of records to grant access to.
+   * @param readerId ID of client which will be allowed to read the records.
+   * @param handleResult If successful, returns no useful information (except that the operation
+   *                     completed).
    */
   public void shareOnBehalfOf(final WriterId writer, final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
     checkNotNull(writer, "writer");
@@ -1699,7 +1766,7 @@ public class  Client {
    * the recipient specified by {@code readerId}.
    *
    * @param type The type of records to grant access to.
-   * @param readerId ID of client to give access to.
+   * @param readerId ID of client which will be allowed to read the records.
    * @param handleResult If successful, returns no useful information (except that the operation
    *                     completed).
    */
@@ -1725,26 +1792,26 @@ public class  Client {
     checkNotEmpty(type, "type");
     checkNotNull(readerId, "readerId");
 
-    onBackground(new Runnable() {
-      public void run() {
-        try {
-          removeAccessKey(clientId, clientId, readerId, type);
-          retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-            clientId.toString(),
-            clientId.toString(),
-            readerId.toString(),
-            type,
-            RequestBody.create(APPLICATION_JSON, denyRead)).execute();
+    revoking(type, clientId, readerId, handleResult);
+  }
 
-          if(shareResponse.code() != 201)
-            uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
-          else
-            uiValue(handleResult, null);
-        } catch (Throwable e) {
-          uiError(handleResult, e);
-        }
-      }
-    });
+  /**
+   * Remove permission for the given reader to read records written by the writer.
+   *
+   * <p>This method should be called by a client authorized to share on behalf of the writer.
+   *
+   * @param writerId Writer that produces the records
+   * @param type Record type to revoke permission for.
+   * @param readerId Reader who's permission will be revoked.
+   * @param handleResult If successful, returns no useful information (except that the operation
+   *                     completed).
+   */
+  public void revokeOnBehalfOf(final WriterId writerId, final String type, final UUID readerId, final ResultHandler<Void> handleResult) {
+    checkNotEmpty(type, "type");
+    checkNotNull(readerId, "readerId");
+    checkNotNull(writerId, "writerId");
+
+    revoking(type, writerId.getWriterId(), readerId, handleResult);
   }
 
   /**
@@ -2008,6 +2075,9 @@ public class  Client {
       @Override
       public void run() {
         try {
+          ClientInfo authorizerInfo = getClientInfo(authorizer);
+          byte[] ak = getOwnAccessKey(recordType);
+          setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getCurve25519(), ak, Client.this.clientId, Client.this.publicSigningKey);
           retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
               Client.this.clientId.toString(),
               authorizer.toString(),

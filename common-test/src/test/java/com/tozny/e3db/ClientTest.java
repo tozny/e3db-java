@@ -174,10 +174,14 @@ public class ClientTest {
     return new CI(client, info);
   }
 
-  private void write1(Client client, final ResultHandler<Record> handleResult) throws IOException {
+  private void writeRecord(Client client, final ResultHandler<Record> handleResult) throws IOException {
+    writeRecord(client, TYPE, handleResult);
+  }
+
+  private void writeRecord(Client client, String recordType, final ResultHandler<Record> handleResult) throws IOException {
     Map<String, String> record = new HashMap<>();
     record.put(FIELD, MESSAGE);
-    client.write(TYPE, new RecordData(record), null, new ResultHandler<Record>() {
+    client.write(recordType, new RecordData(record), null, new ResultHandler<Record>() {
       @Override
       public void handle(Result<Record> r) {
         handleResult.handle(r);
@@ -308,7 +312,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        write1(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -362,7 +366,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        write1(client, new ResultHandler<Record>() {
+        writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -407,7 +411,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        write1(getClient().client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(getClient().client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -451,7 +455,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        write1(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -464,7 +468,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        write1(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -509,7 +513,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        write1(client, new ResultHandler<Record>() {
+        writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -540,7 +544,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        write1(client, new ResultHandler<Record>() {
+        writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -600,7 +604,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        write1(clientRef.get(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(clientRef.get(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -1673,6 +1677,35 @@ public class ClientTest {
       authorizer = getClient(profile);
     }
 
+    final Record writtenRecord;
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      writtenRecord = result.get();
+
+      if(writtenRecord == null)
+        fail("Did not write record.");
+    }
+
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() != null)
+        fail("Should not be able read record yet.");
+    }
+
     {
       final AtomicReference<Boolean> result = new AtomicReference<>();
       withTimeout(new AsyncAction() {
@@ -1711,6 +1744,174 @@ public class ClientTest {
 
       if(! result.get())
         fail("Failed to share with reader.");
+    }
+
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() == null)
+        fail("Unable to read record.");
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+            @Override
+            public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to revoke reader.");
+    }
+
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() != null)
+        fail("Should not be able to read record.");
+    }
+  }
+
+  @Test
+  public void testAuthorizeBeforeWriting() throws IOException {
+    final CI writer = getClient();
+    final String recordType = UUID.randomUUID().toString().substring(0, 8);
+    final CI reader;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      reader = getClient(profile);
+    }
+    final CI authorizer;
+    {
+      final AtomicReference<Config> result = new AtomicReference<>();
+      String profile = UUID.randomUUID().toString();
+      registerProfile(profile, null);
+      authorizer = getClient(profile);
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+            @Override
+            public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to add authorizer.");
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+            @Override
+            public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to share with reader.");
+    }
+
+    final Record writtenRecord;
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      writtenRecord = result.get();
+
+      if(writtenRecord == null)
+        fail("Did not write record.");
+    }
+
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() == null)
+        fail("Unable to read record.");
+    }
+
+    {
+      final AtomicReference<Boolean> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+            @Override
+            public void handle(Result r) {
+              if(r.isError())
+                r.asError().other().printStackTrace();
+              result.set(! r.isError());
+            }
+          }));
+        }
+      });
+
+      if(! result.get())
+        fail("Failed to revoke reader.");
+    }
+
+    {
+      final AtomicReference<Record> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+        }
+      });
+
+      if(result.get() != null)
+        fail("Should not be able to read record.");
     }
   }
 

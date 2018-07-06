@@ -20,7 +20,7 @@
 
 apply plugin: 'com.android.library'
 apply plugin: 'com.getkeepsafe.dexcount'
-apply plugin: 'maven-publish'
+apply plugin: 'digital.wup.android-maven-publish'
 
 android {
     compileSdkVersion 26
@@ -65,7 +65,9 @@ task sourceJar(type: Jar) {
 
 publishing {
   publications {
-    maven(MavenPublication) {
+    mavenAar(MavenPublication) {
+      from components.android
+
       groupId project(":publish").ext.groupId
       artifactId 'e3db-client-android'
       version project(":publish").ext.version
@@ -74,64 +76,27 @@ publishing {
         classifier "sources"
       }
 
-      artifact bundleRelease
-
-      pom.withXml {
-        def dependenciesNode = asNode().appendNode('dependencies')
-
-        // List all implementation dependencies and write to POM
-        configurations.implementation.getAllDependencies().each { Dependency dep ->
-          if (dep.group == null || dep.version == null || dep.name == null || dep.name == "unspecified")
-            return // ignore invalid dependencies
-
-          def dependencyNode = dependenciesNode.appendNode('dependency')
-          dependencyNode.appendNode('groupId', dep.group)
-          dependencyNode.appendNode('artifactId', dep.name)
-          dependencyNode.appendNode('version', dep.version)
-
-          // Can't determine a way to tell that these are `aar`, so
-          // put this ugly hack in :(
-          if(dep.name == "jna")
-            dependencyNode.appendNode('type', 'aar')
-
-          if (!dep.transitive) {
-            // If this dependency is transitive, we should force exclude all its dependencies them from the POM
-            def exclusionNode = dependencyNode.appendNode('exclusions').appendNode('exclusion')
-            exclusionNode.appendNode('groupId', '*')
-            exclusionNode.appendNode('artifactId', '*')
-          } else if (!dep.properties.excludeRules.empty) {
-            // Otherwise add specified exclude rules
-            def exclusionsNode = dependencyNode.appendNode('exclusions')
-            dep.properties.excludeRules.each { ExcludeRule rule ->
-              def exclusionNode = exclusionsNode.appendNode('exclusion')
-              exclusionNode.appendNode('groupId', rule.group ?: '*')
-              exclusionNode.appendNode('artifactId', rule.module ?: '*')
-            }
+      repositories {
+        maven {
+          // url should be of the form "s3://<bucket>.s3-<region>.amazonaws.com/<folder>"
+          url "${System.getenv('REPO_URL')}"
+          credentials(AwsCredentials) {
+            accessKey "${System.getenv('AWS_KEY')}"
+            secretKey "${System.getenv('AWS_SECRET')}"
           }
         }
       }
     }
   }
-  repositories {
-      maven {
-          // url should be of the form "s3://<bucket>.s3-<region>.amazonaws.com/<folder>"
-          url "${System.getenv('REPO_URL')}"
-          credentials(AwsCredentials) {
-              accessKey "${System.getenv('AWS_KEY')}"
-              secretKey "${System.getenv('AWS_SECRET')}"
-          }
-      }
-  }
 }
 
 dependencies {
-  implementation 'com.squareup.retrofit2:retrofit:2.4.0'
-  implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-  implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-  implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-  implementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
-  implementation 'net.java.dev.jna:jna:4.5.1@aar'
-  implementation 'com.android.support:support-annotations:27.1.0'
-  implementation 'com.android.support:support-compat:26.0.1'
-  implementation 'com.android.support:support-core-utils:26.0.1'
+  implementation project(":e3db-crypto-android").configurations.implementation.dependencies.matching { dep ->
+    // exclude project dependencies - only include external, maven dependencies
+    ExternalModuleDependency.class.isAssignableFrom(dep.class)
+  }
+  implementation project(":e3db").configurations.compile.dependencies.matching { dep ->
+    // exclude project dependencies - only include external, maven dependencies
+    ExternalModuleDependency.class.isAssignableFrom(dep.class)
+  }
 }

@@ -1118,7 +1118,7 @@ public class  Client {
     String curve25519 = info.get("public_key").get("curve25519").asText();
     String ed25519;
     {
-      if(info.has("signing_key"))
+      if(info.get("signing_key") != null && info.get("signing_key").get("ed25519") != null)
         ed25519 = info.get("signing_key").get("ed25519").asText();
       else
         ed25519 = null;
@@ -2077,7 +2077,12 @@ public class  Client {
         try {
           ClientInfo authorizerInfo = getClientInfo(authorizer);
           byte[] ak = getOwnAccessKey(recordType);
-          setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getCurve25519(), ak, Client.this.clientId, Client.this.publicSigningKey);
+          try {
+            setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getCurve25519(), ak, Client.this.clientId, Client.this.publicSigningKey);
+          }
+          catch(E3DBConflictException e) {
+            // safe to ignore, it means this client has already been authorized.
+          }
           retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
               Client.this.clientId.toString(),
               authorizer.toString(),

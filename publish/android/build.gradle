@@ -84,25 +84,30 @@ publishing {
           if (dep.group == null || dep.version == null || dep.name == null || dep.name == "unspecified")
             return // ignore invalid dependencies
 
-            def dependencyNode = dependenciesNode.appendNode('dependency')
-            dependencyNode.appendNode('groupId', dep.group)
-            dependencyNode.appendNode('artifactId', dep.name)
-            dependencyNode.appendNode('version', dep.version)
+          def dependencyNode = dependenciesNode.appendNode('dependency')
+          dependencyNode.appendNode('groupId', dep.group)
+          dependencyNode.appendNode('artifactId', dep.name)
+          dependencyNode.appendNode('version', dep.version)
 
-            if (!dep.transitive) {
-              // If this dependency is transitive, we should force exclude all its dependencies them from the POM
-              def exclusionNode = dependencyNode.appendNode('exclusions').appendNode('exclusion')
-              exclusionNode.appendNode('groupId', '*')
-              exclusionNode.appendNode('artifactId', '*')
-            } else if (!dep.properties.excludeRules.empty) {
-              // Otherwise add specified exclude rules
-              def exclusionsNode = dependencyNode.appendNode('exclusions')
-              dep.properties.excludeRules.each { ExcludeRule rule ->
-                def exclusionNode = exclusionsNode.appendNode('exclusion')
-                exclusionNode.appendNode('groupId', rule.group ?: '*')
-                exclusionNode.appendNode('artifactId', rule.module ?: '*')
-              }
+          // Can't determine a way to tell that these are `aar`, so
+          // put this ugly hack in :(
+          if(dep.name == "jna")
+            dependencyNode.appendNode('type', 'aar')
+
+          if (!dep.transitive) {
+            // If this dependency is transitive, we should force exclude all its dependencies them from the POM
+            def exclusionNode = dependencyNode.appendNode('exclusions').appendNode('exclusion')
+            exclusionNode.appendNode('groupId', '*')
+            exclusionNode.appendNode('artifactId', '*')
+          } else if (!dep.properties.excludeRules.empty) {
+            // Otherwise add specified exclude rules
+            def exclusionsNode = dependencyNode.appendNode('exclusions')
+            dep.properties.excludeRules.each { ExcludeRule rule ->
+              def exclusionNode = exclusionsNode.appendNode('exclusion')
+              exclusionNode.appendNode('groupId', rule.group ?: '*')
+              exclusionNode.appendNode('artifactId', rule.module ?: '*')
             }
+          }
         }
       }
     }
@@ -124,7 +129,8 @@ dependencies {
   implementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
   implementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
   implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
-  implementation "com.goterl.lazycode:lazysodium-android:2.5.0"
+  implementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
+  implementation 'net.java.dev.jna:jna:4.5.1@aar'
   implementation 'com.android.support:support-annotations:27.1.0'
   implementation 'com.android.support:support-compat:26.0.1'
   implementation 'com.android.support:support-core-utils:26.0.1'

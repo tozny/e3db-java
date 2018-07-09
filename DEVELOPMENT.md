@@ -142,7 +142,7 @@ The published artifacts have different names, but should share versions. They ar
 
 (The version is specified in the file `./publish/build.gradle`.)
 
-Versioning
+Publishing a Release
 ====
 
 When preparing to publish:
@@ -160,7 +160,6 @@ When preparing to publish:
   - docs\index.md - Change link to latest version of docs; move link to previous version of docs to the list of previous versions.
 - Commit changes to documentation
 - Push changes and tags to remote
-
 
 Done!
 

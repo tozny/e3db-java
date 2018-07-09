@@ -35,9 +35,15 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
     buildTypes {
+        debug {
+            buildConfigField "String", "REGISTRATION_TOKEN", "\"${System.getenv("REGISTRATION_TOKEN") == null ? "": System.getenv("REGISTRATION_TOKEN")}\""
+            buildConfigField "String", "DEFAULT_API_URL", "\"${System.getenv("DEFAULT_API_URL") == null ? "https://api.e3db.com" : System.getenv("DEFAULT_API_URL")}\""
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "REGISTRATION_TOKEN", "\"${System.getenv("REGISTRATION_TOKEN") == null ? "x" : System.getenv("REGISTRATION_TOKEN")}\""
+            buildConfigField "String", "DEFAULT_API_URL", "\"${System.getenv("DEFAULT_API_URL") == null ? "https://api.e3db.com" : System.getenv("DEFAULT_API_URL")}\""
         }
     }
     sourceSets.androidTest.java {
@@ -60,6 +66,7 @@ dependencies {
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
     androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+    androidTestImplementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
 
     androidTestImplementation project(path: ':e3db')
     androidTestImplementation project(path: ':e3db-crypto-interface')

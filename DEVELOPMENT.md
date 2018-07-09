@@ -36,12 +36,8 @@ not executed independently, but as part of the `plaintest` and `androidtest` pro
 The common-test/src/test directory contains a set of integration tests that cover
 basic functionality: register, read, write, query, and sharing.
 
-The tests use a hard-coded registration token (which is safe to use and distribute). However,
-you can replace the token via System properies:
-
-* e3db.host - The host to test against (e.g., `https://staging.e3db.com`). By default, tests against
-  our dev environment.
-* e3db.token - Token to use for client registration.
+To run the tests, you must supply a registration token from the Tozny console. We recommend *not* using your
+"main" account, as each test will register multiple clients which can clutter the client management page.
 
 "FileNotFoundException" When Testing
 ====
@@ -62,10 +58,16 @@ Plain Java Testing
 The `plaintest` directory contains test specific to the crypto libraries used on the plain Java platform. You
 can run these test from the command line using teh command `gradlew :plaintest:test`.
 
+You must set the `REGISTRATION_TOKEN` environment variable to supply a registration token.
+
 Android Testing
 ====
 
 The `androidtest` project contains Android-specific tests (for crypto operations as well as secure configuration storage).
+
+You must set the `REGISTRATION_TOKEN` environment variable *when building the app*. Note that this value is compiled into
+the Test APK and executed on the Android device (or emulator). If you change the value, you must clean the `androidtest` project and compile
+again.
 
 You can run the Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
 plugged in and has USB debugging enabled.

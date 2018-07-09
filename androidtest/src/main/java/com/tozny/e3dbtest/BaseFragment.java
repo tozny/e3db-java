@@ -65,9 +65,9 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
     protected TextView mErrorTextView;
     protected TextView mConfigTextView;
 
-    protected static String TOKEN       = "e791f9fbb063f7496886e906eb568b84d20825593080c7a095fa1a1f49ee40c5";
+    protected static String TOKEN       = AppConfig.registrationToken;
     protected static String CLIENT_NAME = UUID.randomUUID().toString();
-    protected static String HOST        = "https://api.e3db.com";
+    protected static String HOST        = AppConfig.defaultApiUrl;
 
     private Config mConfig = null;
 

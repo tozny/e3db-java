@@ -37,12 +37,14 @@ import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.security.*;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.zip.ZipInputStream;
 
 import static com.goterl.lazycode.lazysodium.LazySodium.toHex;
 import static junit.framework.Assert.*;

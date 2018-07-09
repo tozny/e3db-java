@@ -33,6 +33,7 @@ import static org.junit.Assert.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
@@ -54,11 +55,33 @@ public class ClientTest {
 
   private static final String FIELD = "line";
   private static final String TYPE = "stuff";
-  public static final String MESSAGE = "It's a simple message and I'm leaving out the whistles and bells";
+  private static final String MESSAGE = "It's a simple message and I'm leaving out the whistles and bells";
+  private static final String host;
+  private static final String token;
 
   static {
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    try {
+      // ensure we initialize Android-specific config before running
+      // these tests.
+      Class.forName("com.tozny.e3db.AppConfig");
+    } catch (ClassNotFoundException e) {
+
+    }
+
+    String h = System.getProperty("e3db.host", System.getenv("DEFAULT_API_URL"));
+    if(h == null)
+      host = "https://api.e3db.com";
+    else
+      host = h;
+
+    String t = System.getProperty("e3db.token", System.getenv("REGISTRATION_TOKEN"));
+    if(t == null)
+     throw new Error("Registration token must be set via environment variable or system property.");
+    else
+      token = t;
   }
 
   /**
@@ -76,22 +99,6 @@ public class ClientTest {
      catch(Exception e) {
        throw new Error(e);
      }
-  }
-
-  public static <R> ResultHandler<R> withResult(final AtomicReference<R> ref) {
-    return new ResultHandler<R>() {
-      @Override
-      public void handle(Result<R> r) {
-        if(r.isError()) {
-          if(r.asError().other() instanceof Error)
-            throw (Error) r.asError().other();
-          else
-            throw new Error(r.asError().other());
-        }
-
-        ref.set(r.asValue());
-      }
-    };
   }
 
   /**
@@ -136,14 +143,12 @@ public class ClientTest {
 
   private static void registerProfile(final String profile, final ResultHandler<Config> handler) {
     final String clientName = UUID.randomUUID().toString();
-    final String host = System.getProperty("e3db.host", "https://dev.e3db.com");
-    final String token = System.getProperty("e3db.token", "1f991d79091ba4aaa1f333bef1929a10ed8c3f426fb6d3b1340a1157950d5bce");
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-          token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+            token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
             @Override
             public void handle(Result<Config> r) {
               if (!r.isError()) {
@@ -225,11 +230,8 @@ public class ClientTest {
   @Test
   public void testInValidCertificatePin() throws IOException {
     final String clientName = UUID.randomUUID().toString();
-    final String host = System.getProperty("e3db.host", "https://dev.e3db.com");
-    final String token = System.getProperty("e3db.token", "1f991d79091ba4aaa1f333bef1929a10ed8c3f426fb6d3b1340a1157950d5bce");
-
     final CertificatePinner certificatePinner = new CertificatePinner.Builder()
-            .add("dev.e3db.com", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+            .add(URI.create(host).getHost(), "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
             .build();
 
     withTimeout(new AsyncAction() {
@@ -1391,21 +1393,57 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, withResult(writerEak)));
+        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+          @Override
+          public void handle(Result<LocalEAKInfo> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            writerEak.set(r.asValue());
+          }
+        }));
       }
     });
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, withResult(new AtomicReference<Void>())));
+        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            new AtomicReference<Void>().set(r.asValue());
+          }
+        }));
       }
     });
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, withResult(readerEak)));
+        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+          @Override
+          public void handle(Result<LocalEAKInfo> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            readerEak.set(r.asValue());
+          }
+        }));
       }
     });
 
@@ -1503,7 +1541,19 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(type, new ResultWithWaiting<>(wait, withResult(info)));
+        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+          @Override
+          public void handle(Result<LocalEAKInfo> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            info.set(r.asValue());
+          }
+        }));
       }
     });
 
@@ -1569,7 +1619,19 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-          client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, withResult(result)));
+        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            result.set(r.asValue());
+          }
+        }));
       }
     });
 
@@ -1683,7 +1745,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, withResult(result)));
+          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 
@@ -1694,15 +1768,21 @@ public class ClientTest {
     }
 
     {
-      final AtomicReference<Record> result = new AtomicReference<>();
+      final AtomicReference<E3DBNotFoundException> result = new AtomicReference<>();
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
+                result.set((E3DBNotFoundException) r.asError().other());
+            }
+          }));
         }
       });
 
-      if(result.get() != null)
+      if(result.get() == null)
         fail("Should not be able read record yet.");
     }
 
@@ -1751,7 +1831,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 
@@ -1780,15 +1872,21 @@ public class ClientTest {
     }
 
     {
-      final AtomicReference<Record> result = new AtomicReference<>();
+      final AtomicReference<E3DBNotFoundException> result = new AtomicReference<>();
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
+                result.set((E3DBNotFoundException) r.asError().other());
+            }
+          }));
         }
       });
 
-      if(result.get() != null)
+      if(result.get() == null)
         fail("Should not be able to read record.");
     }
   }
@@ -1858,7 +1956,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, withResult(result)));
+          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 
@@ -1873,7 +1983,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 
@@ -1902,15 +2024,21 @@ public class ClientTest {
     }
 
     {
-      final AtomicReference<Record> result = new AtomicReference<>();
+      final AtomicReference<E3DBNotFoundException> result = new AtomicReference<>();
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, withResult(result)));
+          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            @Override
+            public void handle(Result<Record> r) {
+              if (r.isError() && r.asError().other() instanceof E3DBNotFoundException)
+                result.set((E3DBNotFoundException) r.asError().other());
+           }
+          }));
         }
       });
 
-      if(result.get() != null)
+      if(result.get() == null)
         fail("Should not be able to read record.");
     }
   }
@@ -1950,7 +2078,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.getAuthorizers(new ResultWithWaiting<>(wait, withResult(result)));
+          writer.client.getAuthorizers(new ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
+            @Override
+            public void handle(Result<List<AuthorizerPolicy>> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 
@@ -1970,7 +2110,19 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.getAuthorizedBy(new ResultWithWaiting<>(wait, withResult(result)));
+          authorizer.client.getAuthorizedBy(new ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
+            @Override
+            public void handle(Result<List<AuthorizerPolicy>> r) {
+              if (r.isError()) {
+                if (r.asError().other() instanceof Error)
+                  throw (Error) r.asError().other();
+                else
+                  throw new Error(r.asError().other());
+              }
+
+              result.set(r.asValue());
+            }
+          }));
         }
       });
 

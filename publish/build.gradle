@@ -24,13 +24,13 @@ ext {
   baseName = "e3db-client"
 }
 
-task publishLocal(dependsOn: [":publish:android:publishToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
+task publishLocal(dependsOn: [":publish:android:publishMavenAarPublicationToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
   doLast {
     println "Published local artifacts."
   }
 }
 
-task publishRemote(dependsOn: [":publish:android:publishMavenPublicationToMavenRepository", ":publish:plain:publishMavenPublicationToMavenRepository"]) {
+task publishRemote(dependsOn: [":publish:android:publishMavenAarPublicationToMavenRepository", ":publish:plain:publishMavenPublicationToMavenRepository"]) {
   doLast {
     println "Published remote artifacts."
   }

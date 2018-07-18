@@ -27,6 +27,11 @@ import com.goterl.lazycode.lazysodium.interfaces.Sign;
 import com.tozny.e3db.crypto.*;
 
 import org.junit.*;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.Assert.*;
 
 public class PlainCryptoTest {
@@ -79,5 +84,32 @@ public class PlainCryptoTest {
     assertFalse("Verification should fail with wrong document.", crypto.verify(new Signature(signature), wrongDocument, publicSigningKey));
     assertFalse("Verification should fail with zero document.", crypto.verify(new Signature(signature), new byte[100_000], publicSigningKey));
     assertFalse("Verification should fail with empty document.", crypto.verify(new Signature(signature), new byte[0], publicSigningKey));
+  }
+
+  @Test
+  public void testBlnsSerializationJavaMatchesNode() throws IOException {
+    BlnsTest blns = new BlnsTest();
+    List<Map<String, String>> javaTests = blns.serializeBlns();
+    List<Map<String, String>> nodeTests = blns.loadBlnsResults("/com/tozny/e3db/blns-node.json");
+    List<String> failedTests = BlnsTest.compareBlnsResults(javaTests, nodeTests);
+
+    // known indexes for tests that fail based on known issues
+    // 92, 94, 503, 504 have unicode case-sensitivity related errors
+    List<String> knownFailures = Arrays.asList("92", "94", "503", "504");
+    assertArrayEquals(knownFailures.toArray(), failedTests.toArray());
+  }
+
+  @Test
+  public void testBlnsSerializationJavaMatchesSwift() throws IOException {
+    BlnsTest blns = new BlnsTest();
+    List<Map<String, String>> javaTests = blns.serializeBlns();
+    List<Map<String, String>> swiftTests = blns.loadBlnsResults("/com/tozny/e3db/blns-swift.json");
+    List<String> failedTests = BlnsTest.compareBlnsResults(javaTests, swiftTests);
+
+    // known indexes for tests that fail based on known issues
+    // 96 and 169 have hidden-whitespace related errors
+    // 92, 94, 503, 504 have unicode case-sensitivity related errors
+    List<String> knownFailures = Arrays.asList("92", "94", "96", "169", "503", "504");
+    assertArrayEquals(knownFailures.toArray(), failedTests.toArray());
   }
 }

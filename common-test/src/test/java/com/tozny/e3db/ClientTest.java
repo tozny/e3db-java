@@ -1231,7 +1231,7 @@ public class ClientTest {
               }
             };
 
-            client.verify(signed, clientInfo1.clientConfig.publicSigningKey);
+            assertTrue(client.verify(signed, clientInfo1.clientConfig.publicSigningKey));
           }
         }));
       }

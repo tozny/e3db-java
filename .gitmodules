@@ -1,0 +1,4 @@
+[submodule "e3db-fips-java"]
+	path = e3db-fips
+	url = git@github.com:tozny/e3db-fips-java.git
+	branch = WASH-34

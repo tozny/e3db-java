@@ -47,7 +47,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.tozny.e3dbandroidcrypto.R;
+import com.tozny.e3db.R;
 
 import java.security.GeneralSecurityException;
 import java.security.UnrecoverableKeyException;

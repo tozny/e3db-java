@@ -64,6 +64,11 @@ class PlainCrypto implements Crypto {
   }
 
   @Override
+  public CipherSuite suite() {
+    return CipherSuite.Sodium;
+  }
+
+  @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
     checkNotNull(message, "message");
     checkNotEmpty(key, "key");

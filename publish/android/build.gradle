@@ -23,44 +23,44 @@ apply plugin: 'com.getkeepsafe.dexcount'
 apply plugin: 'digital.wup.android-maven-publish'
 
 android {
-    compileSdkVersion 26
-    defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 16
-    }
-    sourceSets {
-      main {
-        manifest.srcFile ("${project(":e3db-crypto-android").projectDir}/src/main/AndroidManifest.xml")
-        java {
-          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java",
-                  "${project(":e3db").projectDir}/src/main/java",
-                  "${project(":e3db-crypto-interface").projectDir}/src/main/java",
-                  "${project(":e3db-crypto-stub-plain").projectDir}/src/main/java"
-        }
-        res {
-          srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/res"
-        }
+  compileSdkVersion 26
+  defaultConfig {
+    minSdkVersion 16
+    targetSdkVersion 16
+  }
+  sourceSets {
+    main {
+      manifest.srcFile ("${project(":e3db-crypto-android").projectDir}/src/main/AndroidManifest.xml")
+      java {
+        srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/java",
+            "${project(":e3db").projectDir}/src/main/java",
+            "${project(":e3db-crypto-interface").projectDir}/src/main/java",
+            "${project(":e3db-crypto-stub-plain").projectDir}/src/main/java"
+      }
+      res {
+        srcDirs "${project(":e3db-crypto-android").projectDir}/src/main/res"
       }
     }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt')
-        }
+  }
+  buildTypes {
+    release {
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android.txt')
     }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_7
-        targetCompatibility JavaVersion.VERSION_1_7
-    }
-    lintOptions {
-      disable 'InvalidPackage' // jna package used by libsodium references some sun packages, but those will never be called.
-    }
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_7
+    targetCompatibility JavaVersion.VERSION_1_7
+  }
+  lintOptions {
+    disable 'InvalidPackage' // jna package used by libsodium references some sun packages, but those will never be called.
+  }
 }
 
 evaluationDependsOn(':publish')
 
 task sourceJar(type: Jar) {
-    from android.sourceSets.main.java.sourceFiles
+  from android.sourceSets.main.java.sourceFiles
 }
 
 publishing {

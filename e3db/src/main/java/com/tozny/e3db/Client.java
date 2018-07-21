@@ -1411,10 +1411,28 @@ public class  Client {
       public void run() {
         try {
           Map<String, String> publicKeyInfo = new HashMap<>();
-          publicKeyInfo.put("curve25519", publicKey);
+          switch(Platform.crypto.suite().getEncryptionKey()) {
+            case Curve25519:
+              publicKeyInfo.put("curve25519", publicKey);
+              break;
+            case P384:
+              publicKeyInfo.put("p384", publicKey);
+              break;
+            default:
+              throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKey() + " not supported.");
+          }
 
           Map<String, String> publicSignKeyInfo = new HashMap<>();
-          publicSignKeyInfo.put("ed25519", publicSignKey);
+          switch(Platform.crypto.suite().getEncryptionKey()) {
+            case Curve25519:
+              publicSignKeyInfo.put("ed25519", publicSignKey);
+              break;
+            case P384:
+              publicSignKeyInfo.put("ed25519", publicSignKey);
+              break;
+            default:
+              throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getEncryptionKey() + " not supported.");
+          }
 
           Map<String, Object> clientInfo = new HashMap<>();
           clientInfo.put("name", clientName);

@@ -27,6 +27,11 @@ import java.io.IOException;
 
 class PlainCrypto implements Crypto {
   @Override
+  public CipherSuite suite() {
+    throw new IllegalStateException();
+  }
+
+  @Override
   public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
     throw new IllegalStateException();
   }

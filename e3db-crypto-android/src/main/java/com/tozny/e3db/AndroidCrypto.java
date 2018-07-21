@@ -48,7 +48,6 @@ class AndroidCrypto implements Crypto {
   }
 
   private static class Init {
-
     // Static inner class as a singleton to make sure
     public static final SodiumAndroid sodium;
     // Sodium library is initalized once and only once.
@@ -61,6 +60,11 @@ class AndroidCrypto implements Crypto {
         throw new RuntimeException(ex);
       }
     }
+  }
+
+  @Override
+  public CipherSuite suite() {
+    return CipherSuite.Sodium;
   }
 
   @Override

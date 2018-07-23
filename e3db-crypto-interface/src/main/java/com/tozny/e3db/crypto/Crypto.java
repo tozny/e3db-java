@@ -156,8 +156,8 @@ public interface Crypto {
   void decryptFile(File file, byte[] secretKey, File dest) throws IOException;
 
   /**
-   * Size of the block used when encrypting files.
-   * @return block size.
+   * Size of the block used when encrypting files (in bytes).
+   * @return block size in bytes.
    */
   int getBlockSize();
 }

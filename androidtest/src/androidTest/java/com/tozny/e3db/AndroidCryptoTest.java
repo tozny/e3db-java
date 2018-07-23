@@ -360,4 +360,41 @@ public class AndroidCryptoTest {
       actual.close();
     }
   }
+
+  @Test
+  public void testBlockSizeFile() throws IOException {
+    byte [] plain = lazySodium.randomBytesBuf(Platform.crypto.getBlockSize());
+    File plainFile = File.createTempFile("e2e", "");
+    plainFile.deleteOnExit();
+
+    FileOutputStream plainOut = new FileOutputStream(plainFile, false);
+    try {
+      plainOut.write(plain);
+    }
+    finally {
+      plainOut.close();
+    }
+
+    byte[] secretKey = crypto.newSecretKey();
+    File encryptFile = crypto.encryptFile(plainFile, secretKey);
+    encryptFile.deleteOnExit();
+
+    File plainResultFile = File.createTempFile("e2e-", ".html");
+    plainResultFile.deleteOnExit();
+
+    crypto.decryptFile(encryptFile, secretKey, plainResultFile);
+    FileInputStream expected = new FileInputStream(plainFile);
+    FileInputStream actual = new FileInputStream(plainResultFile);
+    try {
+      int a, b, pos = 1;
+      for(a = expected.read(), b = actual.read(); a != -1 && b != -1; a = expected.read(), b = actual.read(), pos++ ) {
+        assertEquals("Files differed at position " + pos,  a, b);
+      }
+      assertTrue("Files not the same length.", a == -1 && a == b);
+    }
+    finally {
+      expected.close();;
+      actual.close();
+    }
+  }
 }

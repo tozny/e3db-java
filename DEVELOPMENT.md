@@ -225,3 +225,17 @@ Results are available via `logcat` output, using the tag `BenchmarkResults`. For
 ```
 
 etc.
+
+IntelliJ: Updating Gradle Projects
+=====
+
+IntelliJ, on occasion, decides it doesn't like how this project is organized and fails to synchronize with errors like:
+
+```
+A problem occurred evaluating project ':e3db-fips:publish:android'.
+> Could not get unknown property 'implementation' for configuration container of type org.gradle.api.internal.artifacts.configurations.DefaultConfigurationContainer.
+```
+
+To fix, just select `Sync` from the Gradle tool window. Doing a full build on the command line (e.g., `:publish:publishLocal`)
+will also fix the problem.
+

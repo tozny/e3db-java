@@ -1177,23 +1177,25 @@ public class ClientTest {
 
   @Test
   public void testExternalEncryptedRecord() throws IOException {
-    final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
-    final JsonNode extEncryptedRecord = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
-    final JsonNode doc = extEncryptedRecord.get("doc");
-    final EncryptedRecord record = LocalEncryptedRecord.decode(mapper.writeValueAsString(doc));
+    if(Platform.crypto.suite() == CipherSuite.Sodium) {
+      final CI clientInfo1 = getClient();
+      final Client client = clientInfo1.client;
+      final JsonNode extEncryptedRecord = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
+      final JsonNode doc = extEncryptedRecord.get("doc");
+      final EncryptedRecord record = LocalEncryptedRecord.decode(mapper.writeValueAsString(doc));
 
-    assertTrue("Unable to verify document.", client.verify(new SignedDocument<EncryptedRecord>() {
-      @Override
-      public String signature() {
-        return extEncryptedRecord.get("sig").asText();
-      }
+      assertTrue("Unable to verify document.", client.verify(new SignedDocument<EncryptedRecord>() {
+        @Override
+        public String signature() {
+          return extEncryptedRecord.get("sig").asText();
+        }
 
-      @Override
-      public EncryptedRecord document() {
-        return record;
-      }
-    }, doc.get("meta").get("plain").get("client_pub_sig_key").asText()));
+        @Override
+        public EncryptedRecord document() {
+          return record;
+        }
+      }, doc.get("meta").get("plain").get("client_pub_sig_key").asText()));
+    }
   }
 
   @Test

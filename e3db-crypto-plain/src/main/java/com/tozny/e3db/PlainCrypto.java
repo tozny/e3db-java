@@ -42,6 +42,7 @@ import static com.tozny.e3db.Checks.*;
 class PlainCrypto implements Crypto {
   private static final Charset UTF8 = StandardCharsets.UTF_8;
   private static final int BLOCK_SIZE = 65_536;
+  private static final int SECRET_STREAM_TAG_MESSAGE = 0x0;
   private final LazySodium lazySodium;
 
   public PlainCrypto() {
@@ -189,7 +190,7 @@ class PlainCrypto implements Crypto {
       throw new RuntimeException("Error initializing encrypt operation.");
 
     CipherWithNonce edk = encryptSecretBox(dataKey, secretKey);
-    String version = "1";
+    String version = "3";
     String e3dbHeader = new StringBuilder()
                             .append(version)
                             .append(".")
@@ -212,7 +213,7 @@ class PlainCrypto implements Crypto {
            headAmt != -1;
            headAmt = nextAmt, head = next, nextAmt = source.read(next)) {
 
-        byte messageTag = headAmt == head.length ? SecretStream.TAG_MESSAGE : SecretStream.TAG_FINAL;
+        byte messageTag = nextAmt != -1 ? SECRET_STREAM_TAG_MESSAGE : SecretStream.TAG_FINAL;
         if(! lazySodium.cryptoSecretStreamPush(state, cipher, head, headAmt, messageTag))
           throw new RuntimeException("Error encrypting file.");
 
@@ -227,9 +228,10 @@ class PlainCrypto implements Crypto {
   public void decryptFile(File encrypted, byte[] secretKey, File dest) throws IOException {
     try (FileOutputStream out = new FileOutputStream(dest, false); FileInputStream in = new FileInputStream(encrypted)) {
       // Read version
-      String v = new String(new byte[]{(byte) in.read()}, UTF8);
-      if (!v.equalsIgnoreCase("1"))
-        throw new RuntimeException("Unknown version: " + v);
+      FileVersion v = FileVersion.fromValue(new String(new byte[]{(byte) in.read()}, UTF8));
+      if(v != FileVersion.CORRECTED_MESSAGE_TAG && v != FileVersion.INITIAL)
+        throw new RuntimeException("Unknown file version: " + v);
+
       in.read(); // "."
 
       // Read EDK/EDKn
@@ -261,15 +263,30 @@ class PlainCrypto implements Crypto {
 
         byte[] cipherBlock = new byte[BLOCK_SIZE + SecretStream.ABYTES];
         byte[] tag = new byte[1];
+        boolean sawFinal = false;
 
         for (int cipherAmt = in.read(cipherBlock); cipherAmt != -1; cipherAmt = in.read(cipherBlock)) {
+          if(sawFinal)
+            throw new RuntimeException("Unexpected trailing data.");
+
           byte[] messageBlock = new byte[cipherAmt - SecretStream.ABYTES];
           if (!lazySodium.cryptoSecretStreamPull(state, messageBlock, tag, cipherBlock, cipherAmt))
             throw new RuntimeException("Decryption error.");
 
-          if (tag[0] != SecretStream.TAG_MESSAGE && tag[0] != SecretStream.TAG_FINAL)
-            throw new RuntimeException("Invalid decryption.");
+          switch(v) {
+            case INITIAL:
+              // For backwards compatibility support, as the lazysodium library had a bug
+              // and all messages were tagged final.
+              if(tag[0] != SecretStream.TAG_FINAL)
+                throw new RuntimeException("Invalid decryption.");
+              break;
+            case CORRECTED_MESSAGE_TAG:
+              if(tag[0] != SECRET_STREAM_TAG_MESSAGE && tag[0] != SecretStream.TAG_FINAL)
+                throw new RuntimeException("Invalid decryption.");
+              break;
+          }
 
+          sawFinal = tag[0] == SecretStream.TAG_FINAL;
           out.write(messageBlock);
         }
 

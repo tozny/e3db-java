@@ -397,17 +397,4 @@ public class AndroidCryptoTest {
       actual.close();
     }
   }
-
-  @Test
-  public void testSigningSameDocs() {
-    byte [] doc = ("Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
-                       "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
-                       "ungirdled, was sustained gently behind him on the mild morning air.").getBytes(UTF8);
-
-    byte[] signingKey = crypto.newPrivateSigningKey();
-    byte[] sig1 = crypto.signature(doc, signingKey);
-    byte[] sig2 = crypto.signature(doc, signingKey);
-
-    assertEquals("Same document signed two different times should be the same signature", Base64.encodeURL(sig1), Base64.encodeURL(sig2));
-  }
 }

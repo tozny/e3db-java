@@ -33,11 +33,12 @@ include (':e3db',
         ':plain-benchmark',
         ':common-test')
 
-include(':e3db-fips',
-    ':e3db-fips:android-fips-test',
-    ':e3db-fips:e3db-crypto-fips-android',
-    ':e3db-fips:publish:android',
-    ':e3db-fips:e3db-crypto-fips-plain',
-    ':e3db-fips:publish:plain',
-    ':e3db-fips:plain-fips-test')
-
+if(file("e3db-fips").exists()) {
+  include(':e3db-fips',
+      ':e3db-fips:android-fips-test',
+      ':e3db-fips:e3db-crypto-fips-android',
+      ':e3db-fips:publish:android',
+      ':e3db-fips:e3db-crypto-fips-plain',
+      ':e3db-fips:publish:plain',
+      ':e3db-fips:plain-fips-test')
+}

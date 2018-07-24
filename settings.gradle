@@ -38,5 +38,6 @@ include(':e3db-fips',
     ':e3db-fips:e3db-crypto-fips-android',
     ':e3db-fips:publish:android',
     ':e3db-fips:e3db-crypto-fips-plain',
-    ':e3db-fips:publish:plain')
+    ':e3db-fips:publish:plain',
+    ':e3db-fips:plain-fips-test')
 

@@ -72,3 +72,30 @@ void setJava7(Project project) {
         }
     }
 }
+
+def regToken() {
+    if(project.properties["REGISTRATION_TOKEN"] != null)
+        project.properties["REGISTRATION_TOKEN"]
+    else if (System.getenv("REGISTRATION_TOKEN") != null)
+        System.getenv("REGISTRATION_TOKEN")
+    else {
+        Properties props = new Properties()
+        props.load(project.rootProject.file('local.properties').newDataInputStream())
+        props.getProperty("REGISTRATION_TOKEN")
+    }
+}
+
+def apiUrl() {
+    if(project.properties["DEFAULT_API_URL"] != null)
+        project.properties["DEFAULT_API_URL"]
+    else if(System.getenv("DEFAULT_API_URL") != null)
+        System.getenv("DEFAULT_API_URL")
+    else {
+        Properties props = new Properties()
+        props.load(project.rootProject.file('local.properties').newDataInputStream())
+        if(props.getProperty("DEFAULT_API_URL") != null)
+            props.getProperty("DEFAULT_API_URL")
+        else
+            "https://api.e3db.com"
+    }
+}

@@ -1136,19 +1136,6 @@ public class ClientTest {
     }
 
     {
-      final Map<String, String> plain = new HashMap<>();
-
-      LocalRecord local1 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
-      LocalRecord local2 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
-
-      SignedDocument<LocalRecord> sign1 = client.sign(local1);
-      SignedDocument<LocalRecord> sign2 = client.sign(local2);
-      assertTrue("Unable to verify document", client.verify(sign1, clientInfo1.clientConfig.publicSigningKey));
-      assertTrue("Unable to verify document", client.verify(sign2, clientInfo1.clientConfig.publicSigningKey));
-      assertEquals("Absent plain and empty plain should give the same signature.", sign1.signature(), sign2.signature());
-    }
-
-    {
       // read a remote record, sign it, verify signature
       withTimeout(new AsyncAction() {
         @Override
@@ -1173,6 +1160,26 @@ public class ClientTest {
         }
       });
     }
+  }
+
+  @Test
+  public void testPlainMetaSerialization() throws IOException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String recordType = "lyric";
+    final Map<String, String> data = new HashMap<>();
+    data.put("Jabberwock", "Not to put too fine a point on it");
+    final Map<String, String> plain = new HashMap<>();
+
+    LocalRecord local1 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, null));
+    LocalRecord local2 = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+
+    assertEquals("Absent plain and empty plain should serialize the same", local1.toSerialized(), local2.toSerialized());
+
+    SignedDocument<LocalRecord> sign1 = client.sign(local1);
+    SignedDocument<LocalRecord> sign2 = client.sign(local2);
+    assertTrue("Unable to verify document", client.verify(sign1, clientInfo1.clientConfig.publicSigningKey));
+    assertTrue("Unable to verify document", client.verify(sign2, clientInfo1.clientConfig.publicSigningKey));
   }
 
   @Test

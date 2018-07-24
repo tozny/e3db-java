@@ -251,7 +251,7 @@ public class AndroidCryptoTest {
     String field = new String(new byte[] { (byte) cipherIn.read() }, UTF8);
     String sep = new String(new byte[]{(byte) cipherIn.read()}, UTF8);
 
-    assertEquals("Version not found in header", "1", field);
+    assertEquals("Version not found in header", "3", field);
     assertEquals("Separator not fond", ".", sep);
 
     CipherWithNonce edkDecoded = null;
@@ -396,5 +396,18 @@ public class AndroidCryptoTest {
       expected.close();;
       actual.close();
     }
+  }
+
+  @Test
+  public void testSigningSameDocs() {
+    byte [] doc = ("Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
+                       "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
+                       "ungirdled, was sustained gently behind him on the mild morning air.").getBytes(UTF8);
+
+    byte[] signingKey = crypto.newPrivateSigningKey();
+    byte[] sig1 = crypto.signature(doc, signingKey);
+    byte[] sig2 = crypto.signature(doc, signingKey);
+
+    assertEquals("Same document signed two different times should be the same signature", Base64.encodeURL(sig1), Base64.encodeURL(sig2));
   }
 }

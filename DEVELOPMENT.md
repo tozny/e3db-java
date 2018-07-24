@@ -39,6 +39,21 @@ basic functionality: register, read, write, query, and sharing.
 To run the tests, you must supply a registration token from the Tozny console. We recommend *not* using your
 "main" account, as each test will register multiple clients which can clutter the client management page.
 
+Registration Token Setup
+====
+
+There are multiple ways to set a registration token for use when when running tests:
+
+* Environment Variable - Set 'REGISTRATION_TOKEN'
+* Project Property - At the command line, pass the `-P` option to the gradle wrapper:
+```bash
+$ ./gradlew -PREGISTRATION_TOKEN="..." :androidtest:connectedAndroidTest
+$ ./gradlew -PREGISTRATION_TOKEN="..." :plaintest:test
+```
+* `local.properties` file - Set REGISTRATION_TOKEN in the `local.properties` file (only this method will allow IntelliJ to execute tests)
+
+Tests will fail to run if a registration token is not set.
+
 "FileNotFoundException" When Testing
 ====
 
@@ -65,9 +80,6 @@ Android Testing
 
 The `androidtest` project contains Android-specific tests (for crypto operations as well as secure configuration storage).
 
-You must set the `REGISTRATION_TOKEN` environment variable *when building the app*. Note that this value is compiled into
-the Test APK and executed on the Android device (or emulator). If you change the value, you must clean the `androidtest` project and compile
-again.
 
 You can run the Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
 plugged in and has USB debugging enabled.

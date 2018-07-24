@@ -22,14 +22,6 @@ import com.android.build.gradle.internal.tasks.AndroidTestTask
 
 apply plugin: 'com.android.application'
 
-static def regToken() {
-  System.getenv("REGISTRATION_TOKEN")
-}
-
-static def apiUrl() {
-  System.getenv("DEFAULT_API_URL") == null ? "https://api.e3db.com" : System.getenv("DEFAULT_API_URL")
-}
-
 android {
   compileSdkVersion 27
 
@@ -71,9 +63,11 @@ dependencies {
   androidTestImplementation 'com.android.support.test:runner:1.0.2'
   androidTestImplementation 'com.android.support.test:rules:1.0.2'
   androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-  androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-  androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-  androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+
+  androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0'
+  androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0'
+  androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
+
   androidTestImplementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
 
   androidTestImplementation project(path: ':e3db')
@@ -90,10 +84,11 @@ dependencies {
 }
 
 tasks.withType(AndroidTestTask) {
-  doFirst {
-    // Fail early if mobile registration token hasn't been set
+  onlyIf {
     if(regToken() == null)
-      throw new Error("Regisration token not defined for android unit tests.")
+      throw new Error("Registration token not set.")
+
+    true
   }
 }
 

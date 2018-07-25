@@ -17,11 +17,11 @@ public enum CipherSuite {
     this.signingKey = signingKey;
   }
 
-  public KeyType getSigningKey() {
+  public KeyType getSigningKeyType() {
     return signingKey;
   }
 
-  public KeyType getEncryptionKey() {
+  public KeyType getEncryptionKeyType() {
     return encryptionKey;
   }
 }

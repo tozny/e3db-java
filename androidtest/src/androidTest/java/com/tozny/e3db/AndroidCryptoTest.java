@@ -391,6 +391,8 @@ public class AndroidCryptoTest {
         assertEquals("Files differed at position " + pos,  a, b);
       }
       assertTrue("Files not the same length.", a == -1 && a == b);
+      assertTrue("Block size can't be zero", crypto.getBlockSize() > 0);
+      assertEquals("Files must only be block size in length", crypto.getBlockSize(), pos - 1);
     }
     finally {
       expected.close();;

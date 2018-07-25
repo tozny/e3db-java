@@ -1404,7 +1404,9 @@ public class  Client {
    * @param handleResult Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
-    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).build();
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
+//      .addInterceptor(loggingInterceptor)
+    ).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
   }
@@ -1431,7 +1433,9 @@ public class  Client {
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
     checkNotNull(certificatePinner, "certificatePinner");
-    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).certificatePinner(certificatePinner).build();
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
+//        .addInterceptor(loggingInterceptor)
+    ).certificatePinner(certificatePinner).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
   }

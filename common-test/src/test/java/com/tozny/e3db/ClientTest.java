@@ -147,7 +147,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        Client.register(
+        new Registration().register(
             token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
             @Override
             public void handle(Result<Config> r) {
@@ -212,7 +212,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        Client.register(
+        new Registration().register(
                 token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
                   @Override
                   public void handle(Result<Config> r) {
@@ -237,7 +237,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
-        Client.register(
+        new Registration().register(
                 token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
                   @Override
                   public void handle(Result<Config> r) {

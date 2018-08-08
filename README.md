@@ -128,7 +128,7 @@ import com.tozny.e3db.*;
 String token = "<registration token>";
 String host = "https://api.e3db.com";
 
-Client.register(token, "client1", host, new ResultHandler<Config>() {
+new Registration().register(token, "client1", host, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {
@@ -169,7 +169,7 @@ import com.tozny.e3db.android.*;
 
 Activity context = ...; // application context
 
-Client.register(token, "client1", host, new ResultHandler<Config>() {
+new Registration().register(token, "client1", host, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {
@@ -302,7 +302,7 @@ CertificatePinner pinner = new CertificatePinner.Builder()
     .add("api.e3db.com", "sha256/sha256/Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=")
     .build()
 
-Client.register(token, "client1", host, pinner, new ResultHandler<Config>() {
+new Registration().register(token, "client1", host, pinner, new ResultHandler<Config>() {
   @Override
   public void handle(Result<Config> r) {
     if(! r.isError()) {

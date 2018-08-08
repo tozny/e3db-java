@@ -22,7 +22,7 @@ package com.tozny.e3db.benchmark
 
 import android.util.Base64
 import java.security.SecureRandom
-import com.tozny.e3db.*
+import com.tozny.e3db.Client
 import dk.ilios.spanner.*
 import dk.ilios.spanner.junit.SpannerRunner
 import org.junit.runner.RunWith
@@ -43,7 +43,7 @@ fun registerClient(): Pair<Client, String> {
   var client: Client? = null
   var publicSigningKey: String? = null
 
-  Client.register(token, name, "https://api.e3db.com") {
+  new Registration().register(token, name, "https://api.e3db.com") {
     client = ClientBuilder().fromConfig(it.asValue()).build()
     publicSigningKey = it.asValue().publicSigningKey
     latch1.countDown()

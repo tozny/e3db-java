@@ -87,7 +87,7 @@ import static com.tozny.e3db.Checks.*;
  * new clients. Note that this value is not
  * meant to be secret and is safe to embed in your app.
  *
- * <p>The {@link Registration#register(String, String, String, ResultHandler)} method can be used to
+ * <p>The {@link RegistrationImpl#register(String, String, String, ResultHandler)} method can be used to
  * register a client. After registration, save the resulting credentials for use later.
  *
  * <h1>Creating a Client</h1>

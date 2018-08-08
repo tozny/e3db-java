@@ -188,8 +188,8 @@ public class ClientBuilder {
   public Client build() {
     checkState();
     if (certificatePinner == null)
-      return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);
+      return new ClientImpl(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);
     else
-      return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, certificatePinner);
+      return new ClientImpl(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, certificatePinner);
   }
 }

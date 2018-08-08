@@ -261,7 +261,7 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             updateLabels(getString(R.string.registering_new_client), "", "");
 
-            Client.register(TOKEN, CLIENT_NAME + UUID.randomUUID().toString(), HOST, new ResultHandler<Config>() {
+            new RegistrationImpl().register(TOKEN, CLIENT_NAME + UUID.randomUUID().toString(), HOST, new ResultHandler<Config>() {
                 @Override
                 public void handle(Result<Config> r) {
                     if (!r.isError()) {

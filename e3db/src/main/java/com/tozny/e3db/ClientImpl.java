@@ -227,8 +227,6 @@ public class ClientImpl implements Client {
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
-  private static final Executor backgroundExecutor;
-  private static final Executor uiExecutor;
   private static final String allowRead = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String denyRead = "{\"deny\" : [ { \"read\": {} } ] }";
   private static final String denyAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
@@ -255,43 +253,6 @@ public class ClientImpl implements Client {
     anonymousClient = enableTLSv12(new OkHttpClient.Builder()
 //      .addInterceptor(loggingInterceptor)
     ).build();
-
-    backgroundExecutor = new ThreadPoolExecutor(1,
-        Runtime.getRuntime().availableProcessors(),
-        30,
-        TimeUnit.SECONDS,
-        new LinkedBlockingQueue<Runnable>(10),
-        new ThreadFactory() {
-          private int threadCount = 1;
-
-          @Override
-          public Thread newThread(Runnable runnable) {
-            final Thread thread = Executors.defaultThreadFactory().newThread(runnable);
-            thread.setDaemon(true);
-            thread.setName("E3DB background " + threadCount++);
-            return thread;
-          }
-        });
-
-    if (Platform.isAndroid()) {
-      // Post results to UI thread
-      uiExecutor = new Executor() {
-        private final Handler handler = new Handler(Looper.getMainLooper());
-
-        @Override
-        public void execute(Runnable runnable) {
-          handler.post(runnable);
-        }
-      };
-    } else {
-      // Post results to current thread (whatever that is)
-      uiExecutor = new Executor() {
-        @Override
-        public void execute(Runnable runnable) {
-          runnable.run();
-        }
-      };
-    }
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -414,7 +375,7 @@ public class ClientImpl implements Client {
       clientBuilder.certificatePinner(certificatePinner);
 
     Retrofit build = new Retrofit.Builder()
-            .callbackExecutor(uiExecutor)
+            .callbackExecutor(PredefinedExecutors.uiExecutor)
             .client(clientBuilder.build())
             .baseUrl(host.resolve("/").toString())
             .build();
@@ -537,7 +498,7 @@ public class ClientImpl implements Client {
   }
 
   private void onBackground(Runnable runnable) {
-    backgroundExecutor.execute(runnable);
+    PredefinedExecutors.backgroundExecutor.execute(runnable);
   }
 
   private LocalEncryptedRecord makeEncryptedRecord(EAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) {
@@ -554,7 +515,7 @@ public class ClientImpl implements Client {
 
   private <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
     if (handleError != null)
-      uiExecutor.execute(new Runnable() {
+      PredefinedExecutors.uiExecutor.execute(new Runnable() {
         @Override
         public void run() {
           handleError.handle(new ErrorResult<R>(e));
@@ -564,7 +525,7 @@ public class ClientImpl implements Client {
 
   private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
     if (handleResult != null)
-      uiExecutor.execute(new Runnable() {
+      PredefinedExecutors.uiExecutor.execute(new Runnable() {
         @Override
         public void run() {
           handleResult.handle(new ValueResult<R>(r));

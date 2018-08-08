@@ -43,7 +43,7 @@ fun registerClient(): Pair<Client, String> {
   var client: Client? = null
   var publicSigningKey: String? = null
 
-  new Registration().register(token, name, "https://api.e3db.com") {
+  new RegistrationImpl().register(token, name, "https://api.e3db.com") {
     client = ClientBuilder().fromConfig(it.asValue()).build()
     publicSigningKey = it.asValue().publicSigningKey
     latch1.countDown()

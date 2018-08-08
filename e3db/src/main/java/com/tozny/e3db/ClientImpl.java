@@ -250,7 +250,7 @@ public class ClientImpl implements Client {
 //        System.out.println(message);
 //      }
 //    }).setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BODY);
-    anonymousClient = enableTLSv12(new OkHttpClient.Builder()
+    anonymousClient = OkHttpTLSv12.enable(new OkHttpClient.Builder()
 //      .addInterceptor(loggingInterceptor)
     ).build();
 
@@ -322,40 +322,6 @@ public class ClientImpl implements Client {
     }
   }
 
-  // From https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
-  private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) {
-    if (Platform.isAndroid() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
-      try {
-        // From javadoc for okhttp3.OkHttpClient.Builder.sslSocketFactory(javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager)
-        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
-                TrustManagerFactory.getDefaultAlgorithm());
-        trustManagerFactory.init((KeyStore) null);
-        TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
-        if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager)) {
-          throw new IllegalStateException("Unexpected default trust managers:"
-                  + Arrays.toString(trustManagers));
-        }
-        X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
-        SSLContext sc = SSLContext.getInstance(TlsVersion.TLS_1_2.javaName());
-        sc.init(null, new TrustManager[] { trustManager }, null);
-        client.sslSocketFactory(new Tls12SocketFactory(sc.getSocketFactory()), trustManager);
-
-        ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
-                .tlsVersions(TlsVersion.TLS_1_2)
-                .build();
-
-        List<ConnectionSpec> specs = Arrays.asList(cs,
-                ConnectionSpec.COMPATIBLE_TLS,
-                ConnectionSpec.CLEARTEXT);
-        client.connectionSpecs(specs);
-      } catch (KeyStoreException | KeyManagementException | NoSuchAlgorithmException exc) {
-        throw new RuntimeException(exc);
-      }
-    }
-
-    return client;
-  }
-
   ClientImpl(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey, CertificatePinner certificatePinner) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
@@ -367,7 +333,7 @@ public class ClientImpl implements Client {
     else
       publicSigningKey = null;
 
-    OkHttpClient.Builder clientBuilder = enableTLSv12(new OkHttpClient.Builder()
+    OkHttpClient.Builder clientBuilder = OkHttpTLSv12.enable(new OkHttpClient.Builder()
 //            .addInterceptor(loggingInterceptor)
             .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host, certificatePinner)));
 
@@ -654,7 +620,7 @@ public class ClientImpl implements Client {
       this.host = host;
       this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(UTF8)).base64()).toString();
 
-      OkHttpClient.Builder clientBuilder = enableTLSv12(new OkHttpClient.Builder());
+      OkHttpClient.Builder clientBuilder = OkHttpTLSv12.enable(new OkHttpClient.Builder());
 
       if (certificatePinner != null) {
         clientBuilder.certificatePinner(certificatePinner);

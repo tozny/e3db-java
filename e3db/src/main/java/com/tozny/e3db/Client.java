@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-interface Client {
+public interface Client {
     /**
      * The ID of this client.
      *

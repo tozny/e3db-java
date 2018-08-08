@@ -209,7 +209,7 @@ import static com.tozny.e3db.Checks.*;
  * download the encrypted file to the same directory as the destination given. It will decrypt and decompress in-place, and write
  * the result to the destination file. Afterwards, the temporary encrypted file is deleted.
  */
-public class ClientImpl implements Client {
+class ClientImpl implements Client {
   private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
 //  private static final okhttp3.logging.HttpLoggingInterceptor loggingInterceptor;

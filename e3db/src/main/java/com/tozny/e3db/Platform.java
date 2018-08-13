@@ -23,14 +23,19 @@ package com.tozny.e3db;
 import com.tozny.e3db.crypto.Crypto;
 
 final class Platform {
-  public static final Crypto crypto;
-  static {
-    if (Platform.isAndroid()) {
-      crypto = new AndroidCrypto();
-    } else {
-      crypto = new PlainCrypto();
+  static class Inner {
+    static final Crypto crypto;
+
+    static {
+      if (Platform.isAndroid()) {
+        crypto = new AndroidCrypto();
+      } else {
+        crypto = new PlainCrypto();
+      }
     }
   }
+
+  public static final Crypto crypto = Inner.crypto;
 
   static boolean isAndroid() {
     boolean isAndroid = false;

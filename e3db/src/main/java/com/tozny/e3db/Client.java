@@ -875,9 +875,21 @@ public class  Client {
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if(access_key != null && access_key.isObject()) {
+        final String authorizerPublicKey;
+        switch(Platform.crypto.suite().getEncryptionKeyType()) {
+          case Curve25519:
+            authorizerPublicKey = access_key.get("authorizer_public_key").get("curve25519").asText();
+            break;
+          case P384:
+            authorizerPublicKey = access_key.get("authorizer_public_key").get("p384").asText();
+            break;
+          default:
+            throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+        }
+
         record = makeR(Platform.crypto.decryptBox(
                 CipherWithNonce.decode(access_key.get("eak").asText()),
-                decodeURL(access_key.get("authorizer_public_key").get("curve25519").asText()),
+                decodeURL(authorizerPublicKey),
                 privateEncryptionKey),
                 queryRecord.get("meta"),
                 queryRecord.get("record_data"),
@@ -989,15 +1001,39 @@ public class  Client {
       } else {
         JsonNode eakResponse = mapper.readTree(response.body().string());
         String eak = eakResponse.get("eak").asText();
-        String publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
+        final String publicKey;
+        {
+          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+            case Curve25519:
+              publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
+              break;
+            case P384:
+              publicKey = eakResponse.get("authorizer_public_key").get("p384").asText();
+              break;
+            default:
+              throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+          }
+        }
         UUID authorizerId = UUID.fromString(eakResponse.get("authorizer_id").asText());
 
         JsonNode signer_signing_key = eakResponse.get("signer_signing_key");
         UUID signerId = null;
-        String signerPublicKey = null;
+        final String signerPublicKey;
         if (signer_signing_key != null) {
           signerId = UUID.fromString(eakResponse.get("signer_id").asText());
-          signerPublicKey = signer_signing_key.get("ed25519").asText();
+          switch(Platform.crypto.suite().getSigningKeyType()) {
+            case Ed25519:
+              signerPublicKey = signer_signing_key.get("ed25519").asText();
+              break;
+            case P384:
+              signerPublicKey = signer_signing_key.get("p384").asText();
+              break;
+            default:
+              throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getSigningKeyType() + " not supported.");
+          }
+        }
+        else {
+          signerPublicKey = null;
         }
 
         byte[] ak = Platform.crypto.decryptBox(CipherWithNonce.decode(eak),
@@ -1083,23 +1119,23 @@ public class  Client {
   }
 
   private static class ClientInfo {
-    private final byte[] curve25519;
-    private final byte[] ed25519;
+    private final byte[] encryptionKey;
+    private final byte[] signingKey;
     private final UUID clientId;
 
 
-    public ClientInfo(byte[] curve25519, byte[] ed25519, UUID clientId) {
-      this.curve25519 = curve25519;
-      this.ed25519 = ed25519;
+    public ClientInfo(byte[] encryptionKey, byte[] signingKey, UUID clientId) {
+      this.encryptionKey = encryptionKey;
+      this.signingKey = signingKey;
       this.clientId = clientId;
     }
 
-    public byte[] getCurve25519() {
-      return curve25519;
+    public byte[] getEncryptionKey() {
+      return encryptionKey;
     }
 
-    public byte[] getEd25519() {
-      return ed25519;
+    public byte[] getSigningKey() {
+      return signingKey;
     }
 
     public UUID getClientId() {
@@ -1115,23 +1151,43 @@ public class  Client {
       throw E3DBException.find(clientInfo.code(), clientInfo.message());
     }
     JsonNode info = mapper.readTree(clientInfo.body().string());
-    String curve25519 = info.get("public_key").get("curve25519").asText();
-    String ed25519;
+    final String publicKey;
+    switch(Platform.crypto.suite().getEncryptionKeyType()) {
+      case Curve25519:
+        publicKey = info.get("public_key").get("curve25519").asText();
+        break;
+      case P384:
+        publicKey = info.get("public_key").get("p384").asText();
+        break;
+      default:
+        throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+    }
+    final String signingKey;
     {
-      if(info.get("signing_key") != null && info.get("signing_key").get("ed25519") != null)
-        ed25519 = info.get("signing_key").get("ed25519").asText();
+      if(info.get("signing_key") != null) {
+        switch(Platform.crypto.suite().getSigningKeyType()) {
+          case Ed25519:
+            signingKey = info.get("signing_key").get("ed25519").asText();
+            break;
+          case P384:
+            signingKey = info.get("signing_key").get("p384").asText();
+            break;
+          default:
+            throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getSigningKeyType() + " not supported.");
+        }
+      }
       else
-        ed25519 = null;
+        signingKey = null;
     }
     String cId = info.get("client_id").asText();
-    return new ClientInfo(Base64.decodeURL(curve25519), ed25519 == null ? null : Base64.decodeURL(ed25519), UUID.fromString(cId));
+    return new ClientInfo(Base64.decodeURL(publicKey), signingKey == null ? null : Base64.decodeURL(signingKey), UUID.fromString(cId));
   }
 
   private void sharing(final String type, final UUID readerId, final UUID writerId, final ResultHandler<Void> handleResult) {
     onBackground(new Runnable() {
       public void run() {
         try {
-          final byte[] readerKey = getClientInfo(readerId).getCurve25519();
+          final byte[] readerKey = getClientInfo(readerId).getEncryptionKey();
           final byte[] writerSigningKey;
           {
             if(writerId.equals(Client.this.clientId)) {
@@ -1139,7 +1195,7 @@ public class  Client {
             }
             else {
               ClientInfo writerInfo = getClientInfo(writerId);
-              writerSigningKey = writerInfo.getEd25519();
+              writerSigningKey = writerInfo.getSigningKey();
             }
           }
 
@@ -1348,7 +1404,9 @@ public class  Client {
    * @param handleResult Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
-    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).build();
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
+//      .addInterceptor(loggingInterceptor)
+    ).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
   }
@@ -1375,7 +1433,9 @@ public class  Client {
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
     checkNotNull(certificatePinner, "certificatePinner");
-    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()).certificatePinner(certificatePinner).build();
+    OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
+//        .addInterceptor(loggingInterceptor)
+    ).certificatePinner(certificatePinner).build();
 
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
   }
@@ -1411,10 +1471,28 @@ public class  Client {
       public void run() {
         try {
           Map<String, String> publicKeyInfo = new HashMap<>();
-          publicKeyInfo.put("curve25519", publicKey);
+          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+            case Curve25519:
+              publicKeyInfo.put("curve25519", publicKey);
+              break;
+            case P384:
+              publicKeyInfo.put("p384", publicKey);
+              break;
+            default:
+              throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+          }
 
           Map<String, String> publicSignKeyInfo = new HashMap<>();
-          publicSignKeyInfo.put("ed25519", publicSignKey);
+          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+            case Curve25519:
+              publicSignKeyInfo.put("ed25519", publicSignKey);
+              break;
+            case P384:
+              publicSignKeyInfo.put("p384", publicSignKey);
+              break;
+            default:
+              throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+          }
 
           Map<String, Object> clientInfo = new HashMap<>();
           clientInfo.put("name", clientName);
@@ -1435,8 +1513,32 @@ public class  Client {
             final String apiSecret = creds.get("api_secret").asText();
             final UUID clientId = UUID.fromString(creds.get("client_id").asText());
             final String name = creds.get("name").asText();
-            final String publicKey = creds.get("public_key").get("curve25519").asText();
-            final String signingKey = creds.get("signing_key").get("ed25519").asText();
+            final String publicKey;
+            {
+              switch(Platform.crypto.suite().getEncryptionKeyType()) {
+                case Curve25519:
+                  publicKey = creds.get("public_key").get("curve25519").asText();
+                  break;
+                case P384:
+                  publicKey = creds.get("public_key").get("p384").asText();
+                  break;
+                default:
+                  throw new IllegalStateException("Encryption key type " + Platform.crypto.suite().getEncryptionKeyType() + " not supported.");
+              }
+            }
+            final String signingKey;
+            {
+              switch(Platform.crypto.suite().getSigningKeyType()) {
+                case Ed25519:
+                  signingKey = creds.get("signing_key").get("ed25519").asText();
+                  break;
+                case P384:
+                  signingKey = creds.get("signing_key").get("p384").asText();
+                  break;
+                default:
+                  throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getSigningKeyType() + " not supported.");
+              }
+            }
             final boolean enabled = creds.get("enabled").asBoolean();
             final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, publicSignKey, host, enabled);
             executeValue(uiExecutor, handleResult, clientCredentials);
@@ -2078,7 +2180,7 @@ public class  Client {
           ClientInfo authorizerInfo = getClientInfo(authorizer);
           byte[] ak = getOwnAccessKey(recordType);
           try {
-            setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getCurve25519(), ak, Client.this.clientId, Client.this.publicSigningKey);
+            setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getEncryptionKey(), ak, Client.this.clientId, Client.this.publicSigningKey);
           }
           catch(E3DBConflictException e) {
             // safe to ignore, it means this client has already been authorized.

@@ -21,10 +21,9 @@
 apply plugin: 'java'
 
 dependencies {
-    compile fileTree(dir: 'libs', include: ['*.jar'])
     compileOnly project(':e3db-crypto-interface')
     compile 'com.goterl.lazycode:lazysodium-java:2.5.0'
-    compile 'net.java.dev.jna:jna:4.5.1@aar'
+    compile 'net.java.dev.jna:jna:4.5.1'
 }
 
 sourceCompatibility = "1.7"

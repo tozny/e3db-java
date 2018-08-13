@@ -38,9 +38,24 @@ dependencies {
   testCompile(project(path: ':e3db-crypto-plain')) {
     transitive = true
   }
-  testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0.pr4'
-  testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0.pr4'
-  testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0.pr4'
+  testCompile 'com.fasterxml.jackson.core:jackson-core:2.9.0'
+  testCompile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0'
+  testCompile 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
+}
+
+tasks.withType(Test) {
+  // Fail early if registration token not set
+  onlyIf {
+    if(regToken() == null)
+      throw new Error("Registration token must be set.")
+
+    true
+  }
+  // Pass along registration token and API URL to tests via system properties
+  doFirst {
+    if(apiUrl() != null) systemProperty("e3db.host", apiUrl())
+    if(regToken() != null) systemProperty("e3db.token", regToken())
+  }
 }
 
 test {
@@ -52,6 +67,3 @@ test {
     showStandardStreams true
   }
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"

@@ -251,7 +251,7 @@ public class AndroidCryptoTest {
     String field = new String(new byte[] { (byte) cipherIn.read() }, UTF8);
     String sep = new String(new byte[]{(byte) cipherIn.read()}, UTF8);
 
-    assertEquals("Version not found in header", "1", field);
+    assertEquals("Version not found in header", "3", field);
     assertEquals("Separator not fond", ".", sep);
 
     CipherWithNonce edkDecoded = null;
@@ -354,6 +354,45 @@ public class AndroidCryptoTest {
         assertEquals("Files differed at position " + pos,  a, b);
       }
       assertTrue("Files not the same length.", a == -1 && a == b);
+    }
+    finally {
+      expected.close();;
+      actual.close();
+    }
+  }
+
+  @Test
+  public void testBlockSizeFile() throws IOException {
+    byte [] plain = lazySodium.randomBytesBuf(Platform.crypto.getBlockSize());
+    File plainFile = File.createTempFile("e2e", "");
+    plainFile.deleteOnExit();
+
+    FileOutputStream plainOut = new FileOutputStream(plainFile, false);
+    try {
+      plainOut.write(plain);
+    }
+    finally {
+      plainOut.close();
+    }
+
+    byte[] secretKey = crypto.newSecretKey();
+    File encryptFile = crypto.encryptFile(plainFile, secretKey);
+    encryptFile.deleteOnExit();
+
+    File plainResultFile = File.createTempFile("e2e-", ".html");
+    plainResultFile.deleteOnExit();
+
+    crypto.decryptFile(encryptFile, secretKey, plainResultFile);
+    FileInputStream expected = new FileInputStream(plainFile);
+    FileInputStream actual = new FileInputStream(plainResultFile);
+    try {
+      int a, b, pos = 1;
+      for(a = expected.read(), b = actual.read(); a != -1 && b != -1; a = expected.read(), b = actual.read(), pos++ ) {
+        assertEquals("Files differed at position " + pos,  a, b);
+      }
+      assertTrue("Files not the same length.", a == -1 && a == b);
+      assertTrue("Block size can't be zero", crypto.getBlockSize() > 0);
+      assertEquals("Files must only be block size in length", crypto.getBlockSize(), pos - 1);
     }
     finally {
       expected.close();;

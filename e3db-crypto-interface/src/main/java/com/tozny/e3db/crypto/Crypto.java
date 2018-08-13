@@ -20,6 +20,7 @@
 
 package com.tozny.e3db.crypto;
 
+import com.tozny.e3db.CipherSuite;
 import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.Signature;
 
@@ -32,6 +33,8 @@ import java.io.IOException;
  * client library.
  */
 public interface Crypto {
+  CipherSuite suite();
+
   /**
    * Encrypts a message using the secret key given.
    *
@@ -153,8 +156,8 @@ public interface Crypto {
   void decryptFile(File file, byte[] secretKey, File dest) throws IOException;
 
   /**
-   * Size of the block used when encrypting files.
-   * @return block size.
+   * Size of the block used when encrypting files (in bytes).
+   * @return block size in bytes.
    */
   int getBlockSize();
 }

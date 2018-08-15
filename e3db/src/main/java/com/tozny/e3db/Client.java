@@ -228,7 +228,7 @@ public class  Client {
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   private static final Executor backgroundExecutor;
-  private static final Executor uiExecutor;
+  private static Executor uiExecutor;
   private static final String allowRead = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String denyRead = "{\"deny\" : [ { \"read\": {} } ] }";
   private static final String denyAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
@@ -273,28 +273,35 @@ public class  Client {
           }
         });
 
-    if (Platform.isAndroid()) {
-      // Post results to UI thread
-      uiExecutor = new Executor() {
-        private final Handler handler = new Handler(Looper.getMainLooper());
-
-        @Override
-        public void execute(Runnable runnable) {
-          handler.post(runnable);
-        }
-      };
-    } else {
-      // Post results to current thread (whatever that is)
-      uiExecutor = new Executor() {
-        @Override
-        public void execute(Runnable runnable) {
-          runnable.run();
-        }
-      };
-    }
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+  }
+
+  private static Executor getUiExecutor() {
+    if(uiExecutor == null) {
+      if (Platform.isAndroid()) {
+        // Post results to UI thread
+        uiExecutor = new Executor() {
+          private final Handler handler = new Handler(Looper.getMainLooper());
+
+          @Override
+          public void execute(Runnable runnable) {
+            handler.post(runnable);
+          }
+        };
+      } else {
+        // Post results to current thread (whatever that is)
+        uiExecutor = new Executor() {
+          @Override
+          public void execute(Runnable runnable) {
+            runnable.run();
+          }
+        };
+      }
+    }
+
+    return uiExecutor;
   }
 
   /**
@@ -414,7 +421,7 @@ public class  Client {
       clientBuilder.certificatePinner(certificatePinner);
 
     Retrofit build = new Retrofit.Builder()
-            .callbackExecutor(uiExecutor)
+            .callbackExecutor(getUiExecutor())
             .client(clientBuilder.build())
             .baseUrl(host.resolve("/").toString())
             .build();
@@ -636,7 +643,7 @@ public class  Client {
 
   private <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
     if (handleError != null)
-      uiExecutor.execute(new Runnable() {
+      getUiExecutor().execute(new Runnable() {
         @Override
         public void run() {
           handleError.handle(new ErrorResult<R>(e));
@@ -646,7 +653,7 @@ public class  Client {
 
   private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
     if (handleResult != null)
-      uiExecutor.execute(new Runnable() {
+      getUiExecutor().execute(new Runnable() {
         @Override
         public void run() {
           handleResult.handle(new ValueResult<R>(r));
@@ -1301,13 +1308,13 @@ public class  Client {
       @Override
       public void handle(Result<ClientCredentials> r) {
         if (r.isError()) {
-          executeError(uiExecutor, handleResult, r.asError().other());
+          executeError(getUiExecutor(), handleResult, r.asError().other());
         }
         else {
           final ClientCredentials credentials = r.asValue();
           Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
                   encodeURL(privateSigningKey));
-          executeValue(uiExecutor, handleResult, info);
+          executeValue(getUiExecutor(), handleResult, info);
         }
       }
     };
@@ -1401,7 +1408,7 @@ public class  Client {
     checkNotEmpty(host, "host");
 
     final RegisterAPI registerClient = new Retrofit.Builder()
-            .callbackExecutor(uiExecutor)
+            .callbackExecutor(getUiExecutor())
             .client(anonymousClient)
             .baseUrl(URI.create(host).resolve("/").toString())
             .build().create(RegisterAPI.class);
@@ -1427,7 +1434,7 @@ public class  Client {
 
           final retrofit2.Response<ResponseBody> response = registerClient.register(RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(registerInfo))).execute();
           if (response.code() != 201) {
-            executeError(uiExecutor, handleResult, E3DBException.find(response.code(), response.message()));
+            executeError(getUiExecutor(), handleResult, E3DBException.find(response.code(), response.message()));
           } else {
             final String doc = response.body().string();
             JsonNode creds = mapper.readTree(doc);
@@ -1439,10 +1446,10 @@ public class  Client {
             final String signingKey = creds.get("signing_key").get("ed25519").asText();
             final boolean enabled = creds.get("enabled").asBoolean();
             final ClientCredentials clientCredentials = new CC(apiKey, apiSecret, clientId, name, publicKey, publicSignKey, host, enabled);
-            executeValue(uiExecutor, handleResult, clientCredentials);
+            executeValue(getUiExecutor(), handleResult, clientCredentials);
           }
         } catch (final Throwable e) {
-          executeError(uiExecutor, handleResult, e);
+          executeError(getUiExecutor(), handleResult, e);
         }
       }
     });

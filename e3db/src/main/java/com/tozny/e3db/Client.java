@@ -206,18 +206,22 @@ import static com.tozny.e3db.Checks.*;
  *
  * <h1>Reading &amp; Writing Large Files</h1>
  *
- * E3DB can compress and encrypt files for storage. Files are treated much like records, except the data for the file is
+ * E3DB can encrypt files for storage. Files are treated much like records, except the data for the file is
  * not included inline when downloading a record. Instead, a separate request for each file must be made to the {@link #readFile(UUID, File, ResultHandler)}
  * method.
  *
  * To write a file, use the {@link #writeFile(String, File, Map, ResultHandler)} method. The record type and plaintext meta
- * arguments behave the same as with normal records. The SDK will compress and encrypt the record in the same directory
+ * arguments behave the same as with normal records. The SDK will encrypt the record in the same directory
  * that stores the plaintext file and will need at least twice as much free space as the size of the plaintext file. The
  * temporary encrypted file will always be deleted the upload finishes (or if an error occurs).
  *
  * To read a file, use the {@link #readFile(UUID, File, ResultHandler)} method (which is as yet not implemented). The SDK will
- * download the encrypted file to the same directory as the destination given. It will decrypt and decompress in-place, and write
+ * download the encrypted file to the same directory as the destination given. It will decrypt in-place, and write
  * the result to the destination file. Afterwards, the temporary encrypted file is deleted.
+ *
+ * A large file {@link Record} instance will always return a 0-sized empty {@code Map} from its {@link Record#data()}
+ * method; it will also always return a non-{@code null} value from the {@link RecordMeta#file} method on the metadata
+ * object returned by its {@link Record#meta} method.
  */
 public class  Client {
   private static final OkHttpClient anonymousClient;
@@ -1623,12 +1627,84 @@ public class  Client {
    * Read the file associated with the given record from the server.
    *
    * @param recordId ID of the record. Cannot be {@code null}.
-   * @param dest Destination to write the decrypted file to. If the file exists, it will be truncated.
+   * @param dest Destination to write the decrypted file to. Cannot be {@code null}. If the file exists, it will be truncated.
    * @param handleResult Handles the result of the operation. If the operation completes successfully, the
    *                     destination will hold the contents of the unencrypted file.
+   *
+   *                     <p>If an error occurs, be sure to truncate the destination file, as it may contain partially
+   *                     decrypted result.
    */
-  public void readFile(UUID recordId, File dest, ResultHandler<RecordMeta> handleResult) {
-    throw new IllegalStateException("Not yet implemented.");
+  public void readFile(final UUID recordId, File dest, final ResultHandler<RecordMeta> handleResult) {
+    try {
+      checkNotNull(recordId, "recordId");
+      checkNotNull(dest, "dest");
+      final File absDest = dest.getAbsoluteFile();
+      if(! absDest.canWrite())
+        throw new IOException("Can't write to " + dest);
+
+      onBackground(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            final retrofit2.Response<ResponseBody> response = storageClient.readFile(recordId.toString()).execute();
+            if (response.code() != 200) {
+              if (response.code() == 404)
+                uiError(handleResult, new E3DBNotFoundException(recordId));
+              else
+                uiError(handleResult, E3DBException.find(response.code(), response.message()));
+              return;
+            }
+
+            JsonNode result = mapper.readTree(response.body().string());
+            JsonNode meta = result.get("meta");
+            EAKEntry eak = getEAK(UUID.fromString(meta.get("writer_id").asText()),
+                UUID.fromString(meta.get("user_id").asText()),
+                clientId, meta.get("type").asText());
+
+            if(eak == null) {
+              uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
+              return;
+            }
+
+            JsonNode fileMeta = meta.get("file_meta");
+            String signedUrl = fileMeta.get("file_url").asText();
+            Response getFileResponse = anonymousClient.newCall(new Request.Builder()
+                                                                   .url(signedUrl)
+                                                                   .get()
+                                                                   .build()).execute();
+            ResponseBody fileBody = getFileResponse.body();
+            InputStream in = fileBody.byteStream();
+            File encrypted = File.createTempFile("enc-", ".bin", new File(absDest.getParent()));
+            try {
+              FileOutputStream out = new FileOutputStream(encrypted);
+              try {
+                byte[] bytes = new byte[65_536];
+                for(int amt = in.read(bytes); amt != -1; amt = in.read(bytes)) {
+                  out.write(bytes, 0, amt);
+                }
+              }
+              finally {
+                out.close();
+              }
+
+            }
+            finally {
+              in.close();
+              fileBody.close();
+            }
+
+            Platform.crypto.decryptFile(encrypted, eak.ak, absDest);
+            encrypted.delete();
+            uiValue(handleResult, R.getRecordMeta(meta));
+          }
+          catch(Throwable e) {
+            uiError(handleResult, e);
+          }
+        }
+      });
+    } catch (IOException e) {
+      uiError(handleResult, e);
+    }
   }
 
   /**

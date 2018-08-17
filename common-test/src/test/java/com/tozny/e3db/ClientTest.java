@@ -27,18 +27,14 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import okhttp3.CertificatePinner;
 import org.junit.*;
 
+import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,6 +54,9 @@ public class ClientTest {
   private static final String MESSAGE = "It's a simple message and I'm leaving out the whistles and bells";
   private static final String host;
   private static final String token;
+  public static final String MESSAGE1 = "Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
+                                                           "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
+                                                           "ungirdled, was sustained gently behind him on the mild morning air.";
 
   static {
     mapper = new ObjectMapper();
@@ -192,6 +191,55 @@ public class ClientTest {
         handleResult.handle(r);
       }
     });
+  }
+
+  private RecordMeta writePlainFile(final Client client, final String type, String message) throws IOException {
+    final File plain = File.createTempFile("clientTest", ".txt");
+    plain.deleteOnExit();
+    FileOutputStream out = new FileOutputStream(plain);
+    try {
+      out.write(message.getBytes(UTF8));
+    } finally {
+      out.close();
+    }
+
+    final AtomicReference<RecordMeta> result = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            if (r.isError()) {
+              if (r.asError().other() instanceof Error)
+                throw (Error) r.asError().other();
+              else
+                throw new Error(r.asError().other());
+            }
+
+            result.set(r.asValue());
+          }
+        }));
+      }
+    });
+
+    if (result.get() == null) {
+      throw new Error("Unable to write file.");
+    }
+
+    return result.get();
+  }
+
+  private String readContents(File actualFile, Charset utf8) throws IOException {
+    byte[] contents = new byte[(int) actualFile.length()];
+    FileInputStream in = new FileInputStream(actualFile);
+    try {
+      in.read(contents);
+      return new String(contents, utf8);
+    }
+    finally {
+      in.close();
+    }
   }
 
   @BeforeClass
@@ -1566,7 +1614,7 @@ public class ClientTest {
       }
     });
 
-    // esnure we can encode/decode EAKs.
+    // ensure we can encode/decode EAKs.
     String encodedEAK = info.get().encode();
     final LocalEAKInfo eak = LocalEAKInfo.decode(encodedEAK);
     Map<String, String> data = new HashMap<>();
@@ -1604,6 +1652,192 @@ public class ClientTest {
 
     LocalRecord decoded = client.decryptExisting(LocalEncryptedRecord.decode(localEncryptedRecord), localEAK);
     assertEquals("Decrypted record not equal to original.", data.get("vorpal"), decoded.data().get("vorpal"));
+  }
+
+  @Test
+  public void testReadFile() throws Throwable {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final RecordMeta recordMeta = writePlainFile(client, UUID.randomUUID().toString(), MESSAGE1);
+
+    final AtomicReference<RecordMeta> actualRecordMeta = new AtomicReference<>();
+    final File actualFile = File.createTempFile("dec-", ".txt");
+    actualFile.deleteOnExit();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readFile(recordMeta.recordId(), actualFile, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            if(r.isError())
+              throw new Error(r.asError().other());
+
+            actualRecordMeta.set(r.asValue());
+          }
+        }));
+
+      }
+    });
+
+    if(actualRecordMeta.get() == null)
+      fail("Failed to read file record.");
+
+    assertNotNull("Expected file URL: " + actualRecordMeta.get(), actualRecordMeta.get().file());
+    assertTrue("Actual file should have contents: " + actualFile, actualFile.length() > 0);
+    String actualMessage = readContents(actualFile, UTF8);
+    assertEquals("Actual plaintext and expected not the same.", MESSAGE1, actualMessage);
+  }
+
+  @Test
+  public void testReadRecordWithFile() throws IOException {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final RecordMeta recordMeta = writePlainFile(client, UUID.randomUUID().toString(), MESSAGE1);
+
+    final AtomicReference<Record> actualRecord = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.read(recordMeta.recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          @Override
+          public void handle(Result<Record> r) {
+            if(r.isError())
+              throw new Error(r.asError().other());
+
+            actualRecord.set(r.asValue());
+          }
+        }));
+      }
+    });
+
+    if(actualRecord.get() == null)
+      fail("Failed to retrieve record.");
+
+    assertNotNull("Record should be a file record.", actualRecord.get().meta().file());
+    assertTrue("Record should not have any data.", actualRecord.get().data().size() == 0);
+  }
+
+  @Test
+  public void testQueryWithFile() throws Throwable {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final String recordType = UUID.randomUUID().toString();
+    RecordMeta recordMeta = writePlainFile(client, recordType, MESSAGE1);
+
+    final Record r;
+    {
+      final AtomicReference<QueryResponse> response = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          client.query(new QueryParamsBuilder().setTypes(recordType).setIncludeData(true).build(), new ResultWithWaiting<>(wait, new ResultHandler<QueryResponse>() {
+            @Override
+            public void handle(Result<QueryResponse> r) {
+              if (r.isError())
+                throw new Error(r.asError().other());
+
+              response.set(r.asValue());
+            }
+          }));
+        }
+      });
+
+      if (response.get() == null)
+        fail("Failed to receive query response.");
+
+      assertEquals("Only one record expected", 1, response.get().records().size());
+      r = response.get().records().get(0);
+      assertNotNull("Record should be a file record", r.meta().file());
+      assertEquals("Record should not contain any data.", 0, r.data().size());
+    }
+
+    {
+      final File actualFile = File.createTempFile("act-", ".txt");
+      actualFile.deleteOnExit();
+      final AtomicReference<RecordMeta> result = new AtomicReference<>();
+      withTimeout(new AsyncAction() {
+        @Override
+        public void act(CountDownLatch wait) throws Exception {
+          client.readFile(r.meta().recordId(), actualFile, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+            @Override
+            public void handle(Result<RecordMeta> r) {
+              if (r.isError())
+                throw new Error(r.asError().other());
+
+              result.set(r.asValue());
+            }
+          }));
+        }
+      });
+
+      if(result.get() == null)
+        fail("Failed to read record.");
+
+      String contents = readContents(actualFile, UTF8);
+      assertEquals("File contents did not match", MESSAGE1, contents);
+    }
+  }
+
+  @Test
+  public void testReadNonExistentFile() throws Throwable {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final File dest = new File(UUID.randomUUID().toString() + ".txt").getAbsoluteFile();
+    dest.deleteOnExit();
+    final AtomicReference<Result<RecordMeta>> result = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readFile(UUID.randomUUID(), dest, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            result.set(r);
+          }
+        }));
+
+      }
+    });
+
+    if(result.get() == null)
+      fail("Failed to receive response.");
+
+    assertTrue("Expected error when reading non-existent file record." , result.get().isError());
+    assertFalse("Destination file (" + dest + ") should not exist", dest.exists());
+  }
+
+  @Test
+  public void testReadToBadDestination() throws Throwable {
+    final CI clientInfo1 = getClient();
+    final Client client = clientInfo1.client;
+    final File dest = new File(File.separator +  UUID.randomUUID() + File.separator + UUID.randomUUID().toString() + ".txt").getAbsoluteFile();
+    try {
+      if (dest.createNewFile())
+        fail("Should not be able to create file at " + dest);
+    }
+    catch(IOException e) {
+      // expected
+    }
+
+    final RecordMeta recordMeta = writePlainFile(client, UUID.randomUUID().toString(), MESSAGE1);
+    final AtomicReference<Result<RecordMeta>> result = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readFile(recordMeta.recordId(), dest, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+          @Override
+          public void handle(Result<RecordMeta> r) {
+            result.set(r);
+          }
+        }));
+      }
+    });
+
+    if(result.get() == null)
+      throw new Error("Did not receive response.");
+
+    assertTrue("Expected error", result.get().isError());
+    if(dest.exists())
+      fail("Destination file should not exist: " + dest);
   }
 
   @Test

@@ -741,7 +741,12 @@ client.readFile(readmeRecordId, destinationFile, new ResultHandler<RecordMeta>()
       }
 
       // `README-2.md` will contain contents of file, which we write to standard out.
-      System.out.println("README-2.md: " + new String(Files.readAllBytes(destinationFile), "UFT-8"));
+      try {
+        System.out.println("README-2.md: " + new String(Files.readAllBytes(destinationFile), "UTF-8"));
+      }
+      catch (IOException e) {
+       // Handle error where file isn't found ...
+      }
     }
   }
 );
@@ -791,7 +796,6 @@ The following E3DB-specific exceptions can be thrown:
   email) could not be found.
 * `E3DBVerificationException` - Thrown when signature verification fails while
   decrypting a locally-encrypted document.
-<<<<<<< HEAD
 
 # `e3db-fips` Submodule
 

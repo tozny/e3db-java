@@ -754,3 +754,7 @@ The following E3DB-specific exceptions can be thrown:
 * `E3DBVerificationException` - Thrown when signature verification fails while
   decrypting a locally-encrypted document.
 
+# `e3db-fips` Submodule
+
+The `e3db-fips` submodule is not used during the course of normal development and should be ignored. Only developers with
+access to the submodule's repository should run submodule-related commands.

@@ -139,7 +139,7 @@ public interface Crypto {
    * the encrypted file.
    *
    * @param file File to encrypt.
-   * @param secretKey Key to enrypt with.
+   * @param secretKey Key to encrypt with.
    * @return The encrypted file.
    */
   File encryptFile(File file, byte[] secretKey) throws IOException;

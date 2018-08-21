@@ -27,18 +27,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import okhttp3.CertificatePinner;
 import org.junit.*;
 
-import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
-
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,10 +105,10 @@ public class ClientTest {
   }
 
   private static class CI {
-    public final Client client;
+    public final E3DBClient client;
     public final Config clientConfig;
 
-    private CI(Client client, Config clientConfig) {
+    private CI(E3DBClient client, Config clientConfig) {
       this.client = client;
       this.clientConfig = clientConfig;
     }
@@ -156,13 +148,13 @@ public class ClientTest {
 
   private CI getClient(String profile) throws IOException {
     final Config info = Config.fromJson(profiles.get(profile));
-    final Client client = new ClientBuilder()
+    final E3DBClient client = new ClientBuilder()
       .fromConfig(info)
       .build();
     return new CI(client, info);
   }
 
-  private void write1(Client client, final ResultHandler<Record> handleResult) throws IOException {
+  private void write1(E3DBClient client, final ResultHandler<Record> handleResult) throws IOException {
     Map<String, String> record = new HashMap<>();
     record.put(FIELD, MESSAGE);
     client.write(TYPE, new RecordData(record), null, new ResultHandler<Record>() {
@@ -292,7 +284,7 @@ public class ClientTest {
   @Test
   public void testQuery() throws Exception {
     final AtomicReference<UUID> recordId = new AtomicReference<>();
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
@@ -345,7 +337,7 @@ public class ClientTest {
 
   @Test
   public void testDelete() throws IOException, InterruptedException {
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
 
     withTimeout(new AsyncAction() {
       @Override
@@ -390,7 +382,7 @@ public class ClientTest {
 
   @Test
   public void testWrite() throws IOException, InterruptedException {
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
     final AtomicReference<UUID> recordId = new AtomicReference<>();
     withTimeout(new AsyncAction() {
       @Override
@@ -430,7 +422,7 @@ public class ClientTest {
 
   @Test
   public void testPaging() throws InterruptedException, IOException {
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
     final AtomicInteger pages = new AtomicInteger(0);
     final AtomicReference<Boolean> done = new AtomicReference<>(false);
     final AtomicLong last = new AtomicLong(-1L);
@@ -492,7 +484,7 @@ public class ClientTest {
 
   @Test
   public void testRecordDataUpdate() throws IOException, InterruptedException {
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
     final String updatedMessage = "Not to put too fine a point on it";
     withTimeout(new AsyncAction() {
       @Override
@@ -523,7 +515,7 @@ public class ClientTest {
 
   @Test
   public void testRecordDataCustomUpdateMetaClass() throws IOException, InterruptedException {
-    final Client client = getClient().client;
+    final E3DBClient client = getClient().client;
     final String updatedMessage = "Not to put too fine a point on it";
     withTimeout(new AsyncAction() {
       @Override
@@ -573,7 +565,7 @@ public class ClientTest {
 
   @Test
   public void testPlaintextMetaUpdate() throws InterruptedException, IOException {
-    final AtomicReference<Client> clientRef = new AtomicReference<>();
+    final AtomicReference<E3DBClient> clientRef = new AtomicReference<>();
     final AtomicReference<Record> recordRef = new AtomicReference<>();
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
       @Override
@@ -863,7 +855,7 @@ public class ClientTest {
 
   @Test
   public void testWritePlain() throws InterruptedException, IOException {
-    final AtomicReference<Client> clientRef = new AtomicReference<>();
+    final AtomicReference<E3DBClient> clientRef = new AtomicReference<>();
     Map<String, String> poem = new HashMap<>();
     poem.put("line", "All mimsy were the borogoves,");
     final RecordData data = new RecordData(poem);
@@ -977,7 +969,7 @@ public class ClientTest {
   @Test
   public void testEncryptDecrypt() throws IOException, E3DBException {
     CI clientInfo = getClient();
-    final Client client = clientInfo.client;
+    final E3DBClient client = clientInfo.client;
     final String type = UUID.randomUUID().toString() + "-type";
     final AtomicReference<EAKInfo> eakInfoRef = new AtomicReference<>();
     withTimeout(new AsyncAction() {
@@ -1021,14 +1013,14 @@ public class ClientTest {
   @Test
   public void testEncryptDecryptTwoClients() throws IOException, E3DBException {
     CI clientInfo1 = getClient();
-    final Client client1 = clientInfo1.client;
+    final E3DBClient client1 = clientInfo1.client;
     final String type = UUID.randomUUID().toString() + "-type";
     final AtomicReference<EAKInfo> writerKeyRef = new AtomicReference<>();
 
     final String client2Name = UUID.randomUUID().toString();
     registerProfile(client2Name, null);
     CI clientInfo2 = getClient(client2Name);
-    final Client client2 = clientInfo2.client;
+    final E3DBClient client2 = clientInfo2.client;
 
     withTimeout(new AsyncAction() {
       @Override
@@ -1098,7 +1090,7 @@ public class ClientTest {
   @Test
   public void testSigning() throws IOException {
     final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
+    final E3DBClient client = clientInfo1.client;
     final String recordType = "lyric";
     final Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
@@ -1158,7 +1150,7 @@ public class ClientTest {
   @Test
   public void testExternalEncryptedRecord() throws IOException {
     final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
+    final E3DBClient client = clientInfo1.client;
     final JsonNode extEncryptedRecord = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
     final JsonNode doc = extEncryptedRecord.get("doc");
     final EncryptedRecord record = LocalEncryptedRecord.decode(mapper.writeValueAsString(doc));
@@ -1179,7 +1171,7 @@ public class ClientTest {
   @Test
   public void testEncryptSigning() throws IOException {
     final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
+    final E3DBClient client = clientInfo1.client;
     final String recordType = "lyric";
     final Map<String, String> plain = new HashMap<>();
     plain.put("frabjous", "Filibuster vigilantly");
@@ -1221,7 +1213,7 @@ public class ClientTest {
   @Test
   public void testEncodeDecodeLocal() throws IOException, E3DBException {
     final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
+    final E3DBClient client = clientInfo1.client;
     final String recordType = "signedLyric";
     final AtomicReference<EAKInfo> eak = new AtomicReference<>();
 
@@ -1344,8 +1336,8 @@ public class ClientTest {
 
   @Test
   public void testEncodeDecodeWrite() throws IOException, E3DBException {
-    final AtomicReference<Client> client1 = new AtomicReference<>();
-    final AtomicReference<Client> client2 = new AtomicReference<>();
+    final AtomicReference<E3DBClient> client1 = new AtomicReference<>();
+    final AtomicReference<E3DBClient> client2 = new AtomicReference<>();
     final AtomicReference<EAKInfo> writerEak = new AtomicReference<>();
     final AtomicReference<EAKInfo> readerEak = new AtomicReference<>();
     final String recordType = "signedLyric";
@@ -1500,7 +1492,7 @@ public class ClientTest {
   @Test
   public void testEAK() throws IOException, E3DBException {
     final CI clientInfo1 = getClient();
-    final Client client = clientInfo1.client;
+    final E3DBClient client = clientInfo1.client;
     final String type = UUID.randomUUID().toString();
     final AtomicReference<LocalEAKInfo> info = new AtomicReference<>();
 

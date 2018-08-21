@@ -54,15 +54,15 @@ Android Testing
 
 The `androidtest` project contains Android-specific tests (for crypto operations as well as secure configuration storage).
 
-You can run the Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
-plugged in and has USB debugging enabled.
+You can run instrumented Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, using an
+emulator or connected phone. Unit tests can be run using the command `gradlew :androidtest:test`.
 
 The `androidtest` project also contain an app which exercises all secure configuration storage options. You can register
 a client and protect the generated configuration with a password, lock screen PIN, fingerprint, or not at all (depending
 on API level of the device, of course). The app is not intended to be used as an automated test, but as a tool for manual
 testing.
 
-Note that to run the app, you must publish the SDK locally
+Note that to run the app, you must publish the SDK locally.
 
 Running a Subset of Tests
 ----

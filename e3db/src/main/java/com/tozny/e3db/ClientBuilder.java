@@ -183,7 +183,7 @@ public class ClientBuilder {
    *
    * @return a configured client.
    */
-  public E3DBClient build() {
+  public Client build() {
     checkState();
     if (certificatePinner == null)
       return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);

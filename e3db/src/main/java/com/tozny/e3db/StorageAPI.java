@@ -55,4 +55,7 @@ interface StorageAPI {
 
   @PATCH("/v1/storage/files/{pending_file_id}")
   Call<ResponseBody> commitFile(@Path("pending_file_id") String pendingFileId);
+
+  @GET("/v1/storage/files/{record_id}")
+  Call<ResponseBody> readFile(@Path("record_id") String recordId);
 }

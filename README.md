@@ -693,22 +693,10 @@ if(! client.verify(signed, clientConfig.publicSigningKey)) {
   // Document failed verification, indicate an error as appropriate
 }
 ```
-
 ## Reading and Writing Large Files
 
 E3DB supports the storage of large encrypted files, using a similar interface for reading and writing records.
-The SDK will handle compression, encrypting and uploading the file. Similarly, it will download, decrypt and
-decompress files as well.
-
-When uploading a file, the SDK expects to be able to (temporarily) store an encrypted, compressed version of the plaintext
-file in the same directory. Once the upload finishes (with or without error), the temporary file will be deleted.
-
-When downloading a file, you must provide a location to which the file can be written. The SDK will save the encrypted
-file to storage in the same directory as to where the plaintext file will be written. The SDK will decrypt and decompress
-the encrypted file in that directory, ultimately writing the plaintext file to the destination given.
-
-In both cases, uploading and downloading, the SDK expects at least twice as much free storage as the size of the plaintext or
-encrypted file.
+The SDK will handle encrypting and uploading the file. Similarly, it will download and decrypt files as well.
 
 To write a file, use the `writeFile` method. For example, assuming the program can read this file (`README.md`):
 
@@ -734,6 +722,61 @@ client.writeFile(recordType, readmeFile, null, new ResultHandler<RecordMeta>() {
   }
 );
 ```
+
+Similarly, to read a file, use the `readFile` method. The `File` argument should be the destination that the plaintext
+file will be written to. If the file already exists, it will be overwritten. Continuing the example above, you
+could read the file written as follows:
+
+```
+...
+UUID readmeRecordId = ...; // Record ID of file written previously
+File destinationFile = new File("README-2.md");
+
+client.readFile(readmeRecordId, destinationFile, new ResultHandler<RecordMeta>() {
+    @Override
+    public void handle(Result<RecordMeta> r) {
+      if(r.isError()) {
+        // an error occurred
+        throw new RuntimeException(r.asError().other());
+      }
+
+      // `README-2.md` will contain contents of file, which we write to standard out.
+      try {
+        System.out.println("README-2.md: " + new String(Files.readAllBytes(destinationFile), "UTF-8"));
+      }
+      catch (IOException e) {
+       // Handle error where file isn't found ...
+      }
+    }
+  }
+);
+```
+
+### Storage Requirements
+When uploading a file, the SDK expects to be able to (temporarily) store an encrypted version of the plaintext
+file in the same directory. Once the upload finishes (with or without error), the temporary file will be deleted.
+
+When downloading a file, you must provide a location to which the file can be written. The SDK will save the encrypted
+file to storage in the same directory as to where the plaintext file will be written. The SDK will decrypt
+the encrypted file in that directory, ultimately writing the plaintext file to the destination given.
+
+In both cases, uploading and downloading, the SDK expects at least twice as much free storage as the size of the plaintext or
+encrypted file.
+
+### Query Results
+
+Query results may include large file records (uploaded via the `writeFile` method). A large file (vs. just a record) is indicated
+when the `file()` method on `RecordMeta` returns a non-`null` value. The contents of the file will _not_ be included in
+query results, even if `setIncludeData` is `true`. Use the `readFile` method to retrieve the contents of the file.
+
+Note that the `data()` method will return an empty map (0 size) when the record refers to a large file. `data()` will never
+return `null`, however.
+
+### Reading Records
+
+If the `read()` method is used to a read a record that refers to a file, the result will be the same as when a query
+result contains a file record. Namely, the record's `data()` method will return an empty (0-size), non-`null` map. The
+`file()` method on the object returned by `meta() will be non-`null`.
 
 ## Exceptions
 

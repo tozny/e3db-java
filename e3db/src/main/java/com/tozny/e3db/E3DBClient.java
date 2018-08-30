@@ -305,4 +305,13 @@ public interface E3DBClient {
    * @return {@code true} if the signature matches; {@code false} otherwise.
    */
   boolean verify(SignedDocument signedDocument, String publicSigningKey);
+
+  /**
+   * Return a client capable of registering other clients.
+   *
+   * Intended for mocking the E3DB client when the static {@link Client#register(String, String, String, ResultHandler)}
+   * methods are problematic. Usually, prefer those methods.
+   * @return
+   */
+  E3DBRegistrationClient registrationClient();
 }

@@ -997,6 +997,8 @@ public class Client implements E3DBClient {
     register(token, clientName, publicKey, publicSignKey, host, client, handleResult);
   }
 
+
+
   /**
    * Abstract helper method to enable registration with a pre-configured client instance.
    *
@@ -1063,6 +1065,11 @@ public class Client implements E3DBClient {
         }
       }
     });
+  }
+
+  @Override
+  public E3DBRegistrationClient registrationClient() {
+    return new RegistrationClient();
   }
 
   @Override

@@ -117,6 +117,27 @@ The published artifacts have different names, but should share versions. They ar
 
 (The version is specified in the file `./publish/build.gradle`.)
 
+To publish to Tozny's Maven repository, the following environemt variables must be set:
+
+* `REPO_URL` - URL for the S3 bucket holding maven artifacts (in the form `s3://.../repo`).
+* `AWS_KEY` - Your AWS API key.
+* `AWS_SECRET` - Your AWS API secret.
+
+The version published is set in the file at `publish/build.gradle`.
+
+Assuming your account has the correct privileges, publish by running the following two tasks. First, to
+publish an Android AAR:
+
+```bash
+$ ./gradlew :publish:android:publishMavenPublicationToMavenRepository
+```
+
+and to publish a Plain Java JAR:
+
+```
+$ ./gradlew :publish:plain:publishMavenPublicationToMavenRepository
+```
+
 Writing Android Apps
 ====
 

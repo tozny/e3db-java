@@ -3,6 +3,7 @@ package com.tozny.e3db;
 import org.junit.Test;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mock;
 
@@ -20,6 +21,8 @@ public class MockTests {
     E3DBClient c = mock(E3DBClient.class);
     when(c.registrationClient()).thenReturn(r);
 
-    assertNotNull(c.registrationClient());
+    E3DBRegistrationClient returnedRegClient = c.registrationClient();
+    assertNotNull(returnedRegClient);
+    assertSame(r, returnedRegClient);
   }
 }

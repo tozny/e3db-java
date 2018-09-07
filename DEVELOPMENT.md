@@ -178,7 +178,28 @@ When preparing to publish:
 - Commit changes to documentation
 - Push changes and tags to remote
 
-Done!
+To publish to an S3 hosted maven repository, the following environment variables must be set:
+
+* `REPO_URL` - URL for the S3 bucket holding maven artifacts (in the form `s3://<bucket>.<region>.amazonaws.com/<dir>`).
+* `AWS_KEY` - Your AWS API key.
+* `AWS_SECRET` - Your AWS API secret.
+
+The version published is set in `publish/build.gradle`, in the `ext` block:
+
+```gradle
+ext {
+  version = "<version number>"
+  ...
+}
+```
+
+Assuming your AWS account has the correct privileges, publish by running the following task:
+
+```bash
+$ ./gradlew :publish:publishRemote
+```
+
+The task will publish both the plain Java JAR and the Android AAR to the maven repository.
 
 Writing Android Apps
 ====

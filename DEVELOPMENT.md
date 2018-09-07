@@ -54,6 +54,9 @@ $ ./gradlew -PREGISTRATION_TOKEN="..." :plaintest:test
 
 Tests will fail to run if a registration token is not set.
 
+Note that `DEFAULT_API_URL` can also be set in a similar way to test against any self-hosted E3DB instances. If not set,
+tests will run against `https://api.e3db.com`.
+
 "FileNotFoundException" When Testing
 ====
 

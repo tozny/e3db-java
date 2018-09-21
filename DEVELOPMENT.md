@@ -54,15 +54,15 @@ Android Testing
 
 The `androidtest` project contains Android-specific tests (for crypto operations as well as secure configuration storage).
 
-You can run the Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, assuming a phone is
-plugged in and has USB debugging enabled.
+You can run instrumented Android tests from the command line using the command `gradlew :androidtest:connectedAndroidTest`, using an
+emulator or connected phone. Unit tests can be run using the command `gradlew :androidtest:test`.
 
 The `androidtest` project also contain an app which exercises all secure configuration storage options. You can register
 a client and protect the generated configuration with a password, lock screen PIN, fingerprint, or not at all (depending
 on API level of the device, of course). The app is not intended to be used as an automated test, but as a tool for manual
 testing.
 
-Note that to run the app, you must publish the SDK locally
+Note that to run the app, you must publish the SDK locally.
 
 Running a Subset of Tests
 ----
@@ -116,6 +116,27 @@ The published artifacts have different names, but should share versions. They ar
 * Android - 'com.tozny.e3db:e3db-client-android:<version>@aar'
 
 (The version is specified in the file `./publish/build.gradle`.)
+
+To publish to Tozny's Maven repository, the following environemt variables must be set:
+
+* `REPO_URL` - URL for the S3 bucket holding maven artifacts (in the form `s3://.../repo`).
+* `AWS_KEY` - Your AWS API key.
+* `AWS_SECRET` - Your AWS API secret.
+
+The version published is set in the file at `publish/build.gradle`.
+
+Assuming your account has the correct privileges, publish by running the following two tasks. First, to
+publish an Android AAR:
+
+```bash
+$ ./gradlew :publish:android:publishMavenPublicationToMavenRepository
+```
+
+and to publish a Plain Java JAR:
+
+```
+$ ./gradlew :publish:plain:publishMavenPublicationToMavenRepository
+```
 
 Writing Android Apps
 ====

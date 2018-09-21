@@ -20,10 +20,8 @@
 
 package com.tozny.e3db;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.UUID;
 
@@ -181,9 +179,9 @@ public class ClientBuilder {
   }
 
   /**
-   * Create an E3DB Client instance based on configured parameters.
+   * Create an E3DB client based on configured parameters.
    *
-   * @return a configured Client instance.
+   * @return a configured client.
    */
   public Client build() {
     checkState();

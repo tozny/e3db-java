@@ -71,7 +71,7 @@ publishing {
         classifier "sources"
       }
 
-      artifact bundleRelease
+      artifact bundleReleaseAar
 
       pom.withXml {
         def dependenciesNode = asNode().appendNode('dependencies')

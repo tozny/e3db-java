@@ -851,7 +851,7 @@ public class  Client {
       searchRequest.put("writer_ids", makeArray(params.writerIds));
 
     if(params.includeAllWriters != null)
-      searchRequest.put("include_all_writers", params.includeData.booleanValue());
+      searchRequest.put("include_all_writers", params.includeAllWriters.booleanValue());
 
     if(params.userIds != null)
       searchRequest.put("user_ids", makeArray(params.userIds));

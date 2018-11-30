@@ -185,7 +185,7 @@ public class ClientBuilder {
    *
    * @return a configured Client instance.
    */
-  public Client build() {
+  public Client build() throws E3DBCryptoException {
     checkState();
     if (certificatePinner == null)
       return new Client(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey);

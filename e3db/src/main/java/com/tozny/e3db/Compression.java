@@ -58,6 +58,6 @@ public enum Compression {
     else if(type.equalsIgnoreCase(RAW.getType()))
       return RAW;
     else
-      throw new RuntimeException("Unknown compression type: " + type);
+      throw new IllegalArgumentException("Unknown compression type: " + type);
   }
 }

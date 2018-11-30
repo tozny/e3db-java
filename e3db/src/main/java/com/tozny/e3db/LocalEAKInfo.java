@@ -78,7 +78,7 @@ public class LocalEAKInfo implements EAKInfo {
    * Encode the EAK as a JSON document, suitable for storage.
    * @return
    */
-  public String encode() {
+  public String encode() throws JsonProcessingException {
     Map<String, String> doc = new HashMap<>();
 
     doc.put("authorizer_id", getAuthorizerId().toString());
@@ -87,11 +87,8 @@ public class LocalEAKInfo implements EAKInfo {
     doc.put("signer_signing_key", getSignerSigningKey());
     doc.put("eak", getKey());
 
-    try {
-      return mapper.writeValueAsString(doc);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+    return mapper.writeValueAsString(doc);
+
   }
 
   /**

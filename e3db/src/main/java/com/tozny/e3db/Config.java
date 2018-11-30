@@ -87,7 +87,7 @@ public class Config {
    */
   public final String privateSigningKey;
 
-  Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateEncryptionKey, String privateSigningKey) {
+  Config(String apiKey, String apiSecret, UUID clientId, String name, String host, String privateEncryptionKey, String privateSigningKey) throws E3DBCryptoException {
     checkNotEmpty(apiKey, "apiKey");
     checkNotEmpty(apiSecret, "apiSecret");
     checkNotEmpty(host, "host");
@@ -118,7 +118,7 @@ public class Config {
    * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
-  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey) {
+  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey) throws E3DBCryptoException {
     checkNotNull(creds, "creds");
     checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
 
@@ -141,7 +141,7 @@ public class Config {
    * @param privateSigningKey Ed25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
-  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey, String privateSigningKey) {
+  public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey, String privateSigningKey) throws E3DBCryptoException {
     checkNotNull(creds, "creds");
     checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
     checkNotEmpty(privateSigningKey, "privateSigningKey");
@@ -166,7 +166,7 @@ public class Config {
    * @throws IOException ioException.
    * @return a {@link Config} instance.
    */
-  public static Config fromJson(String doc) throws IOException {
+  public static Config fromJson(String doc) throws IOException, E3DBCryptoException {
     checkNotEmpty(doc, "doc");
 
     JsonNode info = mapper.readTree(doc);

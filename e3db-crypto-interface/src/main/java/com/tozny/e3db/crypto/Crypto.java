@@ -22,6 +22,9 @@ package com.tozny.e3db.crypto;
 
 import com.tozny.e3db.CipherSuite;
 import com.tozny.e3db.CipherWithNonce;
+import com.tozny.e3db.E3DBCryptoException;
+import com.tozny.e3db.E3DBDecryptionException;
+import com.tozny.e3db.E3DBEncryptionException;
 import com.tozny.e3db.Signature;
 
 import java.io.File;
@@ -43,7 +46,7 @@ public interface Crypto {
    *
    * @return The encrypted message and a nonce used during encryption.
    */
-  CipherWithNonce encryptSecretBox(byte[] message, byte [] key);
+  CipherWithNonce encryptSecretBox(byte[] message, byte [] key) throws E3DBEncryptionException;
 
   /**
    * Decrypt a message encrypted with a secret key.
@@ -52,7 +55,7 @@ public interface Crypto {
    * @param key Secret key for decryption. Should be a byte array previously generated with {@link #newSecretKey()}.
    * @return The decrypted bytes, or throws an exception if decryption fails.
    */
-  byte[] decryptSecretBox(CipherWithNonce message, byte [] key);
+  byte[] decryptSecretBox(CipherWithNonce message, byte [] key) throws E3DBDecryptionException;
 
   /**
    * Encrypt a message using public-key cryptography.
@@ -63,7 +66,7 @@ public interface Crypto {
    *                   with {@link #newPrivateKey()}.
    * @return The encrypted message plus a nonce used during encryption.
    */
-  CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey);
+  CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey) throws E3DBEncryptionException;
 
   /**
    * Decrypt a message for a given recipient.
@@ -74,21 +77,21 @@ public interface Crypto {
    *                   with {@link #newPrivateKey()}.
    * @return The decrypted message, or throws if decryption fails.
    */
-  byte[] decryptBox(CipherWithNonce message, byte[] publicKey, byte[] privateKey);
+  byte[] decryptBox(CipherWithNonce message, byte[] publicKey, byte[] privateKey) throws E3DBDecryptionException;
 
   /**
    * Extract the public key from a given private key.
    * @param privateKey A 32-byte array. Private keys can be generated withw {@link #newPrivateKey()}).
    * @return The public key, or throws if the argument does not represent a valid private key.
    */
-  byte[] getPublicKey(byte[] privateKey);
+  byte[] getPublicKey(byte[] privateKey) throws E3DBCryptoException;
 
   /**
    * Create a new private key for use with {@link #encryptBox(byte[], byte[], byte[])} and {@link #decryptBox(CipherWithNonce, byte[], byte[])}. The associated public key can be
    * extracted from the returned key using {@link #getPublicKey(byte[])}.
    * @return A new private key.
    */
-  byte[] newPrivateKey();
+  byte[] newPrivateKey() throws E3DBCryptoException;
 
   /**
    * Generate a new secret key for use with {@link #encryptSecretBox(byte[], byte[])} and {@link #decryptSecretBox(CipherWithNonce, byte[])}.
@@ -101,15 +104,16 @@ public interface Crypto {
    *
    * @return A new Ed25519 private key.
    */
-  byte [] newPrivateSigningKey();
+  byte [] newPrivateSigningKey() throws E3DBCryptoException;
 
   /**
    * Extract the public key portion from a secret signing key.
    *
    * @param privateKey Ed25519 private key.
    * @return Public key portion of the private key.
+   * @throws E3DBCryptoException
    */
-  byte[] getPublicSigningKey(byte[] privateKey);
+  byte[] getPublicSigningKey(byte[] privateKey) throws E3DBCryptoException;
 
   /**
    * Creates an Ed25519 signature over the given message.
@@ -118,7 +122,7 @@ public interface Crypto {
    * @param signingKey Private Ed25519 key to use.
    * @return An Ed25519 signature.
    */
-  byte[] signature(byte [] message, byte[] signingKey);
+  byte[] signature(byte [] message, byte[] signingKey) throws E3DBCryptoException;
 
   /**
    * Verify a signature, given a document and public key.
@@ -142,7 +146,7 @@ public interface Crypto {
    * @param secretKey Key to encrypt with.
    * @return The encrypted file.
    */
-  File encryptFile(File file, byte[] secretKey) throws IOException;
+  File encryptFile(File file, byte[] secretKey) throws IOException, E3DBCryptoException;
 
   /**
    * Decrypts the given file, assuming it was encrypted with the
@@ -153,7 +157,7 @@ public interface Crypto {
    * @param dest The destination to write the decrypted contents to. If this file exists, it will be truncated.
    * @throws IOException
    */
-  void decryptFile(File file, byte[] secretKey, File dest) throws IOException;
+  void decryptFile(File file, byte[] secretKey, File dest) throws IOException, E3DBCryptoException;
 
   /**
    * Size of the block used when encrypting files (in bytes).

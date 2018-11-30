@@ -22,6 +22,7 @@ package com.tozny.e3db.android;
 
 import android.content.Context;
 import com.tozny.e3db.ConfigStore;
+import com.tozny.e3db.E3DBCryptoException;
 
 import javax.crypto.Cipher;
 import java.io.IOException;
@@ -118,7 +119,7 @@ public class AndroidConfigStore implements ConfigStore {
       case PASSWORD:
         return COM_TOZNY_E3DB_CRYPTO + identifier + "-PW";
       default:
-        throw new RuntimeException("Unrecognized key protection type: " +  keyAuthenticationType.name());
+        throw new IllegalArgumentException("Unrecognized key protection type: " +  keyAuthenticationType.name());
     }
   }
 
@@ -147,15 +148,21 @@ public class AndroidConfigStore implements ConfigStore {
     if (SaveHandler == null)
       throw new IllegalArgumentException("SaveHandler cannot be null.");
 
-    try {
-      final String fullIdentifier = full(identifier, protection);
+    final String fullIdentifier;
+    fullIdentifier = full(identifier, protection);
 
-      KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator, new CipherManager.SaveCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
+
+    KeyStoreManager.getCipher(context, fullIdentifier, protection, keyAuthenticator,
+            new CipherManager.SaveCipherGetter(protection.authenticationType()), new KeyStoreManager.AuthenticatedCipherHandler() {
         @Override
         public void onAuthenticated(Cipher cipher) {
-          SecureStringManager.saveStringToSecureStorage(context, fullIdentifier, config, cipher);
+          try {
+            SecureStringManager.saveStringToSecureStorage(context, fullIdentifier, config, cipher);
+            SaveHandler.saveConfigDidSucceed();
+          } catch (IOException e) {
+            SaveHandler.saveConfigDidFail(new RuntimeException(e));
+          }
 
-          SaveHandler.saveConfigDidSucceed();
         }
 
         @Override
@@ -169,9 +176,6 @@ public class AndroidConfigStore implements ConfigStore {
         }
       });
 
-    } catch (Throwable e) {
-      SaveHandler.saveConfigDidFail(e);
-    }
   }
 
   @Override

@@ -24,30 +24,41 @@ import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Log;
+
 import com.goterl.lazycode.lazysodium.LazySodium;
 import com.goterl.lazycode.lazysodium.LazySodiumAndroid;
 import com.goterl.lazycode.lazysodium.SodiumAndroid;
-import com.goterl.lazycode.lazysodium.exceptions.SodiumException;
 import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
 import com.goterl.lazycode.lazysodium.interfaces.Sign;
-import com.tozny.e3db.crypto.*;
+import com.tozny.e3db.crypto.Crypto;
+
 import org.junit.Test;
 
-import javax.crypto.*;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.IvParameterSpec;
-import java.io.*;
-import java.net.URL;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.security.*;
+import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.zip.ZipInputStream;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 
 import static com.goterl.lazycode.lazysodium.LazySodium.toHex;
-import static junit.framework.Assert.*;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
 
 public class AndroidCryptoTest {
   private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -78,7 +89,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testValidSignature() {
+  public void testValidSignature() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
 
@@ -88,7 +99,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testInvalidSignature() {
+  public void testInvalidSignature() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
 
@@ -101,7 +112,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testWrongPublicKey() {
+  public void testWrongPublicKey() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] wrongSigningKey = lazySodium.randomBytesBuf(Sign.PUBLICKEYBYTES);
     byte[] document = lazySodium.randomBytesBuf(100_000);
@@ -113,7 +124,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testWrongDocument() {
+  public void testWrongDocument() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
     byte[] document = lazySodium.randomBytesBuf(100_000);
@@ -126,7 +137,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testGCM() throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, UnsupportedEncodingException, BadPaddingException, IllegalBlockSizeException, NoSuchProviderException {
+  public void testGCM() throws Exception {
     Cipher encryptCipher = Cipher.getInstance("AES/GCM/NoPadding");
     KeyGenerator aes = KeyGenerator.getInstance("AES");
     aes.init(256);
@@ -174,7 +185,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testGCMAKS() throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, UnsupportedEncodingException, BadPaddingException, IllegalBlockSizeException, NoSuchProviderException {
+  public void testGCMAKS() throws Exception {
     if(Build.VERSION.SDK_INT >= 23) {
       byte[] plainbytes = "hello".getBytes(UTF8);
       String keystoreAlias = UUID.randomUUID().toString();
@@ -226,7 +237,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testEncryptFile() throws IOException, SodiumException {
+  public void testEncryptFile() throws Exception {
     File plain = File.createTempFile("test", ".txt");
     plain.deleteOnExit();
     String message = "Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
@@ -305,7 +316,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testRoundTripSecretStream() throws SodiumException {
+  public void testRoundTripSecretStream() throws Exception {
     String message1 = "Hello";
     String message2 = "World";
     byte[] header = new byte[SecretStream.HEADERBYTES];
@@ -325,7 +336,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testRoundtripFile() throws IOException {
+  public void testRoundtripFile() throws Exception {
     byte [] plain = lazySodium.randomBytesBuf(100 + 1);
     File plainFile = File.createTempFile("e2e", "");
     plainFile.deleteOnExit();
@@ -362,7 +373,7 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testBlockSizeFile() throws IOException {
+  public void testBlockSizeFile() throws Exception {
     byte [] plain = lazySodium.randomBytesBuf(Platform.crypto.getBlockSize());
     File plainFile = File.createTempFile("e2e", "");
     plainFile.deleteOnExit();

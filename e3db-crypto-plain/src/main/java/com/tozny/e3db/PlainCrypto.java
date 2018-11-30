@@ -70,29 +70,29 @@ class PlainCrypto implements Crypto {
   }
 
   @Override
-  public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) {
+  public CipherWithNonce encryptSecretBox(byte[] message, byte[] key) throws E3DBEncryptionException {
     checkNotNull(message, "message");
     checkNotEmpty(key, "key");
     byte[] nonce = lazySodium.randomBytesBuf(SecretBox.NONCEBYTES);
     byte[] cipher = new byte[SecretBox.MACBYTES + message.length];
     if(! lazySodium.cryptoSecretBoxEasy(cipher, message, message.length, nonce, key))
-      throw new RuntimeException("Could not encrypt message.");
+      throw new E3DBEncryptionException("Could not encrypt message.");
 
     return new CipherWithNonce(cipher, nonce);
   }
 
   @Override
-  public byte[] decryptSecretBox(CipherWithNonce message, byte[] key) {
+  public byte[] decryptSecretBox(CipherWithNonce message, byte[] key) throws E3DBDecryptionException {
     checkNotNull(message, "message");
     checkNotEmpty(key, "key");
     byte[] messageBytes = new byte[message.getCipher().length - SecretBox.MACBYTES];
     if(! lazySodium.cryptoSecretBoxOpenEasy(messageBytes, message.getCipher(), message.getCipher().length, message.getNonce(), key))
-      throw new RuntimeException("Could not decrypt message.");
+      throw new E3DBDecryptionException("Could not decrypt message.");
     return messageBytes;
   }
 
   @Override
-  public CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey) {
+  public CipherWithNonce encryptBox(byte[] message, byte[] publicKey, byte[] privateKey) throws E3DBEncryptionException {
     checkNotNull(message, "message");
     checkNotEmpty(publicKey, "publicKey");
     checkNotEmpty(privateKey, "privateKey");
@@ -100,39 +100,39 @@ class PlainCrypto implements Crypto {
     byte[] nonce = lazySodium.randomBytesBuf(Box.NONCEBYTES);
     byte[] cipher = new byte[Box.MACBYTES + message.length];
     if(! lazySodium.cryptoBoxEasy(cipher, message, message.length, nonce, publicKey, privateKey))
-      throw new RuntimeException("Unable to encrypt message.");
+      throw new E3DBEncryptionException("Unable to encrypt message.");
 
     return new CipherWithNonce(cipher, nonce);
   }
 
   @Override
-  public byte[] decryptBox(CipherWithNonce message, byte[] publicKey, byte[] privateKey) {
+  public byte[] decryptBox(CipherWithNonce message, byte[] publicKey, byte[] privateKey) throws E3DBDecryptionException {
     checkNotNull(message, "message");
     checkNotNull(publicKey, "publicKey");
     checkNotNull(privateKey, "privateKey");
     byte[] messageBytes = new byte[message.getCipher().length - Box.MACBYTES];
     if(! lazySodium.cryptoBoxOpenEasy(messageBytes, message.getCipher(), message.getCipher().length, message.getNonce(), publicKey, privateKey))
-      throw new RuntimeException("Could not decrypt message.");
+      throw new E3DBDecryptionException("Could not decrypt message.");
 
     return messageBytes;
   }
 
   @Override
-  public byte[] newPrivateKey() {
+  public byte[] newPrivateKey() throws E3DBCryptoException {
     try {
       return lazySodium.cryptoBoxKeypair().getSecretKey();
     } catch (SodiumException e) {
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
   @Override
-  public byte[] getPublicKey(byte[] privateKey) {
+  public byte[] getPublicKey(byte[] privateKey) throws E3DBCryptoException {
     checkNotEmpty(privateKey, "privateKey");
     try {
       return lazySodium.cryptoScalarMultBase(privateKey).getPublicKey();
     } catch (SodiumException e) {
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
@@ -144,11 +144,11 @@ class PlainCrypto implements Crypto {
   }
 
   @Override
-  public byte[] signature(byte[] message, byte[] signingKey) {
+  public byte[] signature(byte[] message, byte[] signingKey) throws E3DBCryptoException {
     byte[] signatureBytes = new byte[Sign.BYTES];
 
     if(! lazySodium.cryptoSignDetached(signatureBytes, new long[]{0}, message, message.length, signingKey))
-      throw new RuntimeException("Unable to sign document.");
+      throw new E3DBCryptoException("Unable to sign document.");
 
     return signatureBytes;
   }
@@ -163,31 +163,32 @@ class PlainCrypto implements Crypto {
   }
 
   @Override
-  public byte[] newPrivateSigningKey() {
+  public byte[] newPrivateSigningKey() throws E3DBCryptoException {
     try {
       return lazySodium.cryptoSignKeypair().getSecretKey();
     } catch (SodiumException e) {
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
   @Override
-  public byte[] getPublicSigningKey(byte[] privateKey) {
+  public byte[] getPublicSigningKey(byte[] privateKey) throws E3DBCryptoException {
     try {
       return lazySodium.cryptoSignSecretKeyPair(privateKey).getPublicKey();
     } catch (SodiumException e) {
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
   @Override
-  public File encryptFile(File file, byte[] secretKey) throws IOException {
+  public File encryptFile(File file, byte[] secretKey) throws IOException, E3DBCryptoException {
     byte[] dataKey = new byte[SecretStream.KEYBYTES];
     lazySodium.cryptoSecretStreamKeygen(dataKey);
     byte[] header = new byte[SecretStream.HEADERBYTES];
     SecretStream.State state = new SecretStream.State();
-    if(! lazySodium.cryptoSecretStreamInitPush(state, header, dataKey))
-      throw new RuntimeException("Error initializing encrypt operation.");
+    if(! lazySodium.cryptoSecretStreamInitPush(state, header, dataKey)) {
+      throw new E3DBCryptoException("Error initializing encrypt operation.");
+    }
 
     CipherWithNonce edk = encryptSecretBox(dataKey, secretKey);
     String version = "3";
@@ -215,7 +216,7 @@ class PlainCrypto implements Crypto {
 
         byte messageTag = nextAmt != -1 ? SECRET_STREAM_TAG_MESSAGE : SecretStream.TAG_FINAL;
         if(! lazySodium.cryptoSecretStreamPush(state, cipher, head, headAmt, messageTag))
-          throw new RuntimeException("Error encrypting file.");
+          throw new E3DBCryptoException("Error encrypting file.");
 
         out.write(cipher, 0, headAmt + SecretStream.ABYTES);
       }
@@ -225,12 +226,12 @@ class PlainCrypto implements Crypto {
   }
 
   @Override
-  public void decryptFile(File encrypted, byte[] secretKey, File dest) throws IOException {
+  public void decryptFile(File encrypted, byte[] secretKey, File dest) throws IOException, E3DBCryptoException {
     try (FileOutputStream out = new FileOutputStream(dest, false); FileInputStream in = new FileInputStream(encrypted)) {
       // Read version
       FileVersion v = FileVersion.fromValue(new String(new byte[]{(byte) in.read()}, UTF8));
       if(v != FileVersion.CORRECTED_MESSAGE_TAG && v != FileVersion.INITIAL)
-        throw new RuntimeException("Unknown file version: " + v);
+        throw new E3DBCryptoException("Unknown file version: " + v);
 
       in.read(); // "."
 
@@ -259,7 +260,7 @@ class PlainCrypto implements Crypto {
       {
         SecretStream.State state = new SecretStream.State();
         if(! lazySodium.cryptoSecretStreamInitPull(state, header, dataKey))
-          throw new RuntimeException("Error initializing decryption operation.");
+          throw new E3DBCryptoException("Error initializing decryption operation.");
 
         byte[] cipherBlock = new byte[BLOCK_SIZE + SecretStream.ABYTES];
         byte[] tag = new byte[1];
@@ -267,22 +268,22 @@ class PlainCrypto implements Crypto {
 
         for (int cipherAmt = in.read(cipherBlock); cipherAmt != -1; cipherAmt = in.read(cipherBlock)) {
           if(sawFinal)
-            throw new RuntimeException("Unexpected trailing data.");
+            throw new E3DBCryptoException("Unexpected trailing data.");
 
           byte[] messageBlock = new byte[cipherAmt - SecretStream.ABYTES];
           if (!lazySodium.cryptoSecretStreamPull(state, messageBlock, tag, cipherBlock, cipherAmt))
-            throw new RuntimeException("Decryption error.");
+            throw new E3DBCryptoException("Decryption error.");
 
           switch(v) {
             case INITIAL:
               // For backwards compatibility support, as the lazysodium library had a bug
               // and all messages were tagged final.
               if(tag[0] != SecretStream.TAG_FINAL)
-                throw new RuntimeException("Invalid decryption.");
+                throw new E3DBDecryptionException("Invalid decryption.");
               break;
             case CORRECTED_MESSAGE_TAG:
               if(tag[0] != SECRET_STREAM_TAG_MESSAGE && tag[0] != SecretStream.TAG_FINAL)
-                throw new RuntimeException("Invalid decryption.");
+                throw new E3DBDecryptionException("Invalid decryption.");
               break;
           }
 
@@ -291,7 +292,7 @@ class PlainCrypto implements Crypto {
         }
 
         if (tag[0] != SecretStream.TAG_FINAL)
-          throw new RuntimeException("Invalid file.");
+          throw new E3DBDecryptionException("Invalid file.");
       }
     }
   }

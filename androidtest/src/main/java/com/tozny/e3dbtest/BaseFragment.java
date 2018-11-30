@@ -162,14 +162,14 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
                 public void loadConfigDidSucceed(String config) {
                     try {
                         mConfig = Config.fromJson(config);
-                    } catch (IOException e) {
+                        mState = State.CONFIG_LOADED;
+
+                        updateLabels(getString(R.string.config_loaded), "", mConfig.json());
+                        updateInterface();
+                    } catch (IOException | E3DBCryptoException e) {
                         loadConfigDidFail(e);
                     }
 
-                    mState = State.CONFIG_LOADED;
-
-                    updateLabels(getString(R.string.config_loaded), "", mConfig.json());
-                    updateInterface();
                 }
 
                 @Override
@@ -261,47 +261,53 @@ public class BaseFragment extends Fragment implements BaseFragmentInterface {
 
             updateLabels(getString(R.string.registering_new_client), "", "");
 
-            Client.register(TOKEN, CLIENT_NAME + UUID.randomUUID().toString(), HOST, new ResultHandler<Config>() {
-                @Override
-                public void handle(Result<Config> r) {
-                    if (!r.isError()) {
+            try {
+                Client.register(TOKEN, CLIENT_NAME + UUID.randomUUID().toString(), HOST, new ResultHandler<Config>() {
+                    @Override
+                    public void handle(Result<Config> r) {
+                        if (!r.isError()) {
 
-                        mConfig = r.asValue();
-                        Config.saveConfigSecurely(ConfigStore(), mConfig.json(), new ConfigStore.SaveHandler() {
-                            @Override
-                            public void saveConfigDidSucceed() {
-                                mState = State.CONFIG_LOADED;
+                            mConfig = r.asValue();
+                            Config.saveConfigSecurely(ConfigStore(), mConfig.json(), new ConfigStore.SaveHandler() {
+                                @Override
+                                public void saveConfigDidSucceed() {
+                                    mState = State.CONFIG_LOADED;
 
-                                updateLabels(getString(R.string.new_config_created_and_saved), "", mConfig.json());
-                                updateInterface();
-                            }
+                                    updateLabels(getString(R.string.new_config_created_and_saved), "", mConfig.json());
+                                    updateInterface();
+                                }
 
-                            @Override
-                            public void saveConfigDidCancel() {
-                                updateLabels(getString(R.string.config_create_canceled), "", "");
+                                @Override
+                                public void saveConfigDidCancel() {
+                                    updateLabels(getString(R.string.config_create_canceled), "", "");
 
-                            }
+                                }
 
-                            @Override
-                            public void saveConfigDidFail(Throwable e) {
-                                e.printStackTrace();
+                                @Override
+                                public void saveConfigDidFail(Throwable e) {
+                                    e.printStackTrace();
 
-                                mState = State.ERROR_FOUND;
+                                    mState = State.ERROR_FOUND;
 
-                                updateLabels(getString(R.string.create_config_failed), e.getLocalizedMessage(), "");
-                                updateInterface();
-                            }
-                        });
+                                    updateLabels(getString(R.string.create_config_failed), e.getLocalizedMessage(), "");
+                                    updateInterface();
+                                }
+                            });
 
-                    } else {
-                        mState = State.ERROR_FOUND;
+                        } else {
+                            mState = State.ERROR_FOUND;
 
-                        updateLabels(getString(R.string.create_config_failed), (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()), "");
-                        updateInterface();
+                            updateLabels(
+                                    getString(R.string.create_config_failed),
+                                    (r.asError().error() == null ? r.asError().toString() : r.asError().error().getMessage()), "");
+                            updateInterface();
 
+                        }
                     }
-                }
-            });
+                });
+            } catch (E3DBCryptoException e) {
+                updateLabels(getString(R.string.registering_new_client_failed), e.getMessage(), "");
+            }
         }
     };
 

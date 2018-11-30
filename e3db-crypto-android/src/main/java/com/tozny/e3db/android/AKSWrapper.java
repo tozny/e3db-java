@@ -26,6 +26,8 @@ import android.security.keystore.KeyProperties;
 import android.support.annotation.RequiresApi;
 import android.util.Log;
 
+import com.tozny.e3db.E3DBCryptoException;
+
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.IOException;
@@ -36,7 +38,7 @@ class AKSWrapper {
   private static final String TAG = "AKSWrapper";
 
   @RequiresApi(api = Build.VERSION_CODES.M)
-  private static void createSecretKeyIfNeeded(String alias, KeyAuthentication protection) {
+  private static void createSecretKeyIfNeeded(String alias, KeyAuthentication protection) throws E3DBCryptoException {
     try {
       Log.d(TAG, "createSecretKeyIfNeeded: " + alias + "; " + protection.authenticationType());
       KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
@@ -80,12 +82,12 @@ class AKSWrapper {
       }
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException | NoSuchProviderException | InvalidAlgorithmParameterException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
   @RequiresApi(api = Build.VERSION_CODES.M)
-  static SecretKey getSecretKey(String alias, KeyAuthentication protection) throws UnrecoverableKeyException {
+  static SecretKey getSecretKey(String alias, KeyAuthentication protection) throws UnrecoverableKeyException, E3DBCryptoException {
     try {
       Log.d(TAG, "getSecretKey: " + alias + ";" + protection.authenticationType());
       createSecretKeyIfNeeded(alias, protection);
@@ -98,11 +100,11 @@ class AKSWrapper {
       return (SecretKey) key;
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
-  static void removeSecretKey(String alias) {
+  static void removeSecretKey(String alias) throws E3DBCryptoException {
     try {
       Log.d(TAG, "removeSecretKey: " + alias);
       KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
@@ -114,7 +116,7 @@ class AKSWrapper {
       }
     } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 }

@@ -39,7 +39,7 @@ public class PlainCryptoTest {
   private final LazySodium lazySodium = new LazySodiumJava(new SodiumJava());
 
   @Test
-  public void testValidSignature() {
+  public void testValidSignature() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
 
@@ -49,7 +49,7 @@ public class PlainCryptoTest {
   }
 
   @Test
-  public void testInvalidSignature() {
+  public void testInvalidSignature() throws Exception{
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
 
@@ -62,7 +62,7 @@ public class PlainCryptoTest {
   }
 
   @Test
-  public void testWrongPublicKey() {
+  public void testWrongPublicKey() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] wrongSigningKey = lazySodium.randomBytesBuf(Sign.ED25519_PUBLICKEYBYTES);
     byte[] document = lazySodium.randomBytesBuf(100_000);
@@ -74,7 +74,7 @@ public class PlainCryptoTest {
   }
 
   @Test
-  public void testWrongDocument() {
+  public void testWrongDocument() throws Exception {
     byte[] privateSigningKey = crypto.newPrivateSigningKey();
     byte[] publicSigningKey = crypto.getPublicSigningKey(privateSigningKey);
     byte[] document = lazySodium.randomBytesBuf(100_000);
@@ -87,7 +87,7 @@ public class PlainCryptoTest {
   }
 
   @Test
-  public void testBlnsSerializationJavaMatchesNode() throws IOException {
+  public void testBlnsSerializationJavaMatchesNode() throws Exception {
     BlnsTest blns = new BlnsTest();
     List<Map<String, String>> javaTests = blns.serializeBlns();
     List<Map<String, String>> nodeTests = blns.loadBlnsResults("/com/tozny/e3db/blns-node.json");
@@ -100,7 +100,7 @@ public class PlainCryptoTest {
   }
 
   @Test
-  public void testBlnsSerializationJavaMatchesSwift() throws IOException {
+  public void testBlnsSerializationJavaMatchesSwift() throws Exception {
     BlnsTest blns = new BlnsTest();
     List<Map<String, String>> javaTests = blns.serializeBlns();
     List<Map<String, String>> swiftTests = blns.loadBlnsResults("/com/tozny/e3db/blns-swift.json");

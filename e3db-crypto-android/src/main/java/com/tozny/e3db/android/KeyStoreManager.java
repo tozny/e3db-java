@@ -30,7 +30,11 @@ import android.support.v4.content.PermissionChecker;
 import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
 
 
+import com.tozny.e3db.E3DBCryptoException;
+
 import javax.crypto.Cipher;
+
+import java.io.IOException;
 import java.security.*;
 
 import static com.tozny.e3db.android.KeyAuthentication.KeyAuthenticationType.*;
@@ -88,7 +92,7 @@ class KeyStoreManager {
               authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, null)));
             else
               authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection)));
-          } catch (InvalidKeyException | UnrecoverableKeyException e) {
+          } catch (InvalidKeyException | UnrecoverableKeyException | IOException | E3DBCryptoException e) {
             authenticatedCipherHandler.onError(e);
           }
 
@@ -118,7 +122,7 @@ class KeyStoreManager {
               }
             });
 
-          } catch (InvalidKeyException | UnrecoverableKeyException e) {
+          } catch (InvalidKeyException | UnrecoverableKeyException | IOException | E3DBCryptoException e) {
             authenticatedCipherHandler.onError(e);
           }
 
@@ -155,7 +159,7 @@ class KeyStoreManager {
                 }
               });
             }
-          } catch (UnrecoverableKeyException e) {
+          } catch (UnrecoverableKeyException | IOException | E3DBCryptoException e) {
             authenticatedCipherHandler.onError(e);
           }
 
@@ -167,7 +171,7 @@ class KeyStoreManager {
             public void handlePassword(String password) throws UnrecoverableKeyException {
               try {
                 authenticatedCipherHandler.onAuthenticated(cipherGetter.getCipher(context, identifier, FSKSWrapper.getSecretKey(context, identifier, protection, password)));
-              } catch (InvalidKeyException e) {
+              } catch (InvalidKeyException | IOException | E3DBCryptoException e) {
                 authenticatedCipherHandler.onError(e);
               }
             }
@@ -190,7 +194,7 @@ class KeyStoreManager {
 
   }
 
-  static void removeSecretKey(Context context, String identifier) {
+  static void removeSecretKey(Context context, String identifier) throws E3DBCryptoException {
     FSKSWrapper.removeSecretKey(context, identifier);
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
       AKSWrapper.removeSecretKey(identifier);

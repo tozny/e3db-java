@@ -24,6 +24,8 @@ import android.content.Context;
 import android.os.Build;
 import android.util.Log;
 
+import com.tozny.e3db.E3DBCryptoException;
+
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
@@ -40,7 +42,7 @@ class CipherManager {
 
   private static final String TAG = "CipherManager";
 
-  private static void saveInitializationVector(Context context, String fileName, byte[] bytes) {
+  private static void saveInitializationVector(Context context, String fileName, byte[] bytes) throws IOException {
     FileOutputStream fos = null;
 
     try {
@@ -48,8 +50,6 @@ class CipherManager {
       fos.write(bytes);
       fos.flush();
 
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     } finally {
       if (fos != null) {
         try {
@@ -61,7 +61,7 @@ class CipherManager {
     }
   }
 
-  private static byte[] loadInitializationVector(Context context, String fileName) {
+  private static byte[] loadInitializationVector(Context context, String fileName) throws IOException{
     FileInputStream fis = null;
     byte[] bytes;
 
@@ -72,8 +72,6 @@ class CipherManager {
       fis = new FileInputStream(file);
       fis.read(bytes, 0, fileSize);
 
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     } finally {
       if (fis != null) {
         try {
@@ -110,7 +108,7 @@ class CipherManager {
   }
 
   interface GetCipher {
-    Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException;
+    Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException, IOException, E3DBCryptoException;
   }
 
   static class SaveCipherGetter implements GetCipher {
@@ -123,7 +121,7 @@ class CipherManager {
     }
 
     @Override
-    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException {
+    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException, IOException, E3DBCryptoException {
       try {
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -141,14 +139,14 @@ class CipherManager {
               cipher.init(Cipher.ENCRYPT_MODE, key, createIV());
               break;
             default:
-              throw new RuntimeException("Unrecognized protection type " + protection.name());
+              throw new IllegalArgumentException("Unrecognized protection type " + protection.name());
           }
         }
 
         saveInitializationVector(context, identifier, cipher.getIV());
         return cipher;
       } catch (InvalidAlgorithmParameterException | NoSuchPaddingException | NoSuchAlgorithmException e) {
-        throw new RuntimeException(e);
+        throw new E3DBCryptoException(e);
       }
     }
 
@@ -177,20 +175,20 @@ class CipherManager {
           case PASSWORD:
             return new IvParameterSpec(iv);
           default:
-            throw new RuntimeException("Unrecognized protection type " + protection.name());
+            throw new IllegalArgumentException("Unrecognized protection type " + protection.name());
         }
       }
     }
 
     @Override
-    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException {
+    public Cipher getCipher(Context context, String identifier, SecretKey key) throws InvalidKeyException, E3DBCryptoException, IOException {
       try {
         AlgorithmParameterSpec params = makeIvSpec(loadInitializationVector(context, identifier));
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.DECRYPT_MODE, key, params);
         return cipher;
       } catch (NoSuchPaddingException | InvalidAlgorithmParameterException | NoSuchAlgorithmException e) {
-        throw new RuntimeException(e);
+        throw new E3DBCryptoException(e);
       }
     }
   }

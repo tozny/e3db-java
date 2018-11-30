@@ -86,20 +86,17 @@ public class LocalMeta implements ClientMeta {
   }
 
   @Override
-  public String toSerialized() {
-    try {
-      SortedMap<String, Object> clientMeta = new TreeMap<>();
-      clientMeta.put("writer_id", writerId().toString());
-      clientMeta.put("user_id", userId().toString());
-      clientMeta.put("type", type());
-      clientMeta.put("plain", plain() == null ?
-                                  new TreeMap<String, String>() :
-                                  new TreeMap<>(plain()));
+  public String toSerialized() throws JsonProcessingException {
+    SortedMap<String, Object> clientMeta = new TreeMap<>();
+    clientMeta.put("writer_id", writerId().toString());
+    clientMeta.put("user_id", userId().toString());
+    clientMeta.put("type", type());
+    clientMeta.put("plain", plain() == null ?
+                                new TreeMap<String, String>() :
+                                new TreeMap<>(plain()));
 
       return mapper.writeValueAsString(clientMeta);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+
   }
 
   public static LocalMeta fromRecordMeta(RecordMeta m) {

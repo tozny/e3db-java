@@ -20,6 +20,8 @@
 
 package com.tozny.e3db;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 /**
  * Indicates that the implementor will provide a deterministic serialization of
  * the document for signing purposes.
@@ -31,5 +33,5 @@ public interface Signable {
    *
    * @return A string representing the document.
    */
-  String toSerialized();
+  String toSerialized() throws JsonProcessingException;
 }

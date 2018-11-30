@@ -25,6 +25,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import com.tozny.e3db.Base64;
+import com.tozny.e3db.E3DBCryptoException;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -49,7 +50,7 @@ class FSKSWrapper {
     return new File(filesDir, privateFile).exists();
   }
 
-  private synchronized static String getPerf(Context context, String dir) {
+  private synchronized static String getPerf(Context context, String dir) throws E3DBCryptoException {
     Log.d(TAG, "getPerf");
     try {
       final int count = 65, bytes = 20;
@@ -122,11 +123,11 @@ class FSKSWrapper {
       return p;
     } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
-  private static KeyStore getFSKS(Context context) {
+  private static KeyStore getFSKS(Context context) throws E3DBCryptoException{
     Log.d(TAG, "getFSKS");
     if (fsKS == null) {
       synchronized (keyStoreCreateLock) {
@@ -169,7 +170,7 @@ class FSKSWrapper {
             fsKS = result;
           } catch (KeyStoreException | IOException | NoSuchAlgorithmException| CertificateException e) {
             Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-            throw new RuntimeException(e);
+            throw new E3DBCryptoException(e);
           }
         }
       }
@@ -178,7 +179,7 @@ class FSKSWrapper {
     return fsKS;
   }
 
-  private static void saveFSKS(Context context) {
+  private static void saveFSKS(Context context) throws E3DBCryptoException {
     Log.d(TAG, "saveFSKS.");
     if (fsKS != null) {
       synchronized(keyStoreWriteLock) {
@@ -196,7 +197,7 @@ class FSKSWrapper {
           }
         } catch (KeyStoreException | IOException | NoSuchAlgorithmException | CertificateException e) {
           Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-          throw new RuntimeException(e);
+          throw new E3DBCryptoException(e);
         }
       }
     }
@@ -220,7 +221,7 @@ class FSKSWrapper {
     }
   }
 
-  private static void createSecretKeyIfNeeded(Context context, String alias, KeyAuthentication protection, String password) {
+  private static void createSecretKeyIfNeeded(Context context, String alias, KeyAuthentication protection, String password) throws E3DBCryptoException {
     try {
       Log.d(TAG, "createSecretKeyIfNeeded " + alias + "; " + protection.authenticationType() + "; " + (password != null));
       KeyStore keyStore = getFSKS(context);
@@ -239,11 +240,11 @@ class FSKSWrapper {
       }
     } catch (KeyStoreException | NoSuchAlgorithmException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
-  static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) throws UnrecoverableKeyException {
+  static SecretKey getSecretKey(Context context, String alias, KeyAuthentication protection, String password) throws UnrecoverableKeyException, E3DBCryptoException {
     try {
       Log.d(TAG, "getSecretKey " + alias + "; " + protection.authenticationType() + "; " + (password != null));
       createSecretKeyIfNeeded(context, alias, protection, password);
@@ -253,11 +254,11 @@ class FSKSWrapper {
       return (SecretKey) key;
     } catch (KeyStoreException | NoSuchAlgorithmException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 
-  static void removeSecretKey(Context context, String alias) {
+  static void removeSecretKey(Context context, String alias) throws E3DBCryptoException {
     try {
       Log.d(TAG, "removeSecretKey " + alias);
       KeyStore keyStore = getFSKS(context);
@@ -268,7 +269,7 @@ class FSKSWrapper {
       }
     } catch (KeyStoreException e) {
       Log.d(TAG, "error ("+ e.getClass().getCanonicalName() +"): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw new E3DBCryptoException(e);
     }
   }
 }

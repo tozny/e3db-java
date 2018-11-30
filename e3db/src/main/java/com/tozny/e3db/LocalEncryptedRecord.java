@@ -78,26 +78,23 @@ public class LocalEncryptedRecord implements EncryptedRecord {
    * Encode a record such that it can be decoded by {@link #decode(String)}.
    * @return Encoded representation of the record.
    */
-  public String encode() {
-    try {
-      HashMap<String, Object> meta1 = new HashMap<>();
-      meta1.put("type", meta().type());
+  public String encode() throws JsonProcessingException {
+    HashMap<String, Object> meta1 = new HashMap<>();
+    meta1.put("type", meta().type());
 
-      if (meta().plain() != null)
-        meta1.put("plain", meta().plain());
+    if (meta().plain() != null)
+      meta1.put("plain", meta().plain());
 
-      meta1.put("user_id", meta().userId().toString());
-      meta1.put("writer_id", meta().writerId().toString());
+    meta1.put("user_id", meta().userId().toString());
+    meta1.put("writer_id", meta().writerId().toString());
 
-      HashMap<String, Object> r = new HashMap<>();
-      r.put("data", data());
-      r.put("meta", meta1);
-      r.put("rec_sig", signature());
+    HashMap<String, Object> r = new HashMap<>();
+    r.put("data", data());
+    r.put("meta", meta1);
+    r.put("rec_sig", signature());
 
-      return mapper.writeValueAsString(r);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+    return mapper.writeValueAsString(r);
+
   }
 
   /**
@@ -153,22 +150,18 @@ public class LocalEncryptedRecord implements EncryptedRecord {
   }
 
   @Override
-  public String toSerialized() {
-    try {
-      SortedMap<String, Object> serializable = new TreeMap<>();
-      SortedMap<String, Object> metaMap = new TreeMap<>();
-      metaMap.put("type", meta.type());
-      metaMap.put("plain", meta.plain());
-      metaMap.put("user_id", meta.userId().toString());
-      metaMap.put("writer_id", meta.writerId().toString());
+  public String toSerialized() throws JsonProcessingException {
+    SortedMap<String, Object> serializable = new TreeMap<>();
+    SortedMap<String, Object> metaMap = new TreeMap<>();
+    metaMap.put("type", meta.type());
+    metaMap.put("plain", meta.plain());
+    metaMap.put("user_id", meta.userId().toString());
+    metaMap.put("writer_id", meta.writerId().toString());
 
-      serializable.put("data", data());
-      serializable.put("meta", metaMap);
-      serializable.put("rec_sig", signature());
-     return mapper.writeValueAsString(serializable);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+    serializable.put("data", data());
+    serializable.put("meta", metaMap);
+    serializable.put("rec_sig", signature());
+   return mapper.writeValueAsString(serializable);
   }
 
   @Override

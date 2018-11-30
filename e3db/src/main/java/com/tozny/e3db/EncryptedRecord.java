@@ -19,6 +19,8 @@
  */
 package com.tozny.e3db;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 import java.util.Map;
 
 /**
@@ -42,7 +44,7 @@ public interface EncryptedRecord extends Signable, SignedDocument<EncryptedRecor
   String signature();
 
   @Override
-  String toSerialized();
+  String toSerialized() throws JsonProcessingException;
 
   @Override
   EncryptedRecord document();

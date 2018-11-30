@@ -20,6 +20,7 @@
 
 package com.tozny.e3db;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -147,30 +148,32 @@ public class ClientTest {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-            token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
-            @Override
-            public void handle(Result<Config> r) {
-              if (!r.isError()) {
-                Config info = r.asValue();
-                profiles.put(profile, info.json());
-              }
+          token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+          @Override
+          public void handle(Result<Config> r) {
+            if (!r.isError()) {
+              Config info = r.asValue();
 
-              if(handler == null) {
-                if (r.isError())
-                  throw new Error(r.asError().other());
-              }
-              else
-                handler.handle(r);
+              profiles.put(profile, info.json());
+
+            }
+
+            if(handler == null) {
+              if (r.isError())
+                throw new Error(r.asError().other());
+            }
+            else
+              handler.handle(r);
           }}));
       }
     });
   }
 
-  private CI getClient() throws IOException {
+  private CI getClient() throws Exception {
     return getClient("default");
   }
 
-  private CI getClient(String profile) throws IOException {
+  private CI getClient(String profile) throws Exception {
     final Config info = Config.fromJson(profiles.get(profile));
     final Client client = new ClientBuilder()
       .fromConfig(info)
@@ -300,7 +303,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testAccessKeys() throws IOException {
+  public void testAccessKeys() throws Exception {
     final CI clientInfo = getClient();
     final Config info = Config.fromJson(profiles.get("default"));
     final Map<String, String> data = new HashMap<>();
@@ -410,7 +413,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testDelete() throws IOException, InterruptedException {
+  public void testDelete() throws Exception {
     final Client client = getClient().client;
 
     withTimeout(new AsyncAction() {
@@ -455,7 +458,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testWrite() throws IOException, InterruptedException {
+  public void testWrite() throws Exception {
     final Client client = getClient().client;
     final AtomicReference<UUID> recordId = new AtomicReference<>();
     withTimeout(new AsyncAction() {
@@ -495,7 +498,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testPaging() throws InterruptedException, IOException {
+  public void testPaging() throws Exception {
     final Client client = getClient().client;
     final AtomicInteger pages = new AtomicInteger(0);
     final AtomicReference<Boolean> done = new AtomicReference<>(false);
@@ -557,7 +560,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testRecordDataUpdate() throws IOException, InterruptedException {
+  public void testRecordDataUpdate() throws Exception {
     final Client client = getClient().client;
     final String updatedMessage = "Not to put too fine a point on it";
     withTimeout(new AsyncAction() {
@@ -588,7 +591,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testRecordDataCustomUpdateMetaClass() throws IOException, InterruptedException {
+  public void testRecordDataCustomUpdateMetaClass() throws Exception {
     final Client client = getClient().client;
     final String updatedMessage = "Not to put too fine a point on it";
     withTimeout(new AsyncAction() {
@@ -647,7 +650,11 @@ public class ClientTest {
         if(r.isError())
           throw new Error(r.asError().other());
 
-        clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        try {
+          clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        } catch (E3DBCryptoException e) {
+          throw new RuntimeException();
+        }
       }
     });
 
@@ -942,7 +949,11 @@ public class ClientTest {
         if(r.isError())
           throw new Error(r.asError().other());
 
-        clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        try {
+          clientRef.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        } catch (E3DBCryptoException e) {
+          throw new RuntimeException();
+        }
       }
     });
 
@@ -1043,7 +1054,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncryptDecrypt() throws IOException, E3DBException {
+  public void testEncryptDecrypt() throws Exception {
     CI clientInfo = getClient();
     final Client client = clientInfo.client;
     final String type = UUID.randomUUID().toString() + "-type";
@@ -1087,7 +1098,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncryptDecryptTwoClients() throws IOException, E3DBException {
+  public void testEncryptDecryptTwoClients() throws Exception {
     CI clientInfo1 = getClient();
     final Client client1 = clientInfo1.client;
     final String type = UUID.randomUUID().toString() + "-type";
@@ -1144,7 +1155,7 @@ public class ClientTest {
           public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
               throw new Error(r.asError().other());
-            
+
             readerKeyRef.set(r.asValue());
           }
         }));
@@ -1153,7 +1164,7 @@ public class ClientTest {
 
     EAKInfo readerKey = readerKeyRef.get();
     assertNotNull("EAK not returned", readerKey);
-    
+
     LocalRecord decrypted = client2.decryptExisting(encrypted, readerKey);
     assertEquals("Writer ID not equal to client ID", decrypted.meta().writerId(), client1.clientId());
     assertEquals("User ID not equal to client ID", decrypted.meta().userId(), client1.clientId());
@@ -1164,54 +1175,59 @@ public class ClientTest {
   }
 
   @Test
-  public void testSigning() throws IOException {
+  public void testSigning() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "lyric";
     final Map<String, String> data = new HashMap<>();
     data.put("Jabberwock", "Not to put too fine a point on it");
-    {
-      final Map<String, String> plain = new HashMap<>();
-      plain.put("frabjous", "Filibuster vigilantly");
 
-      LocalRecord local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
+    final Map<String, String> plain = new HashMap<>();
+    plain.put("frabjous", "Filibuster vigilantly");
 
-      SignedDocument<LocalRecord> sign = client.sign(local);
-      assertNotNull("Signed document is null", sign);
-      assertNotNull("Signature absent", sign.signature());
-      assertFalse("Signature empty", sign.signature().trim().length() == 0);
-      assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
-    }
+    LocalRecord local = new LocalRecord(data, new LocalMeta(client.clientId(), client.clientId(), recordType, plain));
 
-    {
-      // read a remote record, sign it, verify signature
-      withTimeout(new AsyncAction() {
-        @Override
-        public void act(CountDownLatch wait) throws Exception {
-          client.write(recordType, new RecordData(data), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
-            @Override
-            public void handle(Result<Record> r) {
-              if(r.isError())
-                throw new RuntimeException(r.asError().other());
+    SignedDocument<LocalRecord> sign = client.sign(local);
+    assertNotNull("Signed document is null", sign);
+    assertNotNull("Signature absent", sign.signature());
+    assertFalse("Signature empty", sign.signature().trim().length() == 0);
+    assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
 
-              assertTrue("Unable to verify document.", client.verify(client.sign(r.asValue()),
-                  clientInfo1.clientConfig.publicSigningKey));
 
-              {
-                LocalRecord local = new LocalRecord(r.asValue().data(), LocalMeta.fromRecordMeta(r.asValue().meta()));
-                assertTrue("Unable to verify document.", client.verify(client.sign(local),
-                    clientInfo1.clientConfig.publicSigningKey)
-                );
-              }
+
+    // read a remote record, sign it, verify signature
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.write(recordType, new RecordData(data), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          @Override
+          public void handle(Result<Record> r) {
+            if(r.isError()) {
+              throw new RuntimeException(r.asError().other());
             }
-          }));
-        }
-      });
-    }
+
+            try {
+              assertTrue("Unable to verify document.", client.verify(client.sign(r.asValue()),
+                      clientInfo1.clientConfig.publicSigningKey));
+
+
+              LocalRecord local = new LocalRecord(r.asValue().data(), LocalMeta.fromRecordMeta(r.asValue().meta()));
+              assertTrue("Unable to verify document.", client.verify(client.sign(local),
+                      clientInfo1.clientConfig.publicSigningKey)
+              );
+            } catch(JsonProcessingException | E3DBCryptoException e) {
+              throw new RuntimeException("Failed to serialize");
+            }
+
+          }
+        }));
+      }
+    });
+
   }
 
   @Test
-  public void testPlainMetaSerialization() throws IOException {
+  public void testPlainMetaSerialization() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "lyric";
@@ -1231,7 +1247,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testExternalEncryptedRecord() throws IOException {
+  public void testExternalEncryptedRecord() throws Exception {
     if(Platform.crypto.suite() == CipherSuite.Sodium) {
       final CI clientInfo1 = getClient();
       final Client client = clientInfo1.client;
@@ -1254,7 +1270,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncryptSigning() throws IOException {
+  public void testEncryptSigning() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "lyric";
@@ -1272,7 +1288,12 @@ public class ClientTest {
           @Override
           public void handle(Result<LocalEAKInfo> result) {
             EAKInfo eak = result.asValue();
-            final EncryptedRecord encrypted = client.encryptExisting(local, eak);
+            final EncryptedRecord encrypted;
+            try {
+              encrypted = client.encryptExisting(local, eak);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
 
             assertNotNull(encrypted.signature());
 
@@ -1288,7 +1309,11 @@ public class ClientTest {
               }
             };
 
-            assertTrue(client.verify(signed, clientInfo1.clientConfig.publicSigningKey));
+            try {
+              assertTrue(client.verify(signed, clientInfo1.clientConfig.publicSigningKey));
+            } catch (JsonProcessingException e) {
+              throw new RuntimeException("Failure while verifying signed document");
+            }
           }
         }));
       }
@@ -1296,7 +1321,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncodeDecodeLocal() throws IOException, E3DBException {
+  public void testEncodeDecodeLocal() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String recordType = "signedLyric";
@@ -1420,7 +1445,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEncodeDecodeWrite() throws IOException, E3DBException {
+  public void testEncodeDecodeWrite() throws Exception {
     final AtomicReference<Client> client1 = new AtomicReference<>();
     final AtomicReference<Client> client2 = new AtomicReference<>();
     final AtomicReference<LocalEAKInfo> writerEak = new AtomicReference<>();
@@ -1433,7 +1458,11 @@ public class ClientTest {
         if(r.isError())
           throw new Error(r.asError().other());
 
-        client1.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        try {
+          client1.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        } catch (E3DBCryptoException e) {
+          throw new RuntimeException("Could not build client");
+        }
       }
     });
 
@@ -1443,7 +1472,11 @@ public class ClientTest {
         if(r.isError())
           throw new Error(r.asError().other());
 
-        client2.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        try {
+          client2.set(new ClientBuilder().fromConfig(r.asValue()).build());
+        } catch (E3DBCryptoException e) {
+          throw new RuntimeException("Could not build client");
+        }
       }
     });
 
@@ -1548,7 +1581,7 @@ public class ClientTest {
         }
 
         @Override
-        public String toSerialized() {
+        public String toSerialized() throws JsonProcessingException {
           return x.toSerialized();
         }
 
@@ -1589,7 +1622,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testEAK() throws IOException, E3DBException {
+  public void testEAK() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final String type = UUID.randomUUID().toString();
@@ -1689,7 +1722,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testReadRecordWithFile() throws IOException {
+  public void testReadRecordWithFile() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final RecordMeta recordMeta = writePlainFile(client, UUID.randomUUID().toString(), MESSAGE1);
@@ -1779,7 +1812,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testReadNonExistentFile() throws Throwable {
+  public void testReadNonExistentFile() throws Exception {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
     final File dest = new File(UUID.randomUUID().toString() + ".txt").getAbsoluteFile();
@@ -1884,7 +1917,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testAddAuthorizer() throws IOException {
+  public void testAddAuthorizer() throws Exception {
     final CI writer = getClient();
     final String recordType = UUID.randomUUID().toString();
     final CI authorizer;
@@ -1915,7 +1948,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testRemoveAuthorizer() throws IOException {
+  public void testRemoveAuthorizer() throws Exception {
     final CI writer = getClient();
     final String recordType = UUID.randomUUID().toString();
     final CI authorizer;
@@ -1964,7 +1997,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testShareOnBehalfOf() throws IOException {
+  public void testShareOnBehalfOf() throws Exception {
     final CI writer = getClient();
     final String recordType = UUID.randomUUID().toString().substring(0, 8);
     final CI reader;
@@ -2135,7 +2168,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testAuthorizeBeforeWriting() throws IOException {
+  public void testAuthorizeBeforeWriting() throws Exception {
     final CI writer = getClient();
     final String recordType = UUID.randomUUID().toString().substring(0, 8);
     final CI reader;
@@ -2287,7 +2320,7 @@ public class ClientTest {
   }
 
   @Test
-  public void testGetAuthorized() throws IOException {
+  public void testGetAuthorized() throws Exception {
     final CI writer = getClient();
     final String recordType = UUID.randomUUID().toString();
     final CI authorizer;

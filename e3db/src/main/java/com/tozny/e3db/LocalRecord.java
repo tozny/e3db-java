@@ -24,7 +24,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import java.util.*;
+import java.util.Map;
 
 import static com.tozny.e3db.Checks.checkNotNull;
 
@@ -65,12 +65,7 @@ public class LocalRecord implements Signable {
   }
 
   @Override
-  public String toSerialized() {
-    try {
-
-      return meta.toSerialized() + mapper.writeValueAsString(data());
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
+  public String toSerialized() throws JsonProcessingException {
+    return meta.toSerialized() + mapper.writeValueAsString(data());
   }
 }

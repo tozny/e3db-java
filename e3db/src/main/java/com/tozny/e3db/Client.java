@@ -24,6 +24,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -49,6 +50,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jdk.nashorn.internal.runtime.ParserException;
 import okhttp3.*;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
@@ -256,9 +258,13 @@ public class  Client {
 //        System.out.println(message);
 //      }
 //    }).setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BODY);
-    anonymousClient = enableTLSv12(new OkHttpClient.Builder()
-//      .addInterceptor(loggingInterceptor)
-    ).build();
+    try {
+      anonymousClient = enableTLSv12(new OkHttpClient.Builder()
+  //      .addInterceptor(loggingInterceptor)
+      ).build();
+    } catch (E3DBCryptoException e) {
+      throw new RuntimeException("Could not enable TLS V1.2 while initializing Client", e);
+    }
 
     backgroundExecutor = new ThreadPoolExecutor(1,
         Runtime.getRuntime().availableProcessors(),
@@ -366,7 +372,7 @@ public class  Client {
   }
 
   // From https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
-  private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) {
+  private static OkHttpClient.Builder enableTLSv12(OkHttpClient.Builder client) throws E3DBCryptoException {
     if (Platform.isAndroid() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN && Build.VERSION.SDK_INT < 21) {//Build.VERSION_CODES.LOLLIPOP_MR1) {
       try {
         // From javadoc for okhttp3.OkHttpClient.Builder.sslSocketFactory(javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager)
@@ -392,14 +398,14 @@ public class  Client {
                 ConnectionSpec.CLEARTEXT);
         client.connectionSpecs(specs);
       } catch (KeyStoreException | KeyManagementException | NoSuchAlgorithmException exc) {
-        throw new RuntimeException(exc);
+        throw new E3DBCryptoException(exc);
       }
     }
 
     return client;
   }
 
-  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey, CertificatePinner certificatePinner) {
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey, CertificatePinner certificatePinner) throws E3DBCryptoException {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
     this.clientId = clientId;
@@ -428,7 +434,7 @@ public class  Client {
 
   }
 
-  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) {
+  Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) throws E3DBCryptoException {
     this(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, null);
   }
 
@@ -607,7 +613,7 @@ public class  Client {
     backgroundExecutor.execute(runnable);
   }
 
-  private LocalEncryptedRecord makeEncryptedRecord(EAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) {
+  private LocalEncryptedRecord makeEncryptedRecord(EAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) throws E3DBCryptoException, JsonProcessingException {
     if(Client.this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key to encrypt locally.");
 
@@ -689,15 +695,11 @@ public class  Client {
           fileMeta.has("compression") ? Compression.fromType(fileMeta.get("compression").asText()) : null);
     }
 
-    public static R makeLocal(JsonNode rawMeta) {
-      try {
+    public static R makeLocal(JsonNode rawMeta) throws ParseException {
         return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
-      } catch (ParseException e) {
-        throw new RuntimeException(e);
-      }
     }
 
-    private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, E3DBVerificationException {
+    private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
       RecordMeta meta = getRecordMeta(rawMeta);
       Map<String, String> encryptedFields = new HashMap<>();
       Iterator<String> keys = fields.fieldNames();
@@ -731,7 +733,7 @@ public class  Client {
     }
 
     @Override
-    public String toSerialized() {
+    public String toSerialized() throws JsonProcessingException {
       return new LocalRecord(data, clientMeta(meta)).toSerialized();
     }
   }
@@ -740,7 +742,7 @@ public class  Client {
     return R.makeLocal(rawMeta);
   }
 
-  private static Record makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, UnsupportedEncodingException, E3DBVerificationException {
+  private static Record makeR(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
     return R.makeLocal(accessKey, rawMeta, fields, signature, publicSigningKey);
   }
 
@@ -771,11 +773,11 @@ public class  Client {
     private String token = null;
     private Date replaceAfter = new Date(0L);
 
-    private TokenInterceptor(String apiKey, String apiSecret, URI host) {
+    private TokenInterceptor(String apiKey, String apiSecret, URI host) throws E3DBCryptoException {
       this(apiKey, apiSecret, host, null);
     }
 
-    private TokenInterceptor(String apiKey, String apiSecret, URI host, CertificatePinner certificatePinner) {
+    private TokenInterceptor(String apiKey, String apiSecret, URI host, CertificatePinner certificatePinner) throws E3DBCryptoException {
       this.host = host;
       this.basic = new StringBuffer("Basic ").append(ByteString.of(new StringBuffer(apiKey).append(":").append(apiSecret).toString().getBytes(UTF8)).base64()).toString();
 
@@ -835,7 +837,7 @@ public class  Client {
     }
   }
 
-  private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBException, ParseException {
+  private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBException, E3DBDecryptionException, ParseException {
     Map<String, Object> searchRequest = new HashMap<>();
 
     if(params.after > 0)
@@ -919,7 +921,7 @@ public class  Client {
     return objects;
   }
 
-  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields)  {
+  private static Map<String, String> encryptObject(byte[] accessKey, Map<String, String> fields) throws E3DBEncryptionException {
     Map<String, String> encFields = new HashMap<>();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
       byte[] dk = Platform.crypto.newSecretKey();
@@ -931,7 +933,7 @@ public class  Client {
     return encFields;
   }
 
-  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) {
+  private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws E3DBDecryptionException {
     Map<String, String> decryptedFields = new HashMap<>();
     for(Map.Entry<String,String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
@@ -955,7 +957,7 @@ public class  Client {
     return authorizers;
   }
 
-  private byte[] getOwnAccessKey(String type) throws E3DBException, IOException {
+  private byte[] getOwnAccessKey(String type) throws E3DBException, E3DBCryptoException, IOException {
     byte[] existingAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
     if(existingAK != null) {
       return existingAK;
@@ -969,7 +971,7 @@ public class  Client {
 
       byte[] newAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
       if(newAK == null)
-        throw new RuntimeException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
+        throw new E3DBCryptoException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
 
       return newAK;
     }
@@ -985,12 +987,12 @@ public class  Client {
     eakCache.remove(cacheEntry);
   }
 
-  private byte[] getAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws E3DBException, IOException {
+  private byte[] getAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws E3DBException, E3DBDecryptionException, IOException {
     EAKEntry eak = getEAK(writerId, userId, readerId, type);
     return eak == null ? null : eak.ak;
   }
 
-  private EAKEntry getEAK(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException {
+  private EAKEntry getEAK(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException, E3DBDecryptionException {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
     EAKEntry cachedEak = eakCache.get(cacheEntry);
 
@@ -1050,7 +1052,7 @@ public class  Client {
     }
   }
 
-  private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak, UUID signerId, byte[] signerPublicKey) throws E3DBException, IOException {
+  private void setAccessKey(UUID writerId, UUID userId, UUID readerId, String type, byte[] readerKey, byte[] ak, UUID signerId, byte[] signerPublicKey) throws E3DBException, E3DBEncryptionException, IOException {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
     String encryptedAk = Platform.crypto.encryptBox(ak, readerKey, this.privateEncryptionKey).toMessage();
 
@@ -1066,7 +1068,7 @@ public class  Client {
     eakCache.put(cacheEntry, new EAKEntry(ak, new LocalEAKInfo(encryptedAk, encodeURL(readerKey), this.clientId, signerId, encodeURL(signerPublicKey))));
   }
 
-  private byte[] decryptLocalEAKInfo(EAKInfo eakInfo) {
+  private byte[] decryptLocalEAKInfo(EAKInfo eakInfo) throws E3DBDecryptionException {
     return Platform.crypto.decryptBox(CipherWithNonce.decode(eakInfo.getKey()), decodeURL(eakInfo.getPublicKey()), this.privateEncryptionKey);
   }
 
@@ -1262,7 +1264,7 @@ public class  Client {
    * @return A Base64URL-encoded string representing the new private key.
    */
   @Deprecated
-  public static String newPrivateKey() {
+  public static String newPrivateKey() throws E3DBCryptoException {
     return encodeURL(Platform.crypto.newPrivateKey());
   }
 
@@ -1275,7 +1277,7 @@ public class  Client {
    * @return A Base64URL-encoded string representing the new private key.
    *
    */
-  public static String generateKey() {
+  public static String generateKey()  throws E3DBCryptoException{
     return encodeURL(Platform.crypto.newPrivateKey());
   }
 
@@ -1289,7 +1291,7 @@ public class  Client {
    * @param privateKey Curve25519 private key as a Base64URL-encoded string.
    * @return The public key portion of the private key, as a Base64URL-encoded string.
    */
-  public static String getPublicKey(String privateKey) {
+  public static String getPublicKey(String privateKey) throws E3DBCryptoException {
     checkNotEmpty(privateKey, "privateKey");
     byte[] arr = decodeURL(privateKey);
     checkNotEmpty(arr, "privateKey");
@@ -1305,7 +1307,7 @@ public class  Client {
    * @return A Base64URL-encoded string representing the new private key.
    *
    */
-  public static String generateSigningKey() {
+  public static String generateSigningKey() throws E3DBCryptoException {
     return encodeURL(Platform.crypto.newPrivateSigningKey());
   }
 
@@ -1319,7 +1321,7 @@ public class  Client {
    * @param privateSigningKey Ed25519 private key as a Base64URL-encoded string.
    * @return The public key portion of the private key, as a Base64URL-encoded string.
    */
-  public static String getPublicSigningKey(String privateSigningKey) {
+  public static String getPublicSigningKey(String privateSigningKey) throws E3DBCryptoException {
     checkNotEmpty(privateSigningKey, "privateSigningKey");
     byte[] arr = decodeURL(privateSigningKey);
     checkNotEmpty(arr, "privateSigningKey");
@@ -1346,7 +1348,7 @@ public class  Client {
    * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
    *                     a secure location, and loaded later.
    */
-  public static void register(final String token, final String clientName, final String host, final CertificatePinner certificatePinner, final ResultHandler<Config> handleResult) {
+  public static void register(final String token, final String clientName, final String host, final CertificatePinner certificatePinner, final ResultHandler<Config> handleResult) throws E3DBCryptoException {
     checkNotEmpty(token, "token");
     checkNotEmpty(clientName, "clientName");
     checkNotEmpty(host, "host");
@@ -1364,10 +1366,14 @@ public class  Client {
           executeError(uiExecutor, handleResult, r.asError().other());
         }
         else {
-          final ClientCredentials credentials = r.asValue();
-          Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
-                  encodeURL(privateSigningKey));
-          executeValue(uiExecutor, handleResult, info);
+          try {
+            final ClientCredentials credentials = r.asValue();
+            Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
+                    encodeURL(privateSigningKey));
+            executeValue(uiExecutor, handleResult, info);
+          } catch (E3DBCryptoException e) {
+            executeError(uiExecutor, handleResult, e);
+          }
         }
       }
     };
@@ -1388,7 +1394,7 @@ public class  Client {
    * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
    *                     a secure location, and loaded later.
    */
-  public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) {
+  public static void register(final String token, final String clientName, final String host, final ResultHandler<Config> handleResult) throws E3DBCryptoException {
     register(token, clientName, host, null, handleResult);
   }
 
@@ -1407,7 +1413,7 @@ public class  Client {
    * @param host Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration.
    */
-  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) {
+  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) throws E3DBCryptoException {
     OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
 //      .addInterceptor(loggingInterceptor)
     ).build();
@@ -1435,7 +1441,7 @@ public class  Client {
    * @param certificatePinner OkHttp CertificatePinner instance to restrict which certificates and authorities are trusted.
    * @param handleResult Handles the result of registration.
    */
-  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) {
+  public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) throws E3DBCryptoException {
     checkNotNull(certificatePinner, "certificatePinner");
     OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
 //        .addInterceptor(loggingInterceptor)
@@ -2135,7 +2141,7 @@ public class  Client {
    * @throws E3DBVerificationException Thrown when verification of the signature fails.
    * @return The decrypted record.
    */
-  public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBVerificationException {
+  public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
       throw new IllegalStateException("eakInfo cannot be used to verify the record as it has no public signing key.");
 
@@ -2157,7 +2163,7 @@ public class  Client {
    * @param eakInfo The key to use for encrypting.
    * @return The encrypted record.
    */
-  public LocalEncryptedRecord encryptExisting(LocalRecord record, EAKInfo eakInfo) {
+  public LocalEncryptedRecord encryptExisting(LocalRecord record, EAKInfo eakInfo) throws E3DBCryptoException, JsonProcessingException {
     checkNotNull(record, "record");
     checkNotNull(eakInfo, "eakInfo");
 
@@ -2173,7 +2179,7 @@ public class  Client {
    * @param eakInfo The key to use for encrypting.
    * @return The encrypted record.
    */
-  public LocalEncryptedRecord encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) {
+  public LocalEncryptedRecord encryptRecord(String type, RecordData data, Map<String, String> plain, EAKInfo eakInfo) throws E3DBCryptoException, JsonProcessingException {
     checkNotNull(type, "type");
     checkNotNull(data, "data");
     checkNotNull(eakInfo, "eakInfo");
@@ -2194,7 +2200,7 @@ public class  Client {
    * @return A {@link SignedDocument} instance, holding the document given and a signature
    * for it.
    */
-  public <T extends Signable> SignedDocument<T> sign(T document) {
+  public <T extends Signable> SignedDocument<T> sign(T document) throws JsonProcessingException, E3DBCryptoException {
     checkNotNull(document, "document");
     if(this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key.");
@@ -2219,7 +2225,7 @@ public class  Client {
    *                         string.
    * @return {@code true} if the signature matches; {@code false} otherwise.
    */
-  public boolean verify(SignedDocument signedDocument, String publicSigningKey) {
+  public boolean verify(SignedDocument signedDocument, String publicSigningKey) throws JsonProcessingException {
     checkNotNull(signedDocument, "signedDocument");
     checkNotNull(publicSigningKey, "publicSigningKey");
 

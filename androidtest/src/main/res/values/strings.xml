@@ -28,6 +28,7 @@
     <string name="save_config_failed">Save Config Failed</string>
     <string name="delete_config_failed">Delete Config Failed</string>
     <string name="registering_new_client">Registering new client…</string>
+    <string name="registering_new_client_failed">Registering new client failed</string>
     <string name="new_config_created_and_saved">New Config Created and Saved</string>
     <string name="config_create_canceled">Config Create Canceled</string>
     <string name="create_config_failed">Create Config Failed</string>

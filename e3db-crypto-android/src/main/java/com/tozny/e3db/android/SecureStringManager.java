@@ -44,7 +44,7 @@ class SecureStringManager {
     }
   }
 
-  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) {
+  static void saveStringToSecureStorage(Context context, String fileName, String string, Cipher cipher) throws IOException {
     Log.d(TAG, "saveStringToSecureStorage " + fileName + "; " + (string != null) + ";" + cipher.getAlgorithm());
     CipherOutputStream cipherOutputStream = null;
 
@@ -57,7 +57,7 @@ class SecureStringManager {
       Log.d(TAG, "Saved string");
     } catch (IOException e) {
       Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw e;
     } finally {
       if (cipherOutputStream != null) {
         try {
@@ -77,7 +77,7 @@ class SecureStringManager {
       cipherInputStream = new CipherInputStream(new FileInputStream(FileSystemManager.getEncryptedDataFilePath(context, fileName)), cipher);
     } catch (FileNotFoundException e) {
       Log.d(TAG, "error (" + e.getClass().getCanonicalName()+ "): " + e.getMessage(), e);
-      throw new RuntimeException(e);
+      throw e;
     }
 
     try {

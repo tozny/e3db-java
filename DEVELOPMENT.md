@@ -167,7 +167,6 @@ When preparing to publish:
 - Merge all changes that will be published into the master branch.
 - Change the version number in `./publish/build.gradle` to the version that will be published.
 - Make sure all Android lint checks pass (`./gradlew :publish:android:lint`)
-- Publish JARs to the remote repository (`./gradlew :publish:publishRemote`)
 - Tag the commit using the version number just published (`git tag -s -a -m "Release <version>" <version>`)
 - Generate javadocs (`./gradlew :e3db:javadoc`)
 - Commit the newly generated javadocs folder.
@@ -177,12 +176,21 @@ When preparing to publish:
   - docs\index.md - Change link to latest version of docs; move link to previous version of docs to the list of previous versions.
 - Commit changes to documentation
 - Push changes and tags to remote
+- Publish JARs to the remote repository (`./gradlew :publish:publishMavenCentral`)
 
-To publish to an S3 hosted maven repository, the following environment variables must be set:
 
-* `REPO_URL` - URL for the S3 bucket holding maven artifacts (in the form `s3://<bucket>.<region>.amazonaws.com/<dir>`).
-* `AWS_KEY` - Your AWS API key.
-* `AWS_SECRET` - Your AWS API secret.
+To publish to maven central, the following gradle properties must be set:
+
+* signing.keyId= <- last 8 characters of your private signing key, this key must be shared with a third party gpg key server such as hkp://keyserver.ubuntu.com
+* signing.password= <- signing key password
+* signing.secretKeyRingFile= <-full path to your secring.gpg
+  
+* ossrhUsername= <- user token for sonatype ossr account that has permissions to deploy form com.tozny
+* ossrhPassword= <- password token for above account
+  
+* developerId= <developer id>
+* developerName= <Full Name>
+* developerEmail= <tozny email address>
 
 The version published is set in `publish/build.gradle`, in the `ext` block:
 
@@ -193,13 +201,14 @@ ext {
 }
 ```
 
-Assuming your AWS account has the correct privileges, publish by running the following task:
+Assuming your OSSRH account has the correct privileges, publish by running the following task:
 
 ```bash
-$ ./gradlew :publish:publishRemote
+$ ./gradlew :publish:publishMavenCentral
 ```
 
-The task will publish both the plain Java JAR and the Android AAR to the maven repository.
+The task will publish both the plain Java JAR and the Android AAR to the maven staging repository, actual deployment needs to be done with the [Nexus Repository Manager](https://oss.sonatype.org/#stagingRepositories.)
+Instructions for that can be found [here](https://central.sonatype.org/pages/releasing-the-deployment.html)
 
 Writing Android Apps
 ====

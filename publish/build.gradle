@@ -30,8 +30,8 @@ task publishLocal(dependsOn: [":publish:android:publishMavenAarPublicationToMave
   }
 }
 
-task publishRemote(dependsOn: [":publish:android:publishMavenAarPublicationToMavenRepository", ":publish:plain:publishMavenPublicationToMavenRepository"]) {
+task publishMavenCentral(dependsOn: [":publish:android:uploadArchives", ":publish:plain:uploadArchives"]) {
   doLast {
-    println "Published remote artifacts."
+    println "Published Artifacts to Nexus Repository Manager"
   }
 }

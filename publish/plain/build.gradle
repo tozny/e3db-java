@@ -22,6 +22,9 @@ apply plugin: 'java'
 apply plugin: 'maven-publish'
 apply plugin: 'com.github.johnrengelman.shadow'
 
+apply plugin: 'maven'
+apply plugin: 'signing'
+
 sourceSets {
   main {
     java {
@@ -36,7 +39,17 @@ sourceSets {
 evaluationDependsOn(':publish')
 
 task sourceJar(type: Jar) {
+  classifier = 'sources'
   from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar) {
+  classifier = 'javadoc'
+  from javadoc
+}
+
+signing {
+  sign configurations.archives
 }
 
 publishing {
@@ -44,23 +57,9 @@ publishing {
     maven(MavenPublication) {
       from components.java
 
-      artifact sourceJar {
-        classifier "sources"
-      }
-
       groupId project(":publish").ext.groupId
       artifactId 'e3db-client-plain'
       version project(":publish").ext.version
-    }
-  }
-  repositories {
-    maven {
-      // url should be of the form "s3://<bucket>.s3-<region>.amazonaws.com/<folder>"
-      url "${System.getenv('REPO_URL')}"
-      credentials(AwsCredentials) {
-        accessKey "${System.getenv('AWS_KEY')}"
-        secretKey "${System.getenv('AWS_SECRET')}"
-      }
     }
   }
 }
@@ -75,4 +74,59 @@ dependencies {
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
   }
   compileOnly project(":e3db").configurations.compileOnly.dependencies
+}
+
+
+artifacts {
+  archives javadocJar, sourceJar
+}
+
+uploadArchives {
+  group = "com.tozny.e3db"
+  archivesBaseName = "e3db-client-plain"
+  version = project(":publish").ext.version
+  println()
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+      repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+      pom.project {
+        artifactId = 'e3db-client-plain'
+        groupId = 'com.tozny.e3db'
+        name 'E3DB Java SDK'
+        packaging 'jar'
+        // optionally artifactId can be defined here
+        description 'An SDK to interact with TozStore Encrypted Storage'
+        url 'https://github.com/tozny/e3db-java'
+
+        scm {
+          connection 'scm:git:git://github.com/tozny/e3db-java.git'
+          developerConnection 'scm:git:ssh://github.com/tozny/e3db-java.git'
+          url 'https://github.com/tozny/e3db-java/tree/master'
+        }
+
+        licenses {
+          license {
+            name 'TOZNY NON-COMMERCIAL LICENSE'
+            url 'https://tozny.com/legal/non-commercial-license'
+          }
+        }
+
+        developers {
+          developer {
+            id developerId
+            name developerName
+            email developerEmail
+          }
+        }
+      }
+    }
+  }
 }

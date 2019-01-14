@@ -59,7 +59,7 @@ app, add it as a dependency to your build. In Gradle, use:
 
 ```
 repositories {
-  maven { url "https://maven.tozny.com/repo" }
+  mavenCentral()
   maven { url "https://dl.bintray.com/terl/lazysodium-maven" }
 }
 
@@ -73,17 +73,9 @@ needs to request INTERNET permissions.
 
 # Using the SDK with Plain Java
 
-For use with Maven, declare the following repository and dependencies:
+For use with Maven, declare the following dependencies:
 
 ```
-<repositories>
-  <repository>
-    <id>tozny-repo</id>
-    <name>Tozny Repository</name>
-    <url>https://maven.tozny.com/repo</url>
-  </repository>
-</repositories>
-
 <dependencies>
   <dependency>
     <groupId>com.tozny.e3db</groupId>

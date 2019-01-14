@@ -18,9 +18,14 @@
  *
  */
 
+
+
 apply plugin: 'com.android.library'
 apply plugin: 'com.getkeepsafe.dexcount'
 apply plugin: 'digital.wup.android-maven-publish'
+
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'signing'
 
 android {
   compileSdkVersion 27
@@ -60,7 +65,25 @@ android {
 evaluationDependsOn(':publish')
 
 task sourceJar(type: Jar) {
+  classifier = 'sources'
   from android.sourceSets.main.java.sourceFiles
+}
+
+
+task javadoc(type: Javadoc) {
+  source = android.sourceSets.main.java.srcDirs
+  classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+  destinationDir = file("../javadoc/")
+  failOnError false
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+signing {
+  sign configurations.archives
 }
 
 publishing {
@@ -72,20 +95,6 @@ publishing {
       artifactId 'e3db-client-android'
       version project(":publish").ext.version
 
-      artifact sourceJar {
-        classifier "sources"
-      }
-
-      repositories {
-        maven {
-          // url should be of the form "s3://<bucket>.s3-<region>.amazonaws.com/<folder>"
-          url "${System.getenv('REPO_URL')}"
-          credentials(AwsCredentials) {
-            accessKey "${System.getenv('AWS_KEY')}"
-            secretKey "${System.getenv('AWS_SECRET')}"
-          }
-        }
-      }
     }
   }
 }
@@ -98,5 +107,58 @@ dependencies {
   implementation project(":e3db").configurations.compile.dependencies.matching { dep ->
     // exclude project dependencies - only include external, maven dependencies
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
+  }
+}
+
+artifacts {
+  archives javadocJar, sourceJar
+}
+
+uploadArchives {
+  group = "com.tozny.e3db"
+  archivesBaseName = "e3db-client-android"
+  version = project(":publish").ext.version
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+      repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+      pom.project {
+        artifactId = 'e3db-client-android'
+        groupId = 'com.tozny.e3db'
+        name 'E3DB Java SDK'
+        packaging 'jar'
+        // optionally artifactId can be defined here
+        description 'An SDK to interact with TozStore Encrypted Storage with Android'
+        url 'https://github.com/tozny/e3db-java'
+
+        scm {
+          connection 'scm:git:git://github.com/tozny/e3db-java.git'
+          developerConnection 'scm:git:ssh://github.com/tozny/e3db-java.git'
+          url 'https://github.com/tozny/e3db-java/tree/master'
+        }
+
+        licenses {
+          license {
+            name 'TOZNY NON-COMMERCIAL LICENSE'
+            url 'https://tozny.com/legal/non-commercial-license'
+          }
+        }
+
+        developers {
+          developer {
+            id developerId
+            name developerName
+            email developerEmail
+          }
+        }
+      }
+    }
   }
 }

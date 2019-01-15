@@ -211,7 +211,7 @@ class PlainCrypto implements Crypto {
 
       for (int headAmt = source.read(head), nextAmt = source.read(next);
            headAmt != -1;
-           headAmt = nextAmt, head = next, nextAmt = source.read(next)) {
+           headAmt = nextAmt, head = next.clone(), nextAmt = source.read(next)) {
 
         byte messageTag = nextAmt != -1 ? SECRET_STREAM_TAG_MESSAGE : SecretStream.TAG_FINAL;
         if(! lazySodium.cryptoSecretStreamPush(state, cipher, head, headAmt, messageTag))

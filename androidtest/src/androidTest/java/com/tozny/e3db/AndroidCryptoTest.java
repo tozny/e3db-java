@@ -43,6 +43,7 @@ import java.nio.charset.Charset;
 import java.security.*;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.UUID;
 import java.util.zip.ZipInputStream;
 
@@ -325,8 +326,9 @@ public class AndroidCryptoTest {
   }
 
   @Test
-  public void testRoundtripFile() throws IOException {
-    byte [] plain = lazySodium.randomBytesBuf(100 + 1);
+  public void testRoundtripFile() throws Exception {
+    byte [] plain = new byte[500000];
+    new Random().nextBytes(plain);
     File plainFile = File.createTempFile("e2e", "");
     plainFile.deleteOnExit();
 

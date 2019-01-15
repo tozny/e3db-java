@@ -67,6 +67,8 @@ dependencies {
   androidTestImplementation 'com.fasterxml.jackson.core:jackson-core:2.9.0'
   androidTestImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.9.0'
   androidTestImplementation 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
+  androidTestImplementation "commons-io:commons-io:2.6"
+  androidTestImplementation "org.assertj:assertj-core:2.9.1"
 
   androidTestImplementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
 

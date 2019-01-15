@@ -45,6 +45,7 @@ import java.nio.charset.Charset;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.UUID;
 
 import javax.crypto.BadPaddingException;
@@ -337,7 +338,8 @@ public class AndroidCryptoTest {
 
   @Test
   public void testRoundtripFile() throws Exception {
-    byte [] plain = lazySodium.randomBytesBuf(100 + 1);
+    byte [] plain = new byte[500000];
+    new Random().nextBytes(plain);
     File plainFile = File.createTempFile("e2e", "");
     plainFile.deleteOnExit();
 

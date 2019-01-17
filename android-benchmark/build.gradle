@@ -22,11 +22,11 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 26
     defaultConfig {
         applicationId "com.tozny.e3db.benchmark"
         minSdkVersion 16
-        targetSdkVersion 27
+        targetSdkVersion 26
         versionCode 1
         versionName "1.0"
 
@@ -39,7 +39,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
     androidTestImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:rules:1.0.2'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.0'
     androidTestImplementation 'dk.ilios:spanner:0.6.0'
     androidTestImplementation project(path: ':e3db')
     androidTestImplementation project(path: ':e3db-crypto-interface')

@@ -1168,7 +1168,7 @@ public class  Client {
     }
     final String signingKey;
     {
-      if(info.get("signing_key") != null) {
+      if(info.get("signing_key").equals("null")) {
         switch(Platform.crypto.suite().getSigningKeyType()) {
           case Ed25519:
             signingKey = info.get("signing_key").get("ed25519").asText();

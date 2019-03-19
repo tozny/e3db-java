@@ -1025,7 +1025,7 @@ public class  Client {
         JsonNode signer_signing_key = eakResponse.get("signer_signing_key");
         UUID signerId = null;
         final String signerPublicKey;
-        if (signer_signing_key != null) {
+        if (!signer_signing_key.isNull()) {
           signerId = UUID.fromString(eakResponse.get("signer_id").asText());
           switch(Platform.crypto.suite().getSigningKeyType()) {
             case Ed25519:
@@ -1170,7 +1170,7 @@ public class  Client {
     }
     final String signingKey;
     {
-      if(info.get("signing_key") != null) {
+      if(!info.get("signing_key").isNull()) {
         switch(Platform.crypto.suite().getSigningKeyType()) {
           case Ed25519:
             signingKey = info.get("signing_key").get("ed25519").asText();

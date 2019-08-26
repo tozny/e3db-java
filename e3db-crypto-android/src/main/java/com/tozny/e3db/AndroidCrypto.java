@@ -24,6 +24,7 @@ import com.goterl.lazycode.lazysodium.LazySodium;
 import com.goterl.lazycode.lazysodium.LazySodiumAndroid;
 import com.goterl.lazycode.lazysodium.exceptions.SodiumException;
 import com.goterl.lazycode.lazysodium.interfaces.Box;
+import com.goterl.lazycode.lazysodium.interfaces.GenericHash;
 import com.goterl.lazycode.lazysodium.interfaces.SecretBox;
 import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
 import com.goterl.lazycode.lazysodium.interfaces.Sign;
@@ -309,5 +310,17 @@ class AndroidCrypto implements Crypto {
   @Override
   public int getBlockSize() {
     return BLOCK_SIZE;
+  }
+
+
+  @Override
+  public byte[] hashString(String message) throws E3DBCryptoException {
+    byte[] out = new byte[GenericHash.BLAKE2B_BYTES];
+    byte[] messageBytes = message.getBytes();
+    boolean success = lazySodium.cryptoGenericHash(out, out.length, messageBytes, messageBytes.length);
+    if (!success) {
+      throw new E3DBCryptoException("Failure to hash message");
+    }
+    return out;
   }
 }

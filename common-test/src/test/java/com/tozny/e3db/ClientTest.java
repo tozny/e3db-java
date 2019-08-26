@@ -2413,4 +2413,253 @@ public class ClientTest {
         fail("Writer not found in authorized by list.");
     }
   }
+
+  @Test
+  public void testNoteFlowById() throws Exception {
+    final Client client = getClient().client;
+    final AtomicReference<Note> storedRecord = new AtomicReference<>();
+    //Write
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        final Map<String, String> dataToEncrypt = new HashMap<>();
+        dataToEncrypt.put("TestNoteKey", "Test");
+        final RecordData recordData = new RecordData(dataToEncrypt);
+        String noteName = "testnote" + UUID.randomUUID();
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    final UUID noteID = storedRecord.get().noteID;
+
+    //Read by id
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            storedRecord.set(null);
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+
+    });
+    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+
+    // delete record
+    AtomicReference<Result<Void>> resultAtomicReference = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> n) {
+            resultAtomicReference.set(n);
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(!resultAtomicReference.get().isError());
+
+    // Read by id, should be missing
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            storedRecord.set(null);
+            if (!n.isError()) {
+              System.out.println("There was no error??");
+              storedRecord.set(n.asValue());
+              wait.countDown();
+            }
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(storedRecord.get() == null);
+  }
+
+  @Test
+  public void testNoteFlowByName() throws Exception {
+    final Client client = getClient().client;
+    final AtomicReference<Note> storedRecord = new AtomicReference<>();
+    //Write
+    final String noteName = "testnote" + UUID.randomUUID();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        final Map<String, String> dataToEncrypt = new HashMap<>();
+        dataToEncrypt.put("TestNoteKey", "Test");
+        final RecordData recordData = new RecordData(dataToEncrypt);
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    final UUID noteID = storedRecord.get().noteID;
+    //Read by name
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readNoteByName(noteName, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            storedRecord.set(null);
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+
+    });
+    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+
+    AtomicReference<Result<Void>> resultAtomicReference = new AtomicReference<>();
+    // delete record
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> n) {
+            resultAtomicReference.set(n);
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(!resultAtomicReference.get().isError());
+
+    //Read by name, should be missing
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readNoteByName(noteName, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            storedRecord.set(null);
+            if (!n.isError()) {
+              System.out.println("There was no error??");
+              storedRecord.set(n.asValue());
+              wait.countDown();
+            }
+            wait.countDown();
+          }
+        }));
+      }
+
+    });
+    assert(storedRecord.get() == null);
+  }
+
+  @Test
+  public void testNoteFlowDeleteTwice() throws Exception {
+    final Client client = getClient().client;
+    final AtomicReference<Note> storedRecord = new AtomicReference<>();
+    //Write
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        final Map<String, String> dataToEncrypt = new HashMap<>();
+        dataToEncrypt.put("TestNoteKey", "Test");
+        final RecordData recordData = new RecordData(dataToEncrypt);
+        String noteName = "testnote" + UUID.randomUUID();
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+
+    });
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    final UUID noteID = storedRecord.get().noteID;
+    //Read by id
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+          @Override
+          public void handle(Result<Note> n) {
+            storedRecord.set(null);
+            if (n.isError()) {
+              throw new Error(n.asError().other());
+            }
+            storedRecord.set(n.asValue());
+            wait.countDown();
+          }
+        }));
+      }
+
+    });
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    // Delete record
+    AtomicReference<Result<Void>> resultAtomicReference = new AtomicReference<>();
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> n) {
+            resultAtomicReference.set(n);
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(!resultAtomicReference.get().isError());
+
+    // delete record again, expect error
+    withTimeout(new AsyncAction() {
+      @Override
+      public void act(CountDownLatch wait) throws Exception {
+        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+          @Override
+          public void handle(Result<Void> n) {
+            resultAtomicReference.set(n);
+            wait.countDown();
+          }
+        }));
+      }
+    });
+    assert(resultAtomicReference.get().isError());
+  }
 }

@@ -98,6 +98,11 @@ class AndroidCrypto implements Crypto {
   }
 
   @Override
+  public byte[] hashString(String message) throws E3DBCryptoException {
+    throw new IllegalStateException();
+  }
+
+  @Override
   public int getBlockSize() {
     throw new IllegalStateException();
   }

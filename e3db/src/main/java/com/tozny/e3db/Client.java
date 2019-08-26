@@ -28,8 +28,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -37,10 +43,25 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
-import java.security.*;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.StringJoiner;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -50,8 +71,16 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import jdk.nashorn.internal.runtime.ParserException;
-import okhttp3.*;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
+import okhttp3.CertificatePinner;
+import okhttp3.ConnectionSpec;
+import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -59,15 +88,16 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-
+import okhttp3.TlsVersion;
 import okio.ByteString;
 import retrofit2.Retrofit;
-
-import javax.net.ssl.*;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 
 import static com.tozny.e3db.Base64.decodeURL;
 import static com.tozny.e3db.Base64.encodeURL;
-import static com.tozny.e3db.Checks.*;
+import static com.tozny.e3db.Checks.checkMap;
+import static com.tozny.e3db.Checks.checkNotEmpty;
+import static com.tozny.e3db.Checks.checkNotNull;
 
 /**
  * Implements interactions with E3DB.
@@ -112,12 +142,12 @@ import static com.tozny.e3db.Checks.*;
  * password, and private key used by the {@link Client} instance!
  *
  * <h1>Write, Update and Delete Records</h1>
- *
+ * <p>
  * Records can be written with the {@link #write(String, RecordData, Map, ResultHandler)} method,
  * updated with {@link #update(UpdateMeta, RecordData, Map, ResultHandler)}, and deleted with {@link #delete(UUID, String, ResultHandler)}.
  *
  * <h1>Reading &amp; Querying Records</h1>
- *
+ * <p>
  * You can read a single record with the {@link #read(UUID, ResultHandler)} method.
  *
  * <p>Multiple records (matching some criteria) can be read using the {@link #query(QueryParams, ResultHandler)} method. You must pass a {@link QueryParams} instance
@@ -139,14 +169,14 @@ import static com.tozny.e3db.Checks.*;
  * This client can allow another client to share records on its behalf. That is, a client that writes records (the "writer") can allow
  * another client (the "authorizer") to share those records with any other client (the "reader"). This de-couples the production of
  * data from sharing the data.
- *
+ * <p>
  * To grant authorizer permission, this client should call the {@link #addAuthorizer(UUID, String, ResultHandler)}) method. Permission is granted per record type; there is
  * no facility for sharing all records written by a client. The writer <b>must</b> call {@code addAuthorizer} before the authorizer can share records
  * on the writer's behalf.
- *
+ * <p>
  * Permission to share records can be revoked by either of the {@code removeAuthorizer} methods. It is possible to remove permission for <b>all</b>
  * record types written by this client.
- *
+ * <p>
  * Use the {@link #getAuthorizers(ResultHandler)} method to see all the client's authorized to share records on behalf of this client. Similarly,
  * as an authorizer, use the {@link #getAuthorizedBy(ResultHandler)} method to see all the writers that have given permission for this client
  * to share records.
@@ -155,7 +185,7 @@ import static com.tozny.e3db.Checks.*;
  * There is no difference between an authorizer sharing records on behalf of this client, or this client sharing records directly with
  * a reader. Removing the authorizer's permission to share records does <b>not</b> remove any sharing relationships set up by that
  * authorizer. The writer must remove each sharing relationship explicitly.
- *
+ * <p>
  * To share records as an authorizer, use the {@link #shareOnBehalfOf(WriterId, String, UUID, ResultHandler)} method. Calling this method will grant permission
  * to reader specified to read the records written by the writer, of the given type.
  *
@@ -166,13 +196,13 @@ import static com.tozny.e3db.Checks.*;
  * <p>Local encryption (and decryption) requires two steps:
  *
  * <oL>
- *   <li>Create a 'writer key' (for encryption) or obtain a 'reader key' (for decryption).</li>
- *  <li>Call {@link #encryptRecord(String, RecordData, Map, EAKInfo)} (for a new document) or {@link #encryptExisting(LocalRecord, EAKInfo)}
- *  (for an existing {@link LocalRecord} instance); for decryption, call {@link #decryptExisting(EncryptedRecord, EAKInfo)}.</li>
+ * <li>Create a 'writer key' (for encryption) or obtain a 'reader key' (for decryption).</li>
+ * <li>Call {@link #encryptRecord(String, RecordData, Map, EAKInfo)} (for a new document) or {@link #encryptExisting(LocalRecord, EAKInfo)}
+ * (for an existing {@link LocalRecord} instance); for decryption, call {@link #decryptExisting(EncryptedRecord, EAKInfo)}.</li>
  * </ol>
  *
  * <h1>Obtaining A Key for Local Encryption &amp; Decryption</h1>
- *
+ * <p>
  * A writer key can be created by calling {@link #createWriterKey(String, ResultHandler)}; a 'reader key' can be obtained by calling
  * {@link #getReaderKey(UUID, UUID, String, ResultHandler)}. (Note that the client calling {@code getReaderKey} will only receive a key if the writer
  * of those records has given access to the calling client through the `share` operation.)
@@ -183,7 +213,7 @@ import static com.tozny.e3db.Checks.*;
  * <p>However, note that {@code EAKInfo} objects are encrypted with the client's private key, meaning they cannot be decoded by any other client.
  *
  * <h1>Storing Encrypted Records Locally</h1>
- *
+ * <p>
  * Use the {@link LocalEncryptedRecord#encode()} method to convert an encrypted record to a string for storage. You can use
  * the {@link LocalEncryptedRecord#decode(String)} method to convert an encoded record back to an {@code EncryptedRecord}
  * instance.
@@ -195,40 +225,40 @@ import static com.tozny.e3db.Checks.*;
  * By attaching signatures to documents, clients can be confident in:
  *
  * <ul>
- *   <li>Document integrity - the document's contents have not been altered (because the signature will not match).</li>
- *   <li>Proof-of-authorship - The author of the document held the private signing key associated with the given public key
- *       when the document was created.</li>
+ * <li>Document integrity - the document's contents have not been altered (because the signature will not match).</li>
+ * <li>Proof-of-authorship - The author of the document held the private signing key associated with the given public key
+ * when the document was created.</li>
  * </ul>
  *
  * <p>Use the {@link #sign(Signable)} method to sign a document. Note that {@link Record}, {@link LocalEncryptedRecord}, and {@link LocalRecord}
  * all implement the {@link Signable} interface, and thus can be signed.
- *
+ * <p>
  * To verify a signed document, use the {@link #verify(SignedDocument, String)} method. Note that the {@link LocalEncryptedRecord} class
  * implements {@link SignedDocument} and thus always has a signature attached that can be verified.
  *
  * <h1>Reading &amp; Writing Large Files</h1>
- *
+ * <p>
  * E3DB can encrypt files for storage. Files are treated much like records, except the data for the file is
  * not included inline when downloading a record. Instead, a separate request for each file must be made to the {@link #readFile(UUID, File, ResultHandler)}
  * method.
- *
+ * <p>
  * To write a file, use the {@link #writeFile(String, File, Map, ResultHandler)} method. The record type and plaintext meta
  * arguments behave the same as with normal records. The SDK will encrypt the record in the same directory
  * that stores the plaintext file and will need at least twice as much free space as the size of the plaintext file. The
  * temporary encrypted file will always be deleted the upload finishes (or if an error occurs).
- *
+ * <p>
  * To read a file, use the {@link #readFile(UUID, File, ResultHandler)} method (which is as yet not implemented). The SDK will
  * download the encrypted file to the same directory as the destination given. It will decrypt in-place, and write
  * the result to the destination file. Afterwards, the temporary encrypted file is deleted.
- *
+ * <p>
  * A large file {@link Record} instance will always return a 0-sized empty {@code Map} from its {@link Record#data()}
  * method; it will also always return a non-{@code null} value from the {@link RecordMeta#file} method on the metadata
  * object returned by its {@link Record#meta} method.
  */
-public class  Client {
+public class Client {
   private static final OkHttpClient anonymousClient;
   private static final ObjectMapper mapper;
-//  private static final okhttp3.logging.HttpLoggingInterceptor loggingInterceptor;
+  //  private static final okhttp3.logging.HttpLoggingInterceptor loggingInterceptor;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
@@ -244,10 +274,12 @@ public class  Client {
   private final String apiSecret;
   private final UUID clientId;
   private final byte[] privateEncryptionKey;
+  private final byte[] publicEncryptionKey;
   private final byte[] privateSigningKey;
   private final byte[] publicSigningKey;
   private final StorageAPI storageClient;
   private final ShareAPI shareClient;
+  private final StorageV2API notesClient;
 
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -260,28 +292,28 @@ public class  Client {
 //    }).setLevel(okhttp3.logging.HttpLoggingInterceptor.Level.BODY);
     try {
       anonymousClient = enableTLSv12(new OkHttpClient.Builder()
-  //      .addInterceptor(loggingInterceptor)
+              //      .addInterceptor(loggingInterceptor)
       ).build();
     } catch (E3DBCryptoException e) {
       throw new RuntimeException("Could not enable TLS V1.2 while initializing Client", e);
     }
 
     backgroundExecutor = new ThreadPoolExecutor(1,
-        Runtime.getRuntime().availableProcessors(),
-        30,
-        TimeUnit.SECONDS,
-        new LinkedBlockingQueue<Runnable>(10),
-        new ThreadFactory() {
-          private int threadCount = 1;
+            Runtime.getRuntime().availableProcessors(),
+            30,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>(10),
+            new ThreadFactory() {
+              private int threadCount = 1;
 
-          @Override
-          public Thread newThread(Runnable runnable) {
-            final Thread thread = Executors.defaultThreadFactory().newThread(runnable);
-            thread.setDaemon(true);
-            thread.setName("E3DB background " + threadCount++);
-            return thread;
-          }
-        });
+              @Override
+              public Thread newThread(Runnable runnable) {
+                final Thread thread = Executors.defaultThreadFactory().newThread(runnable);
+                thread.setDaemon(true);
+                thread.setName("E3DB background " + threadCount++);
+                return thread;
+              }
+            });
 
     if (Platform.isAndroid()) {
       // Post results to UI thread
@@ -308,12 +340,23 @@ public class  Client {
   }
 
   /**
+   * @return returns the public encryption key of the client
+   */
+  public byte[] getPublicEncryptionKey() {
+    return this.publicEncryptionKey;
+  }
+
+  public byte[] getPublicSigningKey() {
+    return this.publicSigningKey;
+  }
+
+  /**
    * Enables TLS v1.2 when creating SSLSockets.
    * <p/>
    * For some reason, android supports TLS v1.2 from API 16, but enables it by
    * default only from API 20.
    * <p>
-   *
+   * <p>
    * Thanks to https://github.com/square/okhttp/issues/2372#issuecomment-244807676.
    *
    * @link https://developer.android.com/reference/javax/net/ssl/SSLSocket.html
@@ -386,7 +429,7 @@ public class  Client {
         }
         X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
         SSLContext sc = SSLContext.getInstance(TlsVersion.TLS_1_2.javaName());
-        sc.init(null, new TrustManager[] { trustManager }, null);
+        sc.init(null, new TrustManager[]{trustManager}, null);
         client.sslSocketFactory(new Tls12SocketFactory(sc.getSocketFactory()), trustManager);
 
         ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
@@ -410,8 +453,13 @@ public class  Client {
     this.apiSecret = apiSecret;
     this.clientId = clientId;
     this.privateEncryptionKey = privateKey;
+    if (this.privateEncryptionKey != null) {
+      publicEncryptionKey = Platform.crypto.getPublicKey(privateEncryptionKey);
+    } else {
+      publicEncryptionKey = null;
+    }
     this.privateSigningKey = privateSigningKey;
-    if(this.privateSigningKey != null)
+    if (this.privateSigningKey != null)
       publicSigningKey = Platform.crypto.getPublicSigningKey(privateSigningKey);
     else
       publicSigningKey = null;
@@ -420,8 +468,24 @@ public class  Client {
 //            .addInterceptor(loggingInterceptor)
             .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host, certificatePinner)));
 
-    if (certificatePinner != null)
+    OkHttpClient.Builder tsv1ClientBuilder = enableTLSv12(new OkHttpClient.Builder()
+            .addInterceptor(new TSV1Interceptor(privateSigningKey, publicSigningKey, clientId)));
+
+    if (certificatePinner != null) {
       clientBuilder.certificatePinner(certificatePinner);
+      tsv1ClientBuilder.certificatePinner(certificatePinner);
+    }
+
+    ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new Jdk8Module())
+            .registerModule(new JavaTimeModule());
+
+    Retrofit tsv1Build = new Retrofit.Builder()
+            .callbackExecutor(uiExecutor)
+            .client(tsv1ClientBuilder.build())
+            .addConverterFactory(JacksonConverterFactory.create(mapper))
+            .baseUrl(host.resolve("/").toString())
+            .build();
 
     Retrofit build = new Retrofit.Builder()
             .callbackExecutor(uiExecutor)
@@ -431,6 +495,7 @@ public class  Client {
 
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
+    notesClient = tsv1Build.create(StorageV2API.class);
 
   }
 
@@ -494,6 +559,7 @@ public class  Client {
     public String host() {
       return host.toASCIIString();
     }
+
     @Override
     public boolean enabled() {
       return enabled;
@@ -529,6 +595,7 @@ public class  Client {
 
       return true;
     }
+
     @Override
     public int hashCode() {
       int result = writerId.hashCode();
@@ -561,6 +628,7 @@ public class  Client {
     public final CipherWithNonce edk; // encrypted data key
 
     public final CipherWithNonce ef; // encrypted field
+
     public ER(String quad) {
       int split = quad.indexOf(".", quad.indexOf(".") + 1);
       edk = CipherWithNonce.decode(quad.substring(0, split));
@@ -614,7 +682,7 @@ public class  Client {
   }
 
   private LocalEncryptedRecord makeEncryptedRecord(EAKInfo eakInfo, Map<String, String> data, ClientMeta clientMeta) throws E3DBCryptoException, JsonProcessingException {
-    if(Client.this.privateSigningKey == null)
+    if (Client.this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key to encrypt locally.");
 
     byte[] ak = decryptLocalEAKInfo(eakInfo);
@@ -640,6 +708,7 @@ public class  Client {
         }
       });
   }
+
   /**
    * Obtains a Tozny JWT, if necessary, and adds it to every request.
    */
@@ -689,14 +758,14 @@ public class  Client {
 
     private static FM getFileMeta(JsonNode fileMeta) {
       return new FM(fileMeta.has("size") ? fileMeta.get("size").asLong() : null,
-          fileMeta.has("file_url") ? fileMeta.get("file_url").asText() : null,
-          fileMeta.has("file_name") ? fileMeta.get("file_name").asText() : null,
-          fileMeta.has("checksum") ? fileMeta.get("checksum").asText() : null,
-          fileMeta.has("compression") ? Compression.fromType(fileMeta.get("compression").asText()) : null);
+              fileMeta.has("file_url") ? fileMeta.get("file_url").asText() : null,
+              fileMeta.has("file_name") ? fileMeta.get("file_name").asText() : null,
+              fileMeta.has("checksum") ? fileMeta.get("checksum").asText() : null,
+              fileMeta.has("compression") ? Compression.fromType(fileMeta.get("compression").asText()) : null);
     }
 
     public static R makeLocal(JsonNode rawMeta) throws ParseException {
-        return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
+      return new R(new HashMap<String, String>(), getRecordMeta(rawMeta));
     }
 
     private static Record makeLocal(byte[] accessKey, JsonNode rawMeta, JsonNode fields, byte[] signature, byte[] publicSigningKey) throws ParseException, E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
@@ -712,8 +781,8 @@ public class  Client {
 
       if (signature != null && publicSigningKey != null) {
         boolean verified = Platform.crypto.verify(new Signature(signature),
-            record.toSerialized().getBytes(UTF8),
-            publicSigningKey);
+                record.toSerialized().getBytes(UTF8),
+                publicSigningKey);
 
         if (!verified)
           throw new E3DBVerificationException(clientMeta(meta));
@@ -788,10 +857,10 @@ public class  Client {
       }
 
       this.authClient = new Retrofit.Builder()
-        .client(clientBuilder.build())
-        .baseUrl(host.resolve("/").toString())
-        .build()
-        .create(AuthAPI.class);
+              .client(clientBuilder.build())
+              .baseUrl(host.resolve("/").toString())
+              .build()
+              .create(AuthAPI.class);
     }
 
     @Override
@@ -817,6 +886,87 @@ public class  Client {
     }
   }
 
+  private static class TSV1Interceptor implements Interceptor {
+    private final byte[] privateSigningKey;
+    private final byte[] publicSigningKey;
+    private final UUID clientId;
+
+    TSV1Interceptor(byte[] privateSigningKey, byte[] publicSigningKey, UUID clientId) {
+      this.privateSigningKey = privateSigningKey;
+      this.publicSigningKey = publicSigningKey;
+      this.clientId = clientId;
+
+    }
+
+    @Override
+    public Response intercept(Chain chain) throws IOException {
+      Request req = chain.request();
+      HttpUrl url = req.url();
+      String canonicalURI = url.encodedPath();
+      String method = req.method();
+      String queryString = sortQueryParams(url);
+      try {
+        String signature = createTsv1Signature(privateSigningKey, publicSigningKey, clientId.toString(), queryString, canonicalURI, method);
+        return chain.proceed(req.newBuilder().addHeader("Authorization", signature).build());
+
+      } catch (Throwable e) {
+        throw new IOException(e);
+      }
+    }
+
+    private String sortQueryParams(HttpUrl url) {
+      ArrayList<String> params = new ArrayList<>();
+
+      for (String queryParameterName : url.queryParameterNames()) {
+        for (String queryParameterValue : url.queryParameterValues(queryParameterName)) {
+          params.add(queryParameterName + "=" + queryParameterValue);
+        }
+      }
+      Collections.sort(params);
+      StringJoiner paramBuilder = new StringJoiner("&");
+      for (String param : params) {
+        paramBuilder.add(param);
+      }
+      return paramBuilder.toString();
+    }
+  }
+
+  private static String createTsv1Signature(byte[] privateSigningKey, byte[] publicSigningKey, String clientID, String queryParams, String canonicalURI, String method) throws E3DBCryptoException {
+    String authenticationPrefix = "TSV1";
+    String hashingAlgorithim = "ED25519";
+    String signatureType = "BLAKE2B";
+    String authenticationMethod = new StringJoiner("-")
+            .add(authenticationPrefix)
+            .add(hashingAlgorithim)
+            .add(signatureType)
+            .toString();
+    String publicKeyBase64 = Base64.encodeURL(publicSigningKey);
+    long timestamp = Instant.now().getEpochSecond();
+    UUID nonce = UUID.randomUUID();
+    String userId;
+    if (clientID != null) {
+      userId = "uid:" + clientID;
+    } else {
+      userId = "uid:";
+    }
+    String headerString = new StringJoiner("; ")
+            .add(authenticationMethod)
+            .add(publicKeyBase64)
+            .add(String.valueOf(timestamp))
+            .add(nonce.toString())
+            .add(userId).toString();
+    String stringToSign = new StringJoiner("; ")
+            .add(canonicalURI)
+            .add(queryParams)
+            .add(method)
+            .add(headerString)
+            .toString();
+    byte[] hash = Platform.crypto.hashString(stringToSign);
+    String signature = Base64.encodeURL(Platform.crypto.signature(hash, privateSigningKey));
+    String header = new StringJoiner("; ").add(headerString).add(signature).toString();
+    return header;
+  }
+
   private class SD<T extends Signable> implements SignedDocument<T> {
     private final T document;
     private final String signature;
@@ -840,25 +990,25 @@ public class  Client {
   private QueryResponse doSearchRequest(QueryParams params) throws IOException, E3DBException, E3DBDecryptionException, ParseException {
     Map<String, Object> searchRequest = new HashMap<>();
 
-    if(params.after > 0)
+    if (params.after > 0)
       searchRequest.put("after_index", params.after);
 
-    if(params.count != -1)
+    if (params.count != -1)
       searchRequest.put("count", params.count);
 
-    if(params.includeData != null)
+    if (params.includeData != null)
       searchRequest.put("include_data", params.includeData.booleanValue());
 
-    if(params.writerIds != null)
+    if (params.writerIds != null)
       searchRequest.put("writer_ids", makeArray(params.writerIds));
 
-    if(params.includeAllWriters != null)
+    if (params.includeAllWriters != null)
       searchRequest.put("include_all_writers", params.includeAllWriters.booleanValue());
 
-    if(params.userIds != null)
+    if (params.userIds != null)
       searchRequest.put("user_ids", makeArray(params.userIds));
 
-    if(params.recordIds != null)
+    if (params.recordIds != null)
       searchRequest.put("record_ids", makeArray(params.recordIds));
 
     if (params.types != null)
@@ -880,9 +1030,9 @@ public class  Client {
       Record record;
       JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
-      if(access_key != null && access_key.isObject()) {
+      if (access_key != null && access_key.isObject()) {
         final String authorizerPublicKey;
-        switch(Platform.crypto.suite().getEncryptionKeyType()) {
+        switch (Platform.crypto.suite().getEncryptionKeyType()) {
           case Curve25519:
             authorizerPublicKey = access_key.get("authorizer_public_key").get("curve25519").asText();
             break;
@@ -902,8 +1052,7 @@ public class  Client {
                 null,
                 null
         );
-      }
-      else {
+      } else {
         record = makeR(queryRecord.get("meta"));
       }
       records.add(record);
@@ -915,7 +1064,7 @@ public class  Client {
   private String[] makeArray(List writerIds) {
     String[] objects = new String[writerIds.size()];
     int idx = 0;
-    for(Object id : writerIds) {
+    for (Object id : writerIds) {
       objects[idx++] = id.toString();
     }
     return objects;
@@ -927,7 +1076,7 @@ public class  Client {
       byte[] dk = Platform.crypto.newSecretKey();
 
       String encField = new StringBuilder(Platform.crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
-        .append(Platform.crypto.encryptSecretBox(entry.getValue().getBytes(UTF8), dk).toMessage()).toString();
+              .append(Platform.crypto.encryptSecretBox(entry.getValue().getBytes(UTF8), dk).toMessage()).toString();
       encFields.put(entry.getKey(), encField);
     }
     return encFields;
@@ -935,7 +1084,7 @@ public class  Client {
 
   private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws E3DBDecryptionException {
     Map<String, String> decryptedFields = new HashMap<>();
-    for(Map.Entry<String,String> entry : record.entrySet()) {
+    for (Map.Entry<String, String> entry : record.entrySet()) {
       ER er = new ER(entry.getValue());
       byte[] dk = Platform.crypto.decryptSecretBox(er.edk, accessKey);
       String value = new String(Platform.crypto.decryptSecretBox(er.ef, dk), UTF8);
@@ -949,28 +1098,27 @@ public class  Client {
     for (int i = 0; i < list.size(); i += 1) {
       JsonNode item = list.get(i);
       authorizers.add(new AP(UUID.fromString(item.get("authorizer_id").asText()),
-          UUID.fromString(item.get("writer_id").asText()),
-          UUID.fromString(item.get("user_id").asText()),
-          item.get("record_type").asText(),
-          UUID.fromString(item.get("authorized_by").asText())));
+              UUID.fromString(item.get("writer_id").asText()),
+              UUID.fromString(item.get("user_id").asText()),
+              item.get("record_type").asText(),
+              UUID.fromString(item.get("authorized_by").asText())));
     }
     return authorizers;
   }
 
   private byte[] getOwnAccessKey(String type) throws E3DBException, E3DBCryptoException, IOException {
     byte[] existingAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
-    if(existingAK != null) {
+    if (existingAK != null) {
       return existingAK;
-    }
-    else {
+    } else {
       // Create new AK
       try {
         setAccessKey(this.clientId, this.clientId, this.clientId, type, Platform.crypto.getPublicKey(this.privateEncryptionKey), Platform.crypto.newSecretKey(), this.clientId, this.publicSigningKey);
+      } catch (E3DBConflictException ex) {
       }
-      catch(E3DBConflictException ex) { }
 
       byte[] newAK = getAccessKey(this.clientId, this.clientId, this.clientId, type);
-      if(newAK == null)
+      if (newAK == null)
         throw new E3DBCryptoException("Unable to create own AK for " + this.clientId + " and type '" + type + "'");
 
       return newAK;
@@ -979,7 +1127,7 @@ public class  Client {
 
   private void removeAccessKey(UUID writerId, UUID userId, UUID readerId, String type) throws IOException, E3DBException {
     retrofit2.Response<ResponseBody> response = storageClient.deleteAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
-    if(response.code() != 204) {
+    if (response.code() != 204) {
       throw E3DBException.find(response.code(), response.message());
     }
 
@@ -996,7 +1144,7 @@ public class  Client {
     EAKCacheKey cacheEntry = new EAKCacheKey(writerId, userId, type);
     EAKEntry cachedEak = eakCache.get(cacheEntry);
 
-    if(cachedEak != null)
+    if (cachedEak != null)
       return cachedEak;
     else {
       retrofit2.Response<ResponseBody> response = storageClient.getAccessKey(writerId.toString(), userId.toString(), readerId.toString(), type).execute();
@@ -1009,7 +1157,7 @@ public class  Client {
         String eak = eakResponse.get("eak").asText();
         final String publicKey;
         {
-          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+          switch (Platform.crypto.suite().getEncryptionKeyType()) {
             case Curve25519:
               publicKey = eakResponse.get("authorizer_public_key").get("curve25519").asText();
               break;
@@ -1094,7 +1242,7 @@ public class  Client {
   }
 
   private static LocalEAKInfo toLocalEAK(EAKInfo eakInfo) {
-    if(eakInfo instanceof LocalEAKInfo)
+    if (eakInfo instanceof LocalEAKInfo)
       return (LocalEAKInfo) eakInfo;
     else
       return new LocalEAKInfo(eakInfo.getKey(), eakInfo.getPublicKey(), eakInfo.getAuthorizerId(), eakInfo.getSignerId(), eakInfo.getSignerSigningKey());
@@ -1113,7 +1261,7 @@ public class  Client {
     if (plain != null)
       meta.put("plain", plain);
 
-    if(fileMeta != null) {
+    if (fileMeta != null) {
       HashMap<String, Object> fm = new HashMap<>();
       fm.put("checksum", fileMeta.checksum());
       fm.put("compression", fileMeta.compression().getType());
@@ -1158,7 +1306,7 @@ public class  Client {
     }
     JsonNode info = mapper.readTree(clientInfo.body().string());
     final String publicKey;
-    switch(Platform.crypto.suite().getEncryptionKeyType()) {
+    switch (Platform.crypto.suite().getEncryptionKeyType()) {
       case Curve25519:
         publicKey = info.get("public_key").get("curve25519").asText();
         break;
@@ -1170,8 +1318,8 @@ public class  Client {
     }
     final String signingKey;
     {
-      if(!info.get("signing_key").isNull()) {
-        switch(Platform.crypto.suite().getSigningKeyType()) {
+      if (!info.get("signing_key").isNull()) {
+        switch (Platform.crypto.suite().getSigningKeyType()) {
           case Ed25519:
             signingKey = info.get("signing_key").get("ed25519").asText();
             break;
@@ -1181,8 +1329,7 @@ public class  Client {
           default:
             throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getSigningKeyType() + " not supported.");
         }
-      }
-      else
+      } else
         signingKey = null;
     }
     String cId = info.get("client_id").asText();
@@ -1196,10 +1343,9 @@ public class  Client {
           final byte[] readerKey = getClientInfo(readerId).getEncryptionKey();
           final byte[] writerSigningKey;
           {
-            if(writerId.equals(Client.this.clientId)) {
+            if (writerId.equals(Client.this.clientId)) {
               writerSigningKey = Client.this.publicSigningKey;
-            }
-            else {
+            } else {
               ClientInfo writerInfo = getClientInfo(writerId);
               writerSigningKey = writerInfo.getSigningKey();
             }
@@ -1207,7 +1353,7 @@ public class  Client {
 
           try {
             byte[] ak = getAccessKey(writerId, writerId, Client.this.clientId, type);
-            if(ak == null) {
+            if (ak == null) {
               setAccessKey(writerId, writerId, Client.this.clientId, type, readerKey, Platform.crypto.newSecretKey(), writerId, writerSigningKey);
               ak = getAccessKey(writerId, writerId, Client.this.clientId, type);
             }
@@ -1217,18 +1363,17 @@ public class  Client {
           }
 
           retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-              writerId.toString(),
-              writerId.toString(),
-              readerId.toString(),
-              type,
-              RequestBody.create(APPLICATION_JSON, allowRead)).execute();
+                  writerId.toString(),
+                  writerId.toString(),
+                  readerId.toString(),
+                  type,
+                  RequestBody.create(APPLICATION_JSON, allowRead)).execute();
 
           if (shareResponse.code() != 201)
             uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
           else
             uiValue(handleResult, null);
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handleResult, e);
         }
       }
@@ -1241,13 +1386,13 @@ public class  Client {
         try {
           removeAccessKey(writerId, writerId, readerId, type);
           retrofit2.Response<ResponseBody> shareResponse = shareClient.putPolicy(
-              writerId.toString(),
-              writerId.toString(),
-              readerId.toString(),
-              type,
-              RequestBody.create(APPLICATION_JSON, denyRead)).execute();
+                  writerId.toString(),
+                  writerId.toString(),
+                  readerId.toString(),
+                  type,
+                  RequestBody.create(APPLICATION_JSON, denyRead)).execute();
 
-          if(shareResponse.code() != 201)
+          if (shareResponse.code() != 201)
             uiError(handleResult, E3DBException.find(shareResponse.code(), shareResponse.message()));
           else
             uiValue(handleResult, null);
@@ -1259,9 +1404,8 @@ public class  Client {
   }
 
   /**
-   * @deprecated Use {@link #generateKey()}  instead.
-   *
    * @return A Base64URL-encoded string representing the new private key.
+   * @deprecated Use {@link #generateKey()}  instead.
    */
   @Deprecated
   public static String newPrivateKey() throws E3DBCryptoException {
@@ -1275,9 +1419,8 @@ public class  Client {
    * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
    *
    * @return A Base64URL-encoded string representing the new private key.
-   *
    */
-  public static String generateKey()  throws E3DBCryptoException{
+  public static String generateKey() throws E3DBCryptoException {
     return encodeURL(Platform.crypto.newPrivateKey());
   }
 
@@ -1285,7 +1428,7 @@ public class  Client {
    * Gets the public key for the given private key.
    *
    * <p>The private key must be a Base64URL-encoded string.
-   *
+   * <p>
    * The returned value represents the key as a Base64URL-encoded string.
    *
    * @param privateKey Curve25519 private key as a Base64URL-encoded string.
@@ -1305,7 +1448,6 @@ public class  Client {
    * <p>The associated public key can be retrieved using {@link #getPublicKey(String)}.
    *
    * @return A Base64URL-encoded string representing the new private key.
-   *
    */
   public static String generateSigningKey() throws E3DBCryptoException {
     return encodeURL(Platform.crypto.newPrivateSigningKey());
@@ -1315,7 +1457,7 @@ public class  Client {
    * Gets the public signing key for the given private key.
    *
    * <p>The private key must be a Base64URL-encoded string.
-   *
+   * <p>
    * The returned value represents the key as a Base64URL-encoded string.
    *
    * @param privateSigningKey Ed25519 private key as a Base64URL-encoded string.
@@ -1341,12 +1483,12 @@ public class  Client {
    * Registers a new client. This method creates a new public/private key pair for the client
    * to use when encrypting and decrypting records.
    *
-   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
-   * @param clientName Name of the client; for informational purposes only.
-   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param token             Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName        Name of the client; for informational purposes only.
+   * @param host              Host to register with. Should be {@code https://api.e3db.com}.
    * @param certificatePinner OkHttp CertificatePinner instance to restrict which certificates and authorities are trusted.
-   * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
-   *                     a secure location, and loaded later.
+   * @param handleResult      Handles the result of registration. The {@link Config} value can be converted to JSON, written to
+   *                          a secure location, and loaded later.
    */
   public static void register(final String token, final String clientName, final String host, final CertificatePinner certificatePinner, final ResultHandler<Config> handleResult) throws E3DBCryptoException {
     checkNotEmpty(token, "token");
@@ -1364,8 +1506,7 @@ public class  Client {
       public void handle(Result<ClientCredentials> r) {
         if (r.isError()) {
           executeError(uiExecutor, handleResult, r.asError().other());
-        }
-        else {
+        } else {
           try {
             final ClientCredentials credentials = r.asValue();
             Config info = new Config(credentials.apiKey(), credentials.apiSecret(), credentials.clientId(), clientName, credentials.host(), encodeURL(privateKey),
@@ -1388,9 +1529,9 @@ public class  Client {
    * Registers a new client. This method creates a new public/private key pair for the client
    * to use when encrypting and decrypting records.
    *
-   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
-   * @param clientName Name of the client; for informational purposes only.
-   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param token        Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName   Name of the client; for informational purposes only.
+   * @param host         Host to register with. Should be {@code https://api.e3db.com}.
    * @param handleResult Handles the result of registration. The {@link Config} value can be converted to JSON, written to
    *                     a secure location, and loaded later.
    */
@@ -1404,14 +1545,14 @@ public class  Client {
    * <p>This method does not create a private/public key pair; rather, the public key should be provided
    * by the caller.
    *
-   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
-   * @param clientName Name of the client; for informational purposes only.
-   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
-   *                  private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param token         Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName    Name of the client; for informational purposes only.
+   * @param publicKey     A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                      private key. Consider using {@link #generateKey()} to generate a private key.
    * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
    *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
-   * @param host Host to register with. Should be {@code https://api.e3db.com}.
-   * @param handleResult Handles the result of registration.
+   * @param host          Host to register with. Should be {@code https://api.e3db.com}.
+   * @param handleResult  Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final ResultHandler<ClientCredentials> handleResult) throws E3DBCryptoException {
     OkHttpClient client = enableTLSv12(new OkHttpClient.Builder()
@@ -1431,15 +1572,15 @@ public class  Client {
    * <a href="https://github.com/square/okhttp/wiki/HTTPS#certificate-pinning">implement</a> a {@code CertificatePinner}
    * instance and pass it.
    *
-   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
-   * @param clientName Name of the client; for informational purposes only.
-   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
-   *                  private key. Consider using {@link #generateKey()} to generate a private key.
-   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
-   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
-   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param token             Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName        Name of the client; for informational purposes only.
+   * @param publicKey         A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                          private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey     A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                          private key. Consider using {@link #generateSigningKey()} to generate a private key.
+   * @param host              Host to register with. Should be {@code https://api.e3db.com}.
    * @param certificatePinner OkHttp CertificatePinner instance to restrict which certificates and authorities are trusted.
-   * @param handleResult Handles the result of registration.
+   * @param handleResult      Handles the result of registration.
    */
   public static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final CertificatePinner certificatePinner, final ResultHandler<ClientCredentials> handleResult) throws E3DBCryptoException {
     checkNotNull(certificatePinner, "certificatePinner");
@@ -1453,15 +1594,15 @@ public class  Client {
   /**
    * Abstract helper method to enable registration with a pre-configured client instance.
    *
-   * @param token Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
-   * @param clientName Name of the client; for informational purposes only.
-   * @param publicKey A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
-   *                  private key. Consider using {@link #generateKey()} to generate a private key.
-   * @param publicSignKey A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
-   *                      private key. Consider using {@link #generateSigningKey()} to generate a private key.
-   * @param host Host to register with. Should be {@code https://api.e3db.com}.
+   * @param token           Registration token obtained from the Tozny console at <a href="https://console.tozny.com">https://console.tozny.com</a>.
+   * @param clientName      Name of the client; for informational purposes only.
+   * @param publicKey       A Base64URL-encoded string representing the public key associated with the client. Should be based on a Curve25519
+   *                        private key. Consider using {@link #generateKey()} to generate a private key.
+   * @param publicSignKey   A Base64URL-encoded string representing the public signing key associated with the client. Should be based on a Ed25519
+   *                        private key. Consider using {@link #generateSigningKey()} to generate a private key.
+   * @param host            Host to register with. Should be {@code https://api.e3db.com}.
    * @param anonymousClient OkHttpClient instance for making anonymous requests against the server.
-   * @param handleResult Handles the result of registration.
+   * @param handleResult    Handles the result of registration.
    */
   private static void register(final String token, final String clientName, final String publicKey, final String publicSignKey, final String host, final OkHttpClient anonymousClient, final ResultHandler<ClientCredentials> handleResult) {
     checkNotEmpty(token, "token");
@@ -1481,7 +1622,7 @@ public class  Client {
       public void run() {
         try {
           Map<String, String> publicKeyInfo = new HashMap<>();
-          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+          switch (Platform.crypto.suite().getEncryptionKeyType()) {
             case Curve25519:
               publicKeyInfo.put("curve25519", publicKey);
               break;
@@ -1493,7 +1634,7 @@ public class  Client {
           }
 
           Map<String, String> publicSignKeyInfo = new HashMap<>();
-          switch(Platform.crypto.suite().getEncryptionKeyType()) {
+          switch (Platform.crypto.suite().getEncryptionKeyType()) {
             case Curve25519:
               publicSignKeyInfo.put("ed25519", publicSignKey);
               break;
@@ -1525,7 +1666,7 @@ public class  Client {
             final String name = creds.get("name").asText();
             final String publicKey;
             {
-              switch(Platform.crypto.suite().getEncryptionKeyType()) {
+              switch (Platform.crypto.suite().getEncryptionKeyType()) {
                 case Curve25519:
                   publicKey = creds.get("public_key").get("curve25519").asText();
                   break;
@@ -1538,7 +1679,7 @@ public class  Client {
             }
             final String signingKey;
             {
-              switch(Platform.crypto.suite().getSigningKeyType()) {
+              switch (Platform.crypto.suite().getSigningKeyType()) {
                 case Ed25519:
                   signingKey = creds.get("signing_key").get("ed25519").asText();
                   break;
@@ -1564,15 +1705,15 @@ public class  Client {
    * Write the given file to E3DB. Intended for files from 5MB up to 5GB in size. The contents of the file are
    * encrypted before being uploaded.
    *
-   * @param type Type of the record. Cannot be {@code null} or blank.
-   * @param file Path to the file to upload. Cannot be {@code null}.
-   * @param plain Plaintext meta associated with the file. Can be {@code null}.
+   * @param type         Type of the record. Cannot be {@code null} or blank.
+   * @param file         Path to the file to upload. Cannot be {@code null}.
+   * @param plain        Plaintext meta associated with the file. Can be {@code null}.
    * @param handleResult Handles the result of the write.
    */
   public void writeFile(final String type, final File file, final Map<String, String> plain, final ResultHandler<RecordMeta> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(file, "file");
-    if(plain != null && plain.size() > 0)
+    if (plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     final File absFile = file.getAbsoluteFile();
@@ -1589,7 +1730,8 @@ public class  Client {
           record.put("meta", meta);
           record.put("data", new HashMap<>());
 
-          EXIT: {
+          EXIT:
+          {
             retrofit2.Response<ResponseBody> postResponse = storageClient.writeFile(RequestBody.create(APPLICATION_JSON, mapper.writeValueAsString(record))).execute();
             if (postResponse.code() != 202) {
               uiError(handleResult, E3DBException.find(postResponse.code(), postResponse.message()));
@@ -1602,10 +1744,10 @@ public class  Client {
 
             try {
               Response putFileResponse = anonymousClient.newCall(new Request.Builder()
-                                     .url(destURL)
-                                     .header("Content-MD5", fileMeta.checksum())
-                                     .put(RequestBody.create(APPLICATION_OCTET, encryptedFile))
-                                     .build()).execute();
+                      .url(destURL)
+                      .header("Content-MD5", fileMeta.checksum())
+                      .put(RequestBody.create(APPLICATION_OCTET, encryptedFile))
+                      .build()).execute();
               if (putFileResponse.code() != 200) {
                 uiError(handleResult, E3DBException.find(putFileResponse.code(), putFileResponse.body().string()));
                 break EXIT;
@@ -1632,8 +1774,8 @@ public class  Client {
   /**
    * Read the file associated with the given record from the server.
    *
-   * @param recordId ID of the record. Cannot be {@code null}.
-   * @param dest Destination to write the decrypted file to. Cannot be {@code null}. If the file exists, it will be truncated.
+   * @param recordId     ID of the record. Cannot be {@code null}.
+   * @param dest         Destination to write the decrypted file to. Cannot be {@code null}. If the file exists, it will be truncated.
    * @param handleResult Handles the result of the operation. If the operation completes successfully, the
    *                     destination will hold the contents of the unencrypted file.
    *
@@ -1645,7 +1787,7 @@ public class  Client {
       checkNotNull(recordId, "recordId");
       checkNotNull(dest, "dest");
       final File absDest = dest.getAbsoluteFile();
-      if(! absDest.canWrite())
+      if (!absDest.canWrite())
         throw new IOException("Can't write to " + dest);
 
       onBackground(new Runnable() {
@@ -1664,10 +1806,10 @@ public class  Client {
             JsonNode result = mapper.readTree(response.body().string());
             JsonNode meta = result.get("meta");
             EAKEntry eak = getEAK(UUID.fromString(meta.get("writer_id").asText()),
-                UUID.fromString(meta.get("user_id").asText()),
-                clientId, meta.get("type").asText());
+                    UUID.fromString(meta.get("user_id").asText()),
+                    clientId, meta.get("type").asText());
 
-            if(eak == null) {
+            if (eak == null) {
               uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
               return;
             }
@@ -1675,9 +1817,9 @@ public class  Client {
             JsonNode fileMeta = meta.get("file_meta");
             String signedUrl = fileMeta.get("file_url").asText();
             Response getFileResponse = anonymousClient.newCall(new Request.Builder()
-                                                                   .url(signedUrl)
-                                                                   .get()
-                                                                   .build()).execute();
+                    .url(signedUrl)
+                    .get()
+                    .build()).execute();
             ResponseBody fileBody = getFileResponse.body();
             InputStream in = fileBody.byteStream();
             File encrypted = File.createTempFile("enc-", ".bin", new File(absDest.getParent()));
@@ -1685,16 +1827,14 @@ public class  Client {
               FileOutputStream out = new FileOutputStream(encrypted);
               try {
                 byte[] bytes = new byte[65_536];
-                for(int amt = in.read(bytes); amt != -1; amt = in.read(bytes)) {
+                for (int amt = in.read(bytes); amt != -1; amt = in.read(bytes)) {
                   out.write(bytes, 0, amt);
                 }
-              }
-              finally {
+              } finally {
                 out.close();
               }
 
-            }
-            finally {
+            } finally {
               in.close();
               fileBody.close();
             }
@@ -1702,8 +1842,7 @@ public class  Client {
             Platform.crypto.decryptFile(encrypted, eak.ak, absDest);
             encrypted.delete();
             uiValue(handleResult, R.getRecordMeta(meta));
-          }
-          catch(Throwable e) {
+          } catch (Throwable e) {
             uiError(handleResult, e);
           }
         }
@@ -1714,17 +1853,212 @@ public class  Client {
   }
 
   /**
+   * Write a new client associated note.
+   *
+   * @param fields Record data to be encrypted
+   * @param recipientEncryptionKey public encryption key for the reader
+   * @param recipientSigningKey public signing key for the reader
+   * @param options options for the note
+   * @param handleResult Result of the operation. If successful, returns the requested note
+   * @throws IllegalArgumentException if fields,
+   */
+  public void writeNote(
+          final RecordData fields,
+          final byte[] recipientEncryptionKey,
+          final byte[] recipientSigningKey,
+          final NoteOptions options,
+          final ResultHandler<Note> handleResult) throws IllegalArgumentException {
+    internalWriteNote(
+            this.clientId,
+            fields,
+            options,
+            recipientEncryptionKey,
+            recipientSigningKey,
+            this.publicSigningKey,
+            this.privateEncryptionKey,
+            this.notesClient,
+            handleResult);
+  }
+
+
+  protected void internalWriteNote(
+          final UUID clientId,
+          final RecordData fields,
+          NoteOptions noteOptions,
+          final byte[] recipientEncryptionKey,
+          final byte[] recipientSigningKey,
+          final byte[] writerSigningKey,
+          final byte[] privateEncryptionKey,
+          final StorageV2API notesClient,
+          final ResultHandler<Note> handleResult) throws IllegalArgumentException {
+    checkNotNull(fields, "fields");
+    final NoteOptions options = (noteOptions == null)? new NoteOptions(): noteOptions;
+    checkNotNull(recipientEncryptionKey, "Recipient Encryption Key");
+    checkNotNull(recipientSigningKey, "Recipient Signing Key");
+    checkNotNull(writerSigningKey, "Writer Signing Key");
+    checkNotNull(privateEncryptionKey, "Private Encryption Key");
+
+
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          byte[] ak = Platform.crypto.newSecretKey();
+          String eak = Platform.crypto.encryptBox(ak, recipientEncryptionKey, privateEncryptionKey).toMessage();
+          Map<String, String> encFields = encryptObject(ak, fields.getCleartext());
+
+          Note note = new Note(
+                  options.noteName,
+                  clientId.toString(),
+                  Platform.crypto.suite().toString(),
+                  encodeURL(recipientSigningKey),
+                  encodeURL(writerSigningKey),
+                  encodeURL(Platform.crypto.getPublicKey(privateEncryptionKey)),
+                  eak,
+                  options.noteType,
+                  encFields,
+                  options.plain,
+                  options.fileMeta,
+                  "signature", //This is still todo
+                  options.maxViews,
+                  options.expiration,
+                  options.expires
+          );
+          // TODO: NEED TO SIGN ALL THESE NOTES IN A WAY THAT MATCHES JS implementation
+          retrofit2.Response<Note> noteResponse = notesClient.writeNote(note).execute();
+          if (noteResponse.isSuccessful()) {
+            Note retrievedNote = noteResponse.body();
+            decryptNote(retrievedNote);
+            uiValue(handleResult, retrievedNote);
+          } else {
+            uiError(handleResult, E3DBException.find(noteResponse.code(), noteResponse.message()));
+          }
+        } catch (final Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  /**
+   * Reads a note with the given noteName.
+   * @param noteName user specificied premium noteName of the note.
+   * @param handleResult Result of the operation. If successful, returns the requested note
+   * @throws IllegalArgumentException if both noteName is null
+   */
+  public void readNoteByName(String noteName, final ResultHandler<Note> handleResult) throws IllegalArgumentException  {
+    checkNotEmpty(noteName, "noteName");
+    internalReadNote(null, noteName, handleResult);
+  }
+
+  /**
+   * Reads a note with the given noteID.
+   * @param noteID canonical ID of the note
+   * @param handleResult Result of the operation. If successful, returns the requested note
+   * @throws IllegalArgumentException if both noteID is null
+   */
+  public void readNoteByID(UUID noteID, final ResultHandler<Note> handleResult) throws IllegalArgumentException  {
+    checkNotNull(noteID, "noteID");
+    internalReadNote(noteID, null, handleResult);
+  }
+
+  /**
+   * Reads a note with the given noteID or noteName. If noteID and noteName are both provided
+   * and do not reference the same note which will be returned is undefined.
+   * @param noteID canonical ID of the note
+   * @param noteName user specificied premium noteName of the note.
+   * @param handleResult Result of the operation. If successful, returns the requested note
+   * @throws IllegalArgumentException if both lookup values are null
+   */
+  private void internalReadNote(final UUID noteID, final String noteName,  final ResultHandler<Note> handleResult) throws IllegalArgumentException {
+    if (noteID == null && noteName == null) {
+      throw new IllegalArgumentException("At least one of noteID and noteName must not be null");
+    }
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<Note> noteResponse = notesClient.getNote(noteID, noteName).execute();
+          if (noteResponse.isSuccessful()) {
+            Note note = noteResponse.body();
+            decryptNote(note);
+            uiValue(handleResult, note);
+
+            //TODO signature verify
+          } else if (noteResponse.code() == 404){
+            if (noteID != null) {
+              uiError(handleResult, new E3DBNotFoundException(noteID));
+            } else {
+              uiError(handleResult, new E3DBNotFoundException(noteName));
+            }
+          } else {
+            uiError(handleResult, E3DBException.find(noteResponse.code(), "Error while reading note"));
+          }
+        } catch (Throwable e) {
+          uiError(handleResult, e);
+        }
+
+      }
+    });
+  }
+
+  private void decryptNote(Note note) throws E3DBDecryptionException {
+    Map<String, String> encryptedData = note.getData();
+    String eak = note.getEAK();
+    byte[] accessKey = Platform.crypto.decryptBox(
+            CipherWithNonce.decode(eak),
+            decodeURL(note.getWriterEncryptionKey()),
+            privateEncryptionKey);
+    note.data = decryptObject(accessKey, encryptedData);
+  }
+
+
+  /**
+   * Deletes a note with the given noteID.
+   * @param noteID canonical ID of the note
+   * @param handleResult Result of the operation. If successful, returns Void
+   * @throws IllegalArgumentException if noteID is null
+   */
+  public void deleteNote(final UUID noteID, final ResultHandler<Void> handleResult) throws IllegalArgumentException {
+    internalDeleteNote(noteID, handleResult);
+  }
+
+  private void internalDeleteNote(final UUID noteID, final ResultHandler<Void> handleResult) throws IllegalArgumentException {
+    checkNotNull(noteID, "noteID");
+    onBackground(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          retrofit2.Response<Void> notesResponse = notesClient.deleteNote(noteID).execute();
+          if (notesResponse.isSuccessful()) {
+            uiValue(handleResult, null);
+          } else if (notesResponse.code() == 404){
+            uiError(handleResult, new E3DBNotFoundException(noteID));
+          } else {
+            uiError(handleResult, E3DBException.find(notesResponse.code(), "Error deleting note"));
+          }
+        } catch (IOException e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+
+
+
+  /**
    * Write a new record.
    *
-   * @param type Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
-   * @param fields Values to encrypt and store.
-   * @param plain Additional, user-defined metadata that will <b>NOT</b> be encrypted. Can be null.
+   * @param type         Describes the type of the record (e.g., "contact_info", "credit_card", etc.).
+   * @param fields       Values to encrypt and store.
+   * @param plain        Additional, user-defined metadata that will <b>NOT</b> be encrypted. Can be null.
    * @param handleResult Result of the operation. If successful, returns the newly written record .
    */
   public void write(final String type, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotEmpty(type, "type");
     checkNotNull(fields, "fields");
-    if(plain != null && plain.size() > 0)
+    if (plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     onBackground(new Runnable() {
@@ -1744,12 +2078,12 @@ public class  Client {
           if (response.code() == 201) {
             JsonNode result = mapper.readTree(response.body().string());
             uiValue(handleResult,
-                makeR(
-                    ownAK,
-                    result.get("meta"),
-                    result.get("data"),
-                    null,
-                    Client.this.publicSigningKey));
+                    makeR(
+                            ownAK,
+                            result.get("meta"),
+                            result.get("data"),
+                            null,
+                            Client.this.publicSigningKey));
           } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
@@ -1760,20 +2094,22 @@ public class  Client {
     });
   }
 
+
   /**
    * Replace the given record with new data and plaintext metadata.
    *
    * <p>The {@code updateMeta} argument is only used to obtain
    * information about the record to replace. No metadata updates by
    * the client are allowed.
-   * @param updateMeta Metadata describing the record to update. Can be obtained
-   *                   from an existing {@link RecordMeta} instance using {@link LocalUpdateMeta#fromRecordMeta(RecordMeta)}.
-   * @param fields Field names and values. Wrapped in a {@link
-   *               RecordData} instance to prevent confusing with the
-   *               {@code plain} parameter.
-   * @param plain Any metadata associated with the record that will
-   *              <b>NOT</b> be encrypted. If {@code null}, existing
-   *              metadata will be removed.
+   *
+   * @param updateMeta   Metadata describing the record to update. Can be obtained
+   *                     from an existing {@link RecordMeta} instance using {@link LocalUpdateMeta#fromRecordMeta(RecordMeta)}.
+   * @param fields       Field names and values. Wrapped in a {@link
+   *                     RecordData} instance to prevent confusing with the
+   *                     {@code plain} parameter.
+   * @param plain        Any metadata associated with the record that will
+   *                     <b>NOT</b> be encrypted. If {@code null}, existing
+   *                     metadata will be removed.
    * @param handleResult If the update succeeds, returns the updated
    *                     record. If the update fails due to a version
    *                     conflict, the value passed to the {@link
@@ -1784,7 +2120,7 @@ public class  Client {
   public void update(final UpdateMeta updateMeta, final RecordData fields, final Map<String, String> plain, final ResultHandler<Record> handleResult) {
     checkNotNull(updateMeta, "updateMeta");
     checkNotNull(fields, "fields");
-    if(plain != null && plain.size() > 0)
+    if (plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     onBackground(new Runnable() {
@@ -1811,8 +2147,7 @@ public class  Client {
                             result.get("data"),
                             null,
                             null));
-          }
-          else {
+          } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
         } catch (Throwable e) {
@@ -1825,10 +2160,10 @@ public class  Client {
   /**
    * Deletes a given record.
    *
-   * @param recordId ID of the record to delete. Obtained from {@link RecordMeta#recordId()}.
-   * @param version Version associated with the record. Obtained from {@link RecordMeta#version()}.
+   * @param recordId     ID of the record to delete. Obtained from {@link RecordMeta#recordId()}.
+   * @param version      Version associated with the record. Obtained from {@link RecordMeta#version()}.
    * @param handleResult If the deletion succeeds, returns no useful information. If the delete fails due to a version conflict, the value passed to the {@link ResultHandler#handle(Result)}} method return an instance of
-   * {@link E3DBVersionException} when {@code asError().error()} is called.
+   *                     {@link E3DBVersionException} when {@code asError().error()} is called.
    */
   public void delete(final UUID recordId, final String version, final ResultHandler<Void> handleResult) {
     checkNotNull(recordId, "recordId");
@@ -1841,10 +2176,9 @@ public class  Client {
           retrofit2.Response<ResponseBody> response = storageClient.deleteRecord(recordId.toString(), version.toString()).execute();
           if (response.code() == 409) {
             uiError(handleResult, new E3DBVersionException(recordId, version));
-          } else if(response.code() == 204) {
+          } else if (response.code() == 204) {
             uiValue(handleResult, null);
-          }
-          else {
+          } else {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
           }
         } catch (Throwable e) {
@@ -1857,8 +2191,8 @@ public class  Client {
   /**
    * Read a record.
    *
-   * @param recordId ID of the record to read. Especially useful with {@code query} results that do not include
-   *                 the actual data.
+   * @param recordId     ID of the record to read. Especially useful with {@code query} results that do not include
+   *                     the actual data.
    * @param handleResult If successful, return the record read.
    */
   public void read(final UUID recordId, final ResultHandler<Record> handleResult) {
@@ -1882,7 +2216,7 @@ public class  Client {
                   UUID.fromString(meta.get("user_id").asText()),
                   clientId, meta.get("type").asText());
 
-          if(eak == null) {
+          if (eak == null) {
             uiError(handleResult, new E3DBUnauthorizedException("Can't read records of type " + meta.get("type").asText()));
             return;
           }
@@ -1902,7 +2236,7 @@ public class  Client {
    * <p>By default, results are limited to 50 records and do not include encrypted data (a separate
    * read must be made to get the data for a record).
    *
-   * @param params The criteria to filter records by. Use the {@link QueryParamsBuilder} class to make this object.
+   * @param params       The criteria to filter records by. Use the {@link QueryParamsBuilder} class to make this object.
    * @param handleResult If successful, returns a page of results. The {@link QueryResponse#last()} method can be used
    *                     in conjunction with the {@link QueryParamsBuilder#setAfter(long)} method to implement pagination.
    */
@@ -1929,9 +2263,9 @@ public class  Client {
    *
    * <p>This method should be called by a client authorized to share on behalf of the given writer.</p>
    *
-   * @param writer ID of the client that produces the records.
-   * @param type The type of records to grant access to.
-   * @param readerId ID of client which will be allowed to read the records.
+   * @param writer       ID of the client that produces the records.
+   * @param type         The type of records to grant access to.
+   * @param readerId     ID of client which will be allowed to read the records.
    * @param handleResult If successful, returns no useful information (except that the operation
    *                     completed).
    */
@@ -1949,8 +2283,8 @@ public class  Client {
    * <p>This operation gives read access for records of {@code type}, written by this client, to the
    * the recipient specified by {@code readerId}.
    *
-   * @param type The type of records to grant access to.
-   * @param readerId ID of client which will be allowed to read the records.
+   * @param type         The type of records to grant access to.
+   * @param readerId     ID of client which will be allowed to read the records.
    * @param handleResult If successful, returns no useful information (except that the operation
    *                     completed).
    */
@@ -1967,8 +2301,8 @@ public class  Client {
    * <p>This operation removes previously granted permission for the client specified by {@code readerId} to
    * read records, written by this client, of type {@code type}.
    *
-   * @param type The type of records to remove access to.
-   * @param readerId ID of client to remove access from.
+   * @param type         The type of records to remove access to.
+   * @param readerId     ID of client to remove access from.
    * @param handleResult If successful, returns no useful information (except that the operation
    *                     completed).
    */
@@ -1984,9 +2318,9 @@ public class  Client {
    *
    * <p>This method should be called by a client authorized to share on behalf of the writer.
    *
-   * @param writerId Writer that produces the records
-   * @param type Record type to revoke permission for.
-   * @param readerId Reader who's permission will be revoked.
+   * @param writerId     Writer that produces the records
+   * @param type         Record type to revoke permission for.
+   * @param readerId     Reader who's permission will be revoked.
    * @param handleResult If successful, returns no useful information (except that the operation
    *                     completed).
    */
@@ -2003,6 +2337,7 @@ public class  Client {
    *
    * <p>This operation lists all record types shared with this client, as well as the client (writer)
    * sharing those records.
+   *
    * @param handleResult If successful, returns a list of records types shared with this client. The resulting list may be empty but never null.
    */
   public void getIncomingSharing(final ResultHandler<List<IncomingSharingPolicy>> handleResult) {
@@ -2011,15 +2346,15 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> response = shareClient.getIncoming().execute();
-          if(response.code() != 200) {
+          if (response.code() != 200) {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
             return;
           }
 
           JsonNode results = mapper.readTree(response.body().string());
           ArrayList<IncomingSharingPolicy> policies = new ArrayList<>(results.size());
-          if(results.isArray()) {
-            for(JsonNode policy : results) {
+          if (results.isArray()) {
+            for (JsonNode policy : results) {
               String writer_name = policy.get("writer_name") == null ? "" : policy.get("writer_name").asText();
               String writer_id = policy.get("writer_id").asText();
               String record_type = policy.get("record_type").asText();
@@ -2040,6 +2375,7 @@ public class  Client {
    *
    * <p>This operation returns a list of record types shared by this client, including the
    * client (reader) that the records are shared with.
+   *
    * @param handleResult If successful, returns a list of record types that this client has shared. The resulting list may be empty but will never be null.
    */
   public void getOutgoingSharing(final ResultHandler<List<OutgoingSharingPolicy>> handleResult) {
@@ -2048,15 +2384,15 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> response = shareClient.getOutgoing().execute();
-          if(response.code() != 200) {
+          if (response.code() != 200) {
             uiError(handleResult, E3DBException.find(response.code(), response.message()));
             return;
           }
 
           JsonNode results = mapper.readTree(response.body().string());
           ArrayList<OutgoingSharingPolicy> policies = new ArrayList<>(results.size());
-          if(results.isArray()) {
-            for(JsonNode policy : results) {
+          if (results.isArray()) {
+            for (JsonNode policy : results) {
               String reader_name = policy.get("reader_name") == null ? "" : policy.get("reader_name").asText();
               String reader_id = policy.get("reader_id").asText();
               String record_type = policy.get("record_type").asText();
@@ -2075,7 +2411,7 @@ public class  Client {
   /**
    * Creates (or retrieves) a key that can be used to locally encrypt records.
    *
-   * @param type Type of the records to encrypt.
+   * @param type         Type of the records to encrypt.
    * @param handleResult Handle the LocalEAKInfo object retrieved.
    */
   public void createWriterKey(final String type, final ResultHandler<LocalEAKInfo> handleResult) {
@@ -2085,13 +2421,13 @@ public class  Client {
         try {
           try {
             setAccessKey(Client.this.clientId,
-                Client.this.clientId,
-                Client.this.clientId,
-                type,
-                Platform.crypto.getPublicKey(Client.this.privateEncryptionKey),
-                Platform.crypto.newSecretKey(),
-                Client.this.clientId,
-                Client.this.publicSigningKey);
+                    Client.this.clientId,
+                    Client.this.clientId,
+                    type,
+                    Platform.crypto.getPublicKey(Client.this.privateEncryptionKey),
+                    Platform.crypto.newSecretKey(),
+                    Client.this.clientId,
+                    Client.this.publicSigningKey);
           } catch (E3DBConflictException e) {
             // no-op
           }
@@ -2110,9 +2446,10 @@ public class  Client {
 
   /**
    * Retrieve a key for reading a shared record.
-   * @param writerId ID of the client that wrote the record.
-   * @param userId ID of the user associated with the record (normally equal to {@code writerId}).
-   * @param type Type of record that was shared.
+   *
+   * @param writerId     ID of the client that wrote the record.
+   * @param userId       ID of the user associated with the record (normally equal to {@code writerId}).
+   * @param type         Type of record that was shared.
    * @param handleResult Handle the LocalEAKInfo object retrieved.
    */
   public void getReaderKey(final UUID writerId, final UUID userId, final String type, final ResultHandler<LocalEAKInfo> handleResult) {
@@ -2121,12 +2458,11 @@ public class  Client {
       public void run() {
         try {
           EAKEntry eak = getEAK(writerId, userId, Client.this.clientId, type);
-          if(eak == null)
+          if (eak == null)
             uiError(handleResult, new E3DBException("Access key not found."));
           else
             uiValue(handleResult, eak.eakInfo);
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handleResult, e);
         }
       }
@@ -2136,10 +2472,10 @@ public class  Client {
   /**
    * Decrypt a locally-encrypted record.
    *
-   * @param record The record to decrypt.
+   * @param record  The record to decrypt.
    * @param eakInfo The key to use for decrypting.
-   * @throws E3DBVerificationException Thrown when verification of the signature fails.
    * @return The decrypted record.
+   * @throws E3DBVerificationException Thrown when verification of the signature fails.
    */
   public LocalRecord decryptExisting(EncryptedRecord record, EAKInfo eakInfo) throws E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
     if (eakInfo.getSignerSigningKey() == null || eakInfo.getSignerSigningKey().isEmpty())
@@ -2149,8 +2485,8 @@ public class  Client {
 
     Map<String, String> plainRecord = decryptObject(ak, record.document().data());
 
-    if(!verify(new SD<>(new LocalRecord(plainRecord, record.document().meta()),
-        record.signature()), eakInfo.getSignerSigningKey()))
+    if (!verify(new SD<>(new LocalRecord(plainRecord, record.document().meta()),
+            record.signature()), eakInfo.getSignerSigningKey()))
       throw new E3DBVerificationException(record.document().meta());
 
     return new LocalRecord(plainRecord, record.document().meta());
@@ -2159,7 +2495,7 @@ public class  Client {
   /**
    * Sign &amp; encrypt an existing record for local storage.
    *
-   * @param record The record to encrypt.
+   * @param record  The record to encrypt.
    * @param eakInfo The key to use for encrypting.
    * @return The encrypted record.
    */
@@ -2173,9 +2509,9 @@ public class  Client {
   /**
    * Sign &amp; encrypt a record for local storage.
    *
-   * @param type The type of the record.
-   * @param data Fields to encrypt.
-   * @param plain Plaintext metadata which will be stored with the record.
+   * @param type    The type of the record.
+   * @param data    Fields to encrypt.
+   * @param plain   Plaintext metadata which will be stored with the record.
    * @param eakInfo The key to use for encrypting.
    * @return The encrypted record.
    */
@@ -2185,7 +2521,7 @@ public class  Client {
     checkNotNull(eakInfo, "eakInfo");
     checkMap(data.getCleartext(), "data.getCleartext()");
 
-    if(plain != null && plain.size() > 0)
+    if (plain != null && plain.size() > 0)
       checkMap(plain, "plain");
 
     return makeEncryptedRecord(eakInfo, data.getCleartext(), new LocalMeta(this.clientId, this.clientId, type, plain));
@@ -2196,19 +2532,19 @@ public class  Client {
    *
    * @param document The document to sign. Consider using {@link LocalRecord}, which implements the
    *                 {@link Signable} interface.
-   * @param <T> T.
+   * @param <T>      T.
    * @return A {@link SignedDocument} instance, holding the document given and a signature
    * for it.
    */
   public <T extends Signable> SignedDocument<T> sign(T document) throws JsonProcessingException, E3DBCryptoException {
     checkNotNull(document, "document");
-    if(this.privateSigningKey == null)
+    if (this.privateSigningKey == null)
       throw new IllegalStateException("Client must have a signing key.");
 
     return new SD<>(document, Base64.encodeURL(
-      Platform.crypto.signature(
-        document.toSerialized().getBytes(UTF8), this.privateSigningKey
-      )
+            Platform.crypto.signature(
+                    document.toSerialized().getBytes(UTF8), this.privateSigningKey
+            )
     ));
   }
 
@@ -2220,7 +2556,7 @@ public class  Client {
    * <li>Derived from the document given.
    * </ul>
    *
-   * @param signedDocument Document and signature to verify.
+   * @param signedDocument   Document and signature to verify.
    * @param publicSigningKey Public portion of the Ed25519 key used to produce the signature, as a Base64URL-encoded
    *                         string.
    * @return {@code true} if the signature matches; {@code false} otherwise.
@@ -2249,7 +2585,7 @@ public class  Client {
    *
    * @param authorizer ID of the authorizer. Canot be {@code null}.
    * @param recordType Record type to give authorizer ability to share. Canot be {@code null}.
-   * @param handler Handles result of the call.
+   * @param handler    Handles result of the call.
    */
   public void addAuthorizer(final UUID authorizer, final String recordType, final ResultHandler<Void> handler) {
     checkNotNull(authorizer, "authorizer");
@@ -2263,23 +2599,21 @@ public class  Client {
           byte[] ak = getOwnAccessKey(recordType);
           try {
             setAccessKey(Client.this.clientId, Client.this.clientId, authorizer, recordType, authorizerInfo.getEncryptionKey(), ak, Client.this.clientId, Client.this.publicSigningKey);
-          }
-          catch(E3DBConflictException e) {
+          } catch (E3DBConflictException e) {
             // safe to ignore, it means this client has already been authorized.
           }
           retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
-              Client.this.clientId.toString(),
-              authorizer.toString(),
-              recordType,
-              RequestBody.create(APPLICATION_JSON, allowAuthorizer)
+                  Client.this.clientId.toString(),
+                  authorizer.toString(),
+                  recordType,
+                  RequestBody.create(APPLICATION_JSON, allowAuthorizer)
           ).execute();
 
-          if(putResponse.code() != 201)
+          if (putResponse.code() != 201)
             throw E3DBException.find(putResponse.code(), putResponse.message() + ": unable to write policy: ");
 
           uiValue(handler, null);
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handler, e);
         }
       }
@@ -2295,7 +2629,7 @@ public class  Client {
    * <p>No error occurs if the client did not have permission in the first place.
    *
    * @param authorizer ID of the authorizer. Cannot be {@code null}.
-   * @param handler Handles the result of the operation.
+   * @param handler    Handles the result of the operation.
    */
   public void removeAuthorizer(final UUID authorizer, final ResultHandler<Void> handler) {
     checkNotNull(authorizer, "authorizer");
@@ -2304,16 +2638,15 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> deleteResponse = shareClient.deletePolicy(Client.this.clientId.toString(),
-              Client.this.clientId.toString(),
-              authorizer.toString()
+                  Client.this.clientId.toString(),
+                  authorizer.toString()
           ).execute();
 
-          if(deleteResponse.code() != 200)
+          if (deleteResponse.code() != 200)
             throw E3DBException.find(deleteResponse.code(), deleteResponse.message() + ": could not remove authorizer.");
 
           uiValue(handler, null);
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handler, e);
         }
       }
@@ -2330,7 +2663,7 @@ public class  Client {
    *
    * @param authorizer ID of the authorizer. Cannot be {@code null}.
    * @param recordType Type of record. Cannot be blank or {@code null}.
-   * @param handler Handles the result of the operation.
+   * @param handler    Handles the result of the operation.
    */
   public void removeAuthorizer(final UUID authorizer, final String recordType, final ResultHandler<Void> handler) {
     checkNotNull(authorizer, "authorizer");
@@ -2341,18 +2674,17 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> putResponse = shareClient.putPolicy(Client.this.clientId.toString(),
-              Client.this.clientId.toString(),
-              authorizer.toString(),
-              recordType,
-              RequestBody.create(APPLICATION_JSON, denyAuthorizer)
+                  Client.this.clientId.toString(),
+                  authorizer.toString(),
+                  recordType,
+                  RequestBody.create(APPLICATION_JSON, denyAuthorizer)
           ).execute();
 
-          if(putResponse.code() != 201)
+          if (putResponse.code() != 201)
             throw E3DBException.find(putResponse.code(), putResponse.message() + ": could not remove authorizer.");
 
           uiValue(handler, null);
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handler, e);
         }
       }
@@ -2374,14 +2706,13 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> getResponse = shareClient.getProxies().execute();
-          if(getResponse.code() != 200)
+          if (getResponse.code() != 200)
             throw E3DBException.find(getResponse.code(), getResponse.message() + ": unable to get authorizers.");
 
           uiValue(handler, getAuthorizerPolicies(
-              mapper.readTree(getResponse.body().byteStream())
+                  mapper.readTree(getResponse.body().byteStream())
           ));
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handler, e);
         }
       }
@@ -2403,14 +2734,13 @@ public class  Client {
       public void run() {
         try {
           retrofit2.Response<ResponseBody> getResponse = shareClient.getGranted().execute();
-          if(getResponse.code() != 200)
+          if (getResponse.code() != 200)
             throw E3DBException.find(getResponse.code(), getResponse.message() + ": unable to get authorized by list.");
 
           uiValue(handler, getAuthorizerPolicies(
-              mapper.readTree(getResponse.body().byteStream())
+                  mapper.readTree(getResponse.body().byteStream())
           ));
-        }
-        catch(Throwable e) {
+        } catch (Throwable e) {
           uiError(handler, e);
         }
       }

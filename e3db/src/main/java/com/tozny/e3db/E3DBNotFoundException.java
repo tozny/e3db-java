@@ -33,9 +33,17 @@ public class E3DBNotFoundException extends E3DBException {
    * ID of Record that could not be found.
    */
   public final UUID recordId;
+  public final String recordName;
 
   public E3DBNotFoundException(UUID recordId) {
     super(recordId.toString() + " not found");
     this.recordId = recordId;
+    this.recordName = "";
+  }
+
+  public E3DBNotFoundException(String recordName) {
+    super(recordName + " not found");
+    this.recordName = recordName;
+    this.recordId = new UUID(0,0);
   }
 }

@@ -25,6 +25,7 @@ import com.goterl.lazycode.lazysodium.LazySodiumJava;
 import com.goterl.lazycode.lazysodium.SodiumJava;
 import com.goterl.lazycode.lazysodium.exceptions.SodiumException;
 import com.goterl.lazycode.lazysodium.interfaces.Box;
+import com.goterl.lazycode.lazysodium.interfaces.GenericHash;
 import com.goterl.lazycode.lazysodium.interfaces.SecretBox;
 import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
 import com.goterl.lazycode.lazysodium.interfaces.Sign;
@@ -295,6 +296,17 @@ class PlainCrypto implements Crypto {
           throw new E3DBDecryptionException("Invalid file.");
       }
     }
+  }
+
+  @Override
+  public byte[] hashString(String message) throws E3DBCryptoException {
+    byte[] out = new byte[GenericHash.BLAKE2B_BYTES];
+    byte[] messageBytes = message.getBytes();
+    boolean success = lazySodium.cryptoGenericHash(out, out.length, messageBytes, messageBytes.length);
+    if (!success) {
+      throw new E3DBCryptoException("Failure to hash message");
+    }
+    return out;
   }
 
   @Override

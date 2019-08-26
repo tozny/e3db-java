@@ -159,6 +159,8 @@ public interface Crypto {
    */
   void decryptFile(File file, byte[] secretKey, File dest) throws IOException, E3DBCryptoException;
 
+
+  byte[] hashString(String message) throws E3DBCryptoException;
   /**
    * Size of the block used when encrypting files (in bytes).
    * @return block size in bytes.

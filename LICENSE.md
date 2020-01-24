@@ -12,5 +12,5 @@ a copy of the License at https://tozny.com/legal/non-commercial-license.
 Software distributed under the License is distributed on an "AS IS"
 basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
 License for the specific language governing rights and limitations under
-the License. Portions of the software are Copyright (c) TOZNY LLC, 2017.
+the License. Portions of the software are Copyright (c) TOZNY LLC, 2020.
 All rights reserved.

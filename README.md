@@ -20,13 +20,13 @@ a copy of the License at https://tozny.com/legal/non-commercial-license.
 Software distributed under the License is distributed on an "AS IS"
 basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
 License for the specific language governing rights and limitations under
-the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
+the License. Portions of the software are Copyright (c) TOZNY LLC, 2020.
 All rights reserved.
 
 ## Terms of Service
 
-Your use of E3DB must abide by our [Terms of Service](terms.pdf), as detailed in
-the linked document.
+Your use of E3DB must abide by our [Terms of Service](https://tozny.com/tozny-terms-of-service/), as detailed in
+the linked terms of service agreement.
 
 # Getting Started
 
@@ -36,7 +36,7 @@ used in an Android application or "plain" Java environment (such as a
 server), the SDK presents the same API for using E3DB.
 
 Before using the SDK, go to [Tozny's
-Console](https://console.tozny.com), create an account, and go to
+Dashboard](https://dashboard.tozny.com/login), create an account, and go to
 the `Manage Clients` section. Click the `Create Token` button under
 the `Client Registration Tokens` heading. This value will allow your
 app to self-register a new user with E3DB. Note that this value is not

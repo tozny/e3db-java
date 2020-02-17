@@ -26,5 +26,5 @@ dependencies {
     compile 'net.java.dev.jna:jna:4.5.1'
 }
 
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"

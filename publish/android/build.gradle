@@ -22,9 +22,9 @@
 
 apply plugin: 'com.android.library'
 apply plugin: 'com.getkeepsafe.dexcount'
-apply plugin: 'digital.wup.android-maven-publish'
 
-apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
 apply plugin: 'signing'
 
 android {
@@ -54,8 +54,8 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_7
-    targetCompatibility JavaVersion.VERSION_1_7
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
   }
   lintOptions {
     disable 'InvalidPackage' // jna package used by libsodium references some sun packages, but those will never be called.
@@ -86,18 +86,59 @@ signing {
   sign configurations.archives
 }
 
-publishing {
-  publications {
-    mavenAar(MavenPublication) {
-      from components.android
-
-      groupId project(":publish").ext.groupId
-      artifactId 'e3db-client-android'
-      version project(":publish").ext.version
-
-    }
-  }
-}
+//publishing {
+//  publications {
+//    mavenAar(MavenPublication) {
+//      groupId project(":publish").ext.groupId
+//      artifactId 'e3db-client-android'
+//      version project(":publish").ext.version
+//      artifact(sourceJar)
+//
+//
+//      mavenDeployer(mavenDeployer {
+//        beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+//
+//        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+//          authentication(userName: ossrhUsername, password: ossrhPassword)
+//        }
+//
+//        snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+//          authentication(userName: ossrhUsername, password: ossrhPassword)
+//        }
+//        pom.project {
+//          artifactId = 'e3db-client-android'
+//          groupId = 'com.tozny.e3db'
+//          name 'E3DB Java SDK'
+//          packaging 'jar'
+//          // optionally artifactId can be defined here
+//          description 'An SDK to interact with TozStore Encrypted Storage with Android'
+//          url 'https://github.com/tozny/e3db-java'
+//
+//          scm {
+//            connection 'scm:git:git://github.com/tozny/e3db-java.git'
+//            developerConnection 'scm:git:ssh://github.com/tozny/e3db-java.git'
+//            url 'https://github.com/tozny/e3db-java/tree/master'
+//          }
+//
+//          licenses {
+//            license {
+//              name 'TOZNY NON-COMMERCIAL LICENSE'
+//              url 'https://tozny.com/legal/non-commercial-license'
+//            }
+//          }
+//
+//          developers {
+//            developer {
+//              id developerId
+//              name developerName
+//              email developerEmail
+//            }
+//          }
+//        }
+//      })
+//    }
+//  }
+//}
 
 dependencies {
   implementation project(":e3db-crypto-android").configurations.implementation.dependencies.matching { dep ->

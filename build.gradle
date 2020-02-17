@@ -29,14 +29,12 @@ buildscript {
         maven { url "https://maven.tozny.com/repo" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.1.3'
+        classpath 'com.android.tools.build:gradle:3.5.3'
         classpath "de.mannodermaus.gradle.plugins:android-junit5:1.0.0"
         classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:0.8.2'
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
         classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.1'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.2.30"
-        classpath 'digital.wup:android-maven-publish:3.2.0'
-        classpath 'com.github.dcendents:android-maven-gradle-plugin:2.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.3.61"
         classpath "commons-io:commons-io:2.6"
         classpath "org.assertj:assertj-core:2.9.1"
     }
@@ -53,6 +51,11 @@ allprojects {
             url  "https://dl.bintray.com/terl/lazysodium-maven"
         }
     }
+}
+
+ext {
+    jacksonVersion = "2.10.2"
+    retrofitVersion = "2.7.1"
 }
 
 task clean(type: Delete) {

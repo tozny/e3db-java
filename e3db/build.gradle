@@ -20,28 +20,29 @@
 
 apply plugin: 'java'
 
+
 dependencies {
     compileOnly files('compileLibs/android-4.1.1.4.jar')
 
     compileOnly project(':e3db-crypto-stub-plain')
     compileOnly project(':e3db-crypto-stub-android')
 
-    compile 'com.squareup.retrofit2:retrofit:2.6.1'
-    compile 'com.squareup.retrofit2:converter-jackson:2.6.1'
-//    compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
-    compile 'com.fasterxml.jackson.core:jackson-core:2.9.0'
-    compile 'com.fasterxml.jackson.core:jackson-annotations:2.9.0'
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.0'
-    compile 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.9.0'
-    compile 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.9.0'
+    compile "com.squareup.retrofit2:retrofit:$retrofitVersion"
+    compile "com.squareup.retrofit2:converter-jackson:$retrofitVersion"
+    compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
+    compile "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
+    compile "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
+    compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+    compile "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    compile "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
 
     compile project(':e3db-crypto-interface')
 }
 
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
-setJava7(this.project)
+//setJava7(this.project)
 
 evaluationDependsOn(':publish')
 

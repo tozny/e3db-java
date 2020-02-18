@@ -20,6 +20,9 @@
 
 package com.tozny.e3db;
 
+import java.util.Map;
+import java.util.UUID;
+
 /**
  * Thrown when a record fails verification during decryption.
  */
@@ -44,6 +47,12 @@ public class E3DBVerificationException extends E3DBException {
   public E3DBVerificationException(ClientMeta meta, String message, Exception inner) {
     super(message, inner);
     this.meta = meta;
+  }
+
+  // This constructor should only be used in scenarios where a full client meta is not available.
+  public E3DBVerificationException(String message, String type, Map<String, String> plain) {
+    super(message);
+    this.meta = new LocalMeta(new UUID(0,0), new UUID(0,0), type, plain);
   }
 
   public ClientMeta getMeta() {

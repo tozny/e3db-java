@@ -25,6 +25,7 @@ import com.tozny.e3db.CipherWithNonce;
 import com.tozny.e3db.E3DBCryptoException;
 import com.tozny.e3db.E3DBDecryptionException;
 import com.tozny.e3db.E3DBEncryptionException;
+import com.tozny.e3db.E3DBKeyPair;
 import com.tozny.e3db.Signature;
 
 import java.io.File;
@@ -166,4 +167,11 @@ public interface Crypto {
    * @return block size in bytes.
    */
   int getBlockSize();
+
+
+  E3DBKeyPair deriveEncryptionKeypair(char[] password, byte[] salt) throws E3DBCryptoException;
+
+  E3DBKeyPair deriveSigningKeyPair(char[] password, byte[] salt) throws E3DBCryptoException;
+
+  byte[] randomBytes(int bytes);
 }

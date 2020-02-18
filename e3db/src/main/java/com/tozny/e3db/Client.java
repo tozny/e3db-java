@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.kotlin.KotlinModule;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -261,10 +262,12 @@ public class Client {
   //  private static final okhttp3.logging.HttpLoggingInterceptor loggingInterceptor;
   private static final MediaType APPLICATION_JSON = MediaType.parse("application/json");
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
+  // UUIDv5 TFSP1;ED25519;BLAKE2B
+  private static final String SIGNATURE_VERSION = "e7737e7c-1637-511e-8bab-93c4f3e26fd9";
   private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
-  private static final Executor backgroundExecutor;
-  private static final Executor uiExecutor;
+  protected static final Executor backgroundExecutor;
+  protected static final Executor uiExecutor;
   private static final String allowRead = "{\"allow\" : [ { \"read\": {} } ] }";
   private static final String denyRead = "{\"deny\" : [ { \"read\": {} } ] }";
   private static final String denyAuthorizer = "{\"deny\" : [ { \"authorizer\": {} } ] }";
@@ -273,6 +276,7 @@ public class Client {
   private final String apiKey;
   private final String apiSecret;
   private final UUID clientId;
+  private final URI host;
   private final byte[] privateEncryptionKey;
   private final byte[] publicEncryptionKey;
   private final byte[] privateSigningKey;
@@ -348,6 +352,11 @@ public class Client {
 
   public byte[] getPublicSigningKey() {
     return this.publicSigningKey;
+  }
+
+
+  protected Config getConfig() throws E3DBCryptoException {
+    return new Config(this.apiKey, this.apiSecret, this.clientId, "", this.host.toString(), Base64.encodeURL(this.privateEncryptionKey), Base64.encodeURL(this.privateSigningKey));
   }
 
   /**
@@ -453,12 +462,9 @@ public class Client {
     this.apiSecret = apiSecret;
     this.clientId = clientId;
     this.privateEncryptionKey = privateKey;
-    if (this.privateEncryptionKey != null) {
-      publicEncryptionKey = Platform.crypto.getPublicKey(privateEncryptionKey);
-    } else {
-      publicEncryptionKey = null;
-    }
+    this.publicEncryptionKey = Platform.crypto.getPublicKey(privateEncryptionKey);
     this.privateSigningKey = privateSigningKey;
+    this.host = host;
     if (this.privateSigningKey != null)
       publicSigningKey = Platform.crypto.getPublicSigningKey(privateSigningKey);
     else
@@ -469,7 +475,7 @@ public class Client {
             .addInterceptor(new TokenInterceptor(apiKey, apiSecret, host, certificatePinner)));
 
     OkHttpClient.Builder tsv1ClientBuilder = enableTLSv12(new OkHttpClient.Builder()
-            .addInterceptor(new TSV1Interceptor(privateSigningKey, publicSigningKey, clientId)));
+            .addInterceptor(new TSV1Interceptor(privateSigningKey, publicSigningKey, clientId.toString())));
 
     if (certificatePinner != null) {
       clientBuilder.certificatePinner(certificatePinner);
@@ -478,6 +484,7 @@ public class Client {
 
     ObjectMapper mapper = new ObjectMapper()
             .registerModule(new Jdk8Module())
+            .registerModule(new KotlinModule())
             .registerModule(new JavaTimeModule());
 
     Retrofit tsv1Build = new Retrofit.Builder()
@@ -503,7 +510,7 @@ public class Client {
     this(apiKey, apiSecret, clientId, host, privateKey, privateSigningKey, null);
   }
 
-  private static class CC implements ClientCredentials {
+  static class CC implements ClientCredentials {
     private final String apiKey;
     private final String apiSecret;
     private final UUID clientId;
@@ -713,7 +720,7 @@ public class Client {
    * Obtains a Tozny JWT, if necessary, and adds it to every request.
    */
 
-  private <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
+  private static <R> void uiError(final ResultHandler<R> handleError, final Throwable e) {
     if (handleError != null)
       uiExecutor.execute(new Runnable() {
         @Override
@@ -723,7 +730,8 @@ public class Client {
       });
   }
 
-  private <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
+
+  private static <R> void uiValue(final ResultHandler<R> handleResult, final R r) {
     if (handleResult != null)
       uiExecutor.execute(new Runnable() {
         @Override
@@ -732,6 +740,7 @@ public class Client {
         }
       });
   }
+
 
   private static class R implements Record {
     private final Map<String, String> data;
@@ -886,16 +895,31 @@ public class Client {
     }
   }
 
-  private static class TSV1Interceptor implements Interceptor {
+  protected static class TSV1Interceptor implements Interceptor {
     private final byte[] privateSigningKey;
     private final byte[] publicSigningKey;
-    private final UUID clientId;
+    private final String clientId;
+    private final Map<String, String> headers;
 
-    TSV1Interceptor(byte[] privateSigningKey, byte[] publicSigningKey, UUID clientId) {
+    TSV1Interceptor(byte[] privateSigningKey, byte[] publicSigningKey, String clientId, Map<String, String> headers) {
       this.privateSigningKey = privateSigningKey;
       this.publicSigningKey = publicSigningKey;
       this.clientId = clientId;
+      this.headers = headers;
+    }
 
+    TSV1Interceptor(byte[] privateSigningKey, byte[] publicSigningKey, String clientId) {
+      this.privateSigningKey = privateSigningKey;
+      this.publicSigningKey = publicSigningKey;
+      this.clientId = clientId;
+      headers = new HashMap<>();
+    }
+
+    TSV1Interceptor(byte[] privateSigningKey, byte[] publicSigningKey) {
+      this.privateSigningKey = privateSigningKey;
+      this.publicSigningKey = publicSigningKey;
+      this.clientId = "";
+      headers = new HashMap<>();
     }
 
     @Override
@@ -906,8 +930,17 @@ public class Client {
       String method = req.method();
       String queryString = sortQueryParams(url);
       try {
-        String signature = createTsv1Signature(privateSigningKey, publicSigningKey, clientId.toString(), queryString, canonicalURI, method);
-        return chain.proceed(req.newBuilder().addHeader("Authorization", signature).build());
+        String signature = createTsv1Signature(privateSigningKey, publicSigningKey, clientId, queryString, canonicalURI, method);
+        Request.Builder builder = req.newBuilder();
+        for (String s : headers.keySet()) {
+          String s1 = headers.get(s);
+          if (s1 != null) {
+            builder.addHeader(s, s1);
+          }
+        }
+        Request authorization = builder.addHeader("Authorization", signature).build();
+
+        return chain.proceed(authorization);
 
       } catch (Throwable e) {
         throw new IOException(e);
@@ -1082,6 +1115,32 @@ public class Client {
     return encFields;
   }
 
+  private static Map<String, String> encryptObjectWithSignedFields(byte[] accessKey, byte[] signingKey, UUID salt, Map<String, String> data) throws E3DBCryptoException {
+    HashMap<String, String> encryptedFields = new HashMap<>();
+    for (Map.Entry<String, String> entry : data.entrySet()) {
+      byte[] dk = Platform.crypto.newSecretKey();
+      String signedField = signField(entry.getKey(), entry.getValue(), signingKey, salt);
+      String encField = new StringBuilder(Platform.crypto.encryptSecretBox(dk, accessKey).toMessage()).append(".")
+              .append(Platform.crypto.encryptSecretBox(signedField.getBytes(UTF8), dk).toMessage()).toString();
+      encryptedFields.put(entry.getKey(), encField);
+    }
+    return encryptedFields;
+  }
+
+  protected static String signField(String key, String value, byte[] signingKey) throws E3DBCryptoException {
+    return signField(key, value, signingKey, UUID.randomUUID());
+
+  }
+
+  protected static String signField(String key, String value, byte[] singingKey, UUID objectSalt) throws E3DBCryptoException {
+    byte[] message = Base64.encodeURL(Platform.crypto.hashString(objectSalt.toString() + key + value)).getBytes();
+    byte[] signature = Platform.crypto.signature(message, singingKey);
+    String encodedSignature = encodeURL(signature);
+    int signatureLength = encodedSignature.length();
+    return Client.SIGNATURE_VERSION + ";" + objectSalt + ";" + signatureLength + ";" + encodedSignature + value;
+
+  }
+
   private static Map<String, String> decryptObject(byte[] accessKey, Map<String, String> record) throws E3DBDecryptionException {
     Map<String, String> decryptedFields = new HashMap<>();
     for (Map.Entry<String, String> entry : record.entrySet()) {
@@ -1089,6 +1148,22 @@ public class Client {
       byte[] dk = Platform.crypto.decryptSecretBox(er.edk, accessKey);
       String value = new String(Platform.crypto.decryptSecretBox(er.ef, dk), UTF8);
       decryptedFields.put(entry.getKey(), value);
+    }
+    return decryptedFields;
+  }
+
+
+  private static Map<String, String> decryptObjectWithSignedFields(byte[] accessKey, Map<String, String> record, byte[] publicSigningKey, UUID signatureSalt) throws E3DBException, E3DBCryptoException {
+    Map<String, String> decryptedFields = new HashMap<>();
+    for (Map.Entry<String, String> entry : record.entrySet()) {
+      ER er = new ER(entry.getValue());
+      byte[] dk = Platform.crypto.decryptSecretBox(er.edk, accessKey);
+      String verifiedValue = verifyField(
+              entry.getKey(),
+              new String(Platform.crypto.decryptSecretBox(er.ef, dk), UTF8),
+              publicSigningKey,
+              signatureSalt);
+      decryptedFields.put(entry.getKey(), verifiedValue);
     }
     return decryptedFields;
   }
@@ -1175,7 +1250,7 @@ public class Client {
         final String signerPublicKey;
         if (!signer_signing_key.isNull()) {
           signerId = UUID.fromString(eakResponse.get("signer_id").asText());
-          switch(Platform.crypto.suite().getSigningKeyType()) {
+          switch (Platform.crypto.suite().getSigningKeyType()) {
             case Ed25519:
               signerPublicKey = signer_signing_key.get("ed25519").asText();
               break;
@@ -1185,14 +1260,13 @@ public class Client {
             default:
               throw new IllegalStateException("Signing key type " + Platform.crypto.suite().getSigningKeyType() + " not supported.");
           }
-        }
-        else {
+        } else {
           signerPublicKey = null;
         }
 
         byte[] ak = Platform.crypto.decryptBox(CipherWithNonce.decode(eak),
-          decodeURL(publicKey),
-          this.privateEncryptionKey);
+                decodeURL(publicKey),
+                this.privateEncryptionKey);
         EAKEntry entry = new EAKEntry(ak, new LocalEAKInfo(eak, publicKey, authorizerId, signerId, signerPublicKey));
         eakCache.put(cacheEntry, entry);
         return entry;
@@ -1272,7 +1346,7 @@ public class Client {
     return meta;
   }
 
-  private static class ClientInfo {
+  protected static class ClientInfo {
     private final byte[] encryptionKey;
     private final byte[] signingKey;
     private final UUID clientId;
@@ -1297,7 +1371,7 @@ public class Client {
     }
   }
 
-  private ClientInfo getClientInfo(UUID clientId) throws IOException, E3DBException {
+  protected ClientInfo getClientInfo(UUID clientId) throws IOException, E3DBException {
     final retrofit2.Response<ResponseBody> clientInfo = shareClient.lookupClient(clientId).execute();
     if (clientInfo.code() == 404) {
       throw new E3DBClientNotFoundException(clientId.toString());
@@ -1855,11 +1929,11 @@ public class Client {
   /**
    * Write a new client associated note.
    *
-   * @param fields Record data to be encrypted
+   * @param fields                 Record data to be encrypted
    * @param recipientEncryptionKey public encryption key for the reader
-   * @param recipientSigningKey public signing key for the reader
-   * @param options options for the note
-   * @param handleResult Result of the operation. If successful, returns the requested note
+   * @param recipientSigningKey    public signing key for the reader
+   * @param options                options for the note
+   * @param handleResult           Result of the operation. If successful, returns the requested note
    * @throws IllegalArgumentException if fields,
    */
   public void writeNote(
@@ -1874,14 +1948,14 @@ public class Client {
             options,
             recipientEncryptionKey,
             recipientSigningKey,
-            this.publicSigningKey,
+            this.privateSigningKey,
             this.privateEncryptionKey,
             this.notesClient,
             handleResult);
   }
 
 
-  protected void internalWriteNote(
+  protected static void internalWriteNote(
           final UUID clientId,
           final RecordData fields,
           NoteOptions noteOptions,
@@ -1892,43 +1966,44 @@ public class Client {
           final StorageV2API notesClient,
           final ResultHandler<Note> handleResult) throws IllegalArgumentException {
     checkNotNull(fields, "fields");
-    final NoteOptions options = (noteOptions == null)? new NoteOptions(): noteOptions;
+    final NoteOptions options = (noteOptions == null) ? new NoteOptions() : noteOptions;
     checkNotNull(recipientEncryptionKey, "Recipient Encryption Key");
     checkNotNull(recipientSigningKey, "Recipient Signing Key");
     checkNotNull(writerSigningKey, "Writer Signing Key");
     checkNotNull(privateEncryptionKey, "Private Encryption Key");
 
 
-    onBackground(new Runnable() {
+    backgroundExecutor.execute(new Runnable() {
       @Override
       public void run() {
         try {
           byte[] ak = Platform.crypto.newSecretKey();
           String eak = Platform.crypto.encryptBox(ak, recipientEncryptionKey, privateEncryptionKey).toMessage();
-          Map<String, String> encFields = encryptObject(ak, fields.getCleartext());
-
+          UUID signatureSalt = UUID.randomUUID();
+          String signature = signField("signature", signatureSalt.toString(), writerSigningKey);
+          Map<String, String> encFields = encryptObjectWithSignedFields(ak, writerSigningKey, signatureSalt, fields.getCleartext());
           Note note = new Note(
                   options.noteName,
                   clientId.toString(),
                   Platform.crypto.suite().toString(),
                   encodeURL(recipientSigningKey),
-                  encodeURL(writerSigningKey),
+                  encodeURL(Platform.crypto.getPublicSigningKey(writerSigningKey)),
                   encodeURL(Platform.crypto.getPublicKey(privateEncryptionKey)),
                   eak,
                   options.noteType,
                   encFields,
                   options.plain,
                   options.fileMeta,
-                  "signature", //This is still todo
+                  signature,
                   options.maxViews,
                   options.expiration,
-                  options.expires
+                  options.expires,
+                  options.eacp
           );
-          // TODO: NEED TO SIGN ALL THESE NOTES IN A WAY THAT MATCHES JS implementation
           retrofit2.Response<Note> noteResponse = notesClient.writeNote(note).execute();
           if (noteResponse.isSuccessful()) {
             Note retrievedNote = noteResponse.body();
-            decryptNote(retrievedNote);
+            internalDecryptNoteWithAK(retrievedNote, ak, Base64.decodeURL(note.writerSigningKey));
             uiValue(handleResult, retrievedNote);
           } else {
             uiError(handleResult, E3DBException.find(noteResponse.code(), noteResponse.message()));
@@ -1940,52 +2015,153 @@ public class Client {
     });
   }
 
+  public void replaceNoteByName(final RecordData fields,
+                                final byte[] recipientEncryptionKey,
+                                final byte[] recipientSigningKey,
+                                final NoteOptions noteOptions,
+                                final ResultHandler<Note> handleResult) {
+
+    checkNotNull(fields, "fields");
+    final NoteOptions options = (noteOptions == null) ? new NoteOptions() : noteOptions;
+    checkNotNull(recipientEncryptionKey, "Recipient Encryption Key");
+    checkNotNull(recipientSigningKey, "Recipient Signing Key");
+
+    byte[] writerSigningKey = this.privateSigningKey;
+    backgroundExecutor.execute(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          byte[] ak = Platform.crypto.newSecretKey();
+          String eak = Platform.crypto.encryptBox(ak, recipientEncryptionKey, privateEncryptionKey).toMessage();
+          UUID signatureSalt = UUID.randomUUID();
+          String signature = signField("signature", signatureSalt.toString(), writerSigningKey);
+          Map<String, String> encFields = encryptObjectWithSignedFields(ak, writerSigningKey, signatureSalt, fields.getCleartext());
+          Note note = new Note(
+                  options.noteName,
+                  clientId.toString(),
+                  Platform.crypto.suite().toString(),
+                  encodeURL(recipientSigningKey),
+                  encodeURL(Platform.crypto.getPublicSigningKey(writerSigningKey)),
+                  encodeURL(Platform.crypto.getPublicKey(privateEncryptionKey)),
+                  eak,
+                  options.noteType,
+                  encFields,
+                  options.plain,
+                  options.fileMeta,
+                  signature,
+                  options.maxViews,
+                  options.expiration,
+                  options.expires,
+                  options.eacp
+          );
+          retrofit2.Response<Note> noteResponse = notesClient.replaceNote(note).execute();
+          if (noteResponse.isSuccessful()) {
+            Note retrievedNote = noteResponse.body();
+            internalDecryptNoteWithAK(retrievedNote, ak, Base64.decodeURL(note.writerSigningKey));
+            uiValue(handleResult, retrievedNote);
+          } else {
+            uiError(handleResult, E3DBException.find(noteResponse.code(), noteResponse.message()));
+          }
+        } catch (final Throwable e) {
+          uiError(handleResult, e);
+        }
+      }
+    });
+  }
+
+  protected static StorageV2API getAnonymousNoteClient(byte[] privateSigningKey, byte[] publicSigningKey, URI host, Map<String, String> additionalHeaders, CertificatePinner certificatePinner) throws E3DBCryptoException {
+    additionalHeaders = additionalHeaders != null ? additionalHeaders : new HashMap<String, String>();
+    OkHttpClient.Builder tsv1ClientBuilder = enableTLSv12(new OkHttpClient.Builder()
+            .addInterceptor(new TSV1Interceptor(privateSigningKey, publicSigningKey, "", additionalHeaders)));
+
+    if (certificatePinner != null) {
+      tsv1ClientBuilder.certificatePinner(certificatePinner);
+    }
+
+    ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new Jdk8Module())
+            .registerModule(new KotlinModule())
+            .registerModule(new JavaTimeModule());
+
+    Retrofit tsv1Build = new Retrofit.Builder()
+            .callbackExecutor(uiExecutor)
+            .client(tsv1ClientBuilder.build())
+            .addConverterFactory(JacksonConverterFactory.create(mapper))
+            .baseUrl(host.resolve("/").toString())
+            .build();
+    return tsv1Build.create(StorageV2API.class);
+  }
+
   /**
    * Reads a note with the given noteName.
-   * @param noteName user specificied premium noteName of the note.
+   *
+   * @param noteName     user specificied premium noteName of the note.
    * @param handleResult Result of the operation. If successful, returns the requested note
    * @throws IllegalArgumentException if both noteName is null
    */
-  public void readNoteByName(String noteName, final ResultHandler<Note> handleResult) throws IllegalArgumentException  {
+  public void readNoteByName(String noteName, final ResultHandler<Note> handleResult) throws IllegalArgumentException {
     checkNotEmpty(noteName, "noteName");
-    internalReadNote(null, noteName, handleResult);
+    readNote(null, noteName, notesClient, privateEncryptionKey, handleResult);
   }
 
   /**
    * Reads a note with the given noteID.
-   * @param noteID canonical ID of the note
+   *
+   * @param noteID       canonical ID of the note
    * @param handleResult Result of the operation. If successful, returns the requested note
    * @throws IllegalArgumentException if both noteID is null
    */
-  public void readNoteByID(UUID noteID, final ResultHandler<Note> handleResult) throws IllegalArgumentException  {
+  public void readNoteByID(UUID noteID, final ResultHandler<Note> handleResult) throws IllegalArgumentException {
     checkNotNull(noteID, "noteID");
-    internalReadNote(noteID, null, handleResult);
+    readNote(noteID, null, notesClient, privateEncryptionKey, handleResult);
+  }
+
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"),null,   null);
+    readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
+  }
+
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  Map<String, String> additionalHeaders,  final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"), additionalHeaders, null);
+    readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
+  }
+
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  Map<String, String> additionalHeaders, CertificatePinner certificatePinner, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"), additionalHeaders, certificatePinner);
+    readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
+  }
+
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey, URI host, Map<String, String> additionalHeaders, CertificatePinner certificatePinner, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, host, additionalHeaders, certificatePinner);
+    readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
   }
 
   /**
    * Reads a note with the given noteID or noteName. If noteID and noteName are both provided
-   * and do not reference the same note which will be returned is undefined.
-   * @param noteID canonical ID of the note
-   * @param noteName user specificied premium noteName of the note.
+   * and do not reference the same note which will be returned is undefined. If not reading anonymous notes it is recommended
+   * to use the non static methods #readNoteByName and #readNoteByID
+   *
+   * @param noteID       canonical ID of the note
+   * @param noteName     user specificied premium noteName of the note.
    * @param handleResult Result of the operation. If successful, returns the requested note
    * @throws IllegalArgumentException if both lookup values are null
    */
-  private void internalReadNote(final UUID noteID, final String noteName,  final ResultHandler<Note> handleResult) throws IllegalArgumentException {
+  private static void readNote(final UUID noteID, final String noteName, StorageV2API notesClient, byte[] privateEncryptionKey, final ResultHandler<Note> handleResult) throws IllegalArgumentException {
     if (noteID == null && noteName == null) {
       throw new IllegalArgumentException("At least one of noteID and noteName must not be null");
     }
-    onBackground(new Runnable() {
+    backgroundExecutor.execute(new Runnable() {
       @Override
       public void run() {
         try {
           retrofit2.Response<Note> noteResponse = notesClient.getNote(noteID, noteName).execute();
           if (noteResponse.isSuccessful()) {
             Note note = noteResponse.body();
-            decryptNote(note);
+            internalDecryptNote(note, privateEncryptionKey, Base64.decodeURL(note.writerSigningKey));
             uiValue(handleResult, note);
 
             //TODO signature verify
-          } else if (noteResponse.code() == 404){
+          } else if (noteResponse.code() == 404) {
             if (noteID != null) {
               uiError(handleResult, new E3DBNotFoundException(noteID));
             } else {
@@ -2002,20 +2178,70 @@ public class Client {
     });
   }
 
-  private void decryptNote(Note note) throws E3DBDecryptionException {
-    Map<String, String> encryptedData = note.getData();
+
+  protected static void internalDecryptNote(Note note, final byte[] privateEncryptionKey, final byte[] publicSigningKey) throws E3DBCryptoException, E3DBException {
     String eak = note.getEAK();
     byte[] accessKey = Platform.crypto.decryptBox(
             CipherWithNonce.decode(eak),
             decodeURL(note.getWriterEncryptionKey()),
             privateEncryptionKey);
-    note.data = decryptObject(accessKey, encryptedData);
+    internalDecryptNoteWithAK(note, accessKey, publicSigningKey);
+  }
+
+
+  private static void internalDecryptNoteWithAK(Note note, byte[] accessKey, byte[] publicSigningKey) throws E3DBCryptoException, E3DBException {
+    UUID signatureSalt = UUID.fromString(verifyField("signature", note.signature, publicSigningKey, null));
+    Map<String, String> encryptedData = note.getData();
+
+    note.data = decryptObjectWithSignedFields(accessKey, encryptedData, publicSigningKey, signatureSalt);
+
+  }
+
+  /**
+   * @param key              field key
+   * @param value            field value
+   * @param publicSigningKey public signing key derived from the key used to sign this field
+   * @param salt             a salt that may be provided and must match included salt if provided
+   * @return the value without signing information if verified, throws an E3DBVerificationException if it fails to verify
+   * @throws E3DBVerificationException if signature is present and can't be verified
+   * @throws E3DBCryptoException       if a hash cannot be created during verification.
+   */
+  protected static String verifyField(String key, String value, byte[] publicSigningKey, UUID salt) throws E3DBVerificationException, E3DBCryptoException {
+    String[] parts = value.split(";", 4);
+    if (!parts[0].equals(Client.SIGNATURE_VERSION)) {
+      throw new E3DBVerificationException("The signature version provided was not a know value and could not be verified", "field verify", null);
+    }
+    if (parts.length != 4) {
+      throw new E3DBVerificationException("The field " + key + " could not be verified, a known signature version was provided but signature was malformed", "field verify", null);
+    }
+    if (null != salt && !salt.toString().equals(parts[1])) {
+      throw new E3DBVerificationException("The field " + key + " could not be verified, Invalid salt on signature", "field verify", null);
+    }
+    // Three semi colons + the length of all three parts
+    int headerLength = 3 + parts[0].length() + parts[1].length() + parts[2].length();
+    int signatureLength = 0;
+    try {
+      signatureLength = Integer.parseInt(parts[2]);
+    } catch (NumberFormatException e) {
+      throw new E3DBVerificationException("The field " + key + " could not be verified, signature was malformed, length could not be determined", "field verify", null);
+    }
+    int plainTextIndex = headerLength + signatureLength;
+    String signature = value.substring(headerLength, plainTextIndex);
+    String plainText = value.substring(plainTextIndex);
+    byte[] message = Platform.crypto.hashString(parts[1] + key + plainText);
+    byte[] messageDoubleEncoded = encodeURL(message).getBytes();
+    byte[] rawSignature = decodeURL(signature);
+    if (!Platform.crypto.verify(new Signature(rawSignature), messageDoubleEncoded, publicSigningKey)) {
+      throw new E3DBVerificationException("The field " + key + " could not be verified, signature was not verified using " + Base64.encodeURL(publicSigningKey), "field verify", null);
+    }
+    return plainText;
   }
 
 
   /**
    * Deletes a note with the given noteID.
-   * @param noteID canonical ID of the note
+   *
+   * @param noteID       canonical ID of the note
    * @param handleResult Result of the operation. If successful, returns Void
    * @throws IllegalArgumentException if noteID is null
    */
@@ -2032,7 +2258,7 @@ public class Client {
           retrofit2.Response<Void> notesResponse = notesClient.deleteNote(noteID).execute();
           if (notesResponse.isSuccessful()) {
             uiValue(handleResult, null);
-          } else if (notesResponse.code() == 404){
+          } else if (notesResponse.code() == 404) {
             uiError(handleResult, new E3DBNotFoundException(noteID));
           } else {
             uiError(handleResult, E3DBException.find(notesResponse.code(), "Error deleting note"));
@@ -2043,8 +2269,6 @@ public class Client {
       }
     });
   }
-
-
 
 
   /**

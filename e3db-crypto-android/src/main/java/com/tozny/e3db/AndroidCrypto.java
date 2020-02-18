@@ -28,6 +28,7 @@ import com.goterl.lazycode.lazysodium.interfaces.GenericHash;
 import com.goterl.lazycode.lazysodium.interfaces.SecretBox;
 import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
 import com.goterl.lazycode.lazysodium.interfaces.Sign;
+import com.goterl.lazycode.lazysodium.utils.KeyPair;
 import com.tozny.e3db.crypto.*;
 
 import static com.tozny.e3db.Checks.*;
@@ -38,10 +39,17 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 
 class AndroidCrypto implements Crypto {
   private static final int BLOCK_SIZE = 65_536; // 2 ^ 16
   private static final int SECRET_STREAM_TAG_MESSAGE = 0x0;
+  public static final int ITERATION_COUNT = 10000;
+  public static final int PBKDF_KEY_LENGTH = 32;
 
   private final LazySodium lazySodium;
   private static final Charset UTF8 = Charset.forName("UTF-8");
@@ -310,6 +318,42 @@ class AndroidCrypto implements Crypto {
   @Override
   public int getBlockSize() {
     return BLOCK_SIZE;
+  }
+
+  @Override
+  public E3DBKeyPair deriveEncryptionKeypair(char[] password, byte[] salt) throws E3DBCryptoException {
+    byte[] bytes = derivePBKDF2WithHMACSHA512(password, salt);
+    try {
+      KeyPair keyPair = lazySodium.cryptoBoxSeedKeypair(bytes);
+      return new E3DBKeyPair(keyPair.getPublicKey(), keyPair.getSecretKey());
+    } catch (SodiumException e) {
+      throw new E3DBCryptoException(e);
+    }
+
+  }
+
+  private byte[] derivePBKDF2WithHMACSHA512(char[] password, byte[] salt) throws E3DBCryptoException {
+    try {
+      return SecretKeyFactory.getInstance("PBKDF2WITHHMACSHA512").generateSecret(new PBEKeySpec(password, salt, ITERATION_COUNT, PBKDF_KEY_LENGTH * 8)).getEncoded();
+    } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
+      throw new E3DBCryptoException(e);
+    }
+  }
+
+  @Override
+  public E3DBKeyPair deriveSigningKeyPair(char[] password, byte[] salt) throws E3DBCryptoException {
+    byte[] bytes = derivePBKDF2WithHMACSHA512(password, salt);
+    try {
+      KeyPair keyPair = lazySodium.cryptoSignSeedKeypair(bytes);
+      return new E3DBKeyPair(keyPair.getPublicKey(), keyPair.getSecretKey());
+    } catch (SodiumException e) {
+      throw new E3DBCryptoException(e);
+    }
+  }
+
+  @Override
+  public byte[] randomBytes(int bytes) {
+    return lazySodium.randomBytesBuf(bytes);
   }
 
 

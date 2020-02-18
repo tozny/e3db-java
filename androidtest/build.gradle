@@ -23,12 +23,12 @@ import com.android.build.gradle.internal.tasks.AndroidTestTask
 apply plugin: 'com.android.application'
 
 android {
-  compileSdkVersion 27
+  compileSdkVersion 29
 
   defaultConfig {
     applicationId "com.tozny.e3dbtest"
-    minSdkVersion 16
-    targetSdkVersion 27
+    minSdkVersion 21
+    targetSdkVersion 29
     versionCode 1
     versionName "1.0"
 
@@ -50,6 +50,10 @@ android {
   }
   sourceSets.androidTest.java {
     srcDirs = ['src/androidTest/java', "${project(":common-test").projectDir}/src/test/java"]
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
   }
 }
 

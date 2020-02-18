@@ -43,6 +43,8 @@ public class Note {
   Instant expiration;
   @JsonProperty("expires")
   boolean expires;
+  @JsonProperty("eacp")
+  EACP eacp;
 
   public Note(String noteName,
               String clientId,
@@ -58,7 +60,8 @@ public class Note {
               String signature,
               int maxViews,
               Instant expiration,
-              boolean expires) {
+              boolean expires,
+              EACP eacp) {
     this.noteName = noteName;
     this.clientId = clientId;
     this.mode = mode;
@@ -74,6 +77,7 @@ public class Note {
     this.maxViews = maxViews;
     this.expiration = expiration;
     this.expires = expires;
+    this.eacp = eacp;
   }
 
   public Note() {
@@ -166,5 +170,9 @@ public class Note {
 
   public boolean isExpires() {
     return expires;
+  }
+
+  public EACP getEacp() {
+    return eacp;
   }
 }

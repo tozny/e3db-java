@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import okhttp3.CertificatePinner;
 import org.junit.*;
 
+import static com.tozny.e3db.TestUtilities.withTimeout;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.*;
@@ -84,52 +85,7 @@ public class ClientTest {
       token = t;
   }
 
-  /**
-   * Runs an asynchronous action that requires a countdown latch
-   * to indicate when it has finished. After {@link #TIMEOUT} seconds, an error is thrown to
-   * indicate the action did not completed in time.
-   */
-  private static void withTimeout(AsyncAction action) {
-     try {
-       CountDownLatch wait = new CountDownLatch(1);
-       action.act(wait);
-       if (!wait.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS))
-         throw new Error("Timed out.");
-     }
-     catch(Exception e) {
-       throw new Error(e);
-     }
-  }
 
-  /**
-   * Wraps a result handler with logic to trigger a countdown latch, regardless of
-   * the result of the handler.
-   *
-   * Should be used to wrap result handlers that contain assertion failures or that throw
-   * exceptions. Otherwise, the count down latch may not be triggered and the test will
-   * not complete until timeout occurs.
-   * @param <T>
-   */
-  private static final class ResultWithWaiting<T> implements ResultHandler<T> {
-    private final CountDownLatch waiter;
-    private final ResultHandler<T> handler;
-
-    public ResultWithWaiting(CountDownLatch waiter, ResultHandler<T> handler) {
-      this.waiter = waiter;
-      this.handler = handler;
-    }
-
-    @Override
-    public void handle(Result<T> r) {
-      try {
-        if(handler != null)
-          handler.handle(r);
-      }
-      finally {
-        waiter.countDown();
-      }
-    }
-  }
 
   private static class CI {
     public final Client client;
@@ -148,7 +104,7 @@ public class ClientTest {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-          token, clientName, host, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+          token, clientName, host, new TestUtilities.ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
           @Override
           public void handle(Result<Config> r) {
             if (!r.isError()) {
@@ -210,7 +166,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+        client.writeFile(type, plain, null, new TestUtilities.ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
             if (r.isError()) {
@@ -264,7 +220,7 @@ public class ClientTest {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-                token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+                token, clientName, host, certificatePinner, new TestUtilities.ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
                   @Override
                   public void handle(Result<Config> r) {
                     if (!r.isError()) assertTrue(true);
@@ -289,7 +245,7 @@ public class ClientTest {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-                token, clientName, host, certificatePinner, new ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+                token, clientName, host, certificatePinner, new TestUtilities.ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
                   @Override
                   public void handle(Result<Config> r) {
                     if (!r.isError()) fail("Certificate pin should have been invalid!");
@@ -314,7 +270,7 @@ public class ClientTest {
       @Override
       public void act(CountDownLatch wait) throws Exception {
         clientInfo.client.write(type, new RecordData(data), null,
-          new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+          new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if(r.isError())
@@ -328,7 +284,7 @@ public class ClientTest {
       @Override
       public void act(CountDownLatch wait) throws Exception {
         clientInfo.client.getReaderKey(clientInfo.client.clientId(), clientInfo.client.clientId(), type,
-          new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+          new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
             @Override
             public void handle(Result<LocalEAKInfo> r) {
               if(r.isError())
@@ -344,7 +300,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientInfo.client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        clientInfo.client.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
@@ -365,7 +321,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -381,7 +337,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.query(new QueryParamsBuilder().setRecords(recordId.get()).setIncludeData(true).build(), new ResultWithWaiting<QueryResponse>(wait, new ResultHandler<QueryResponse>() {
+        client.query(new QueryParamsBuilder().setRecords(recordId.get()).setIncludeData(true).build(), new TestUtilities.ResultWithWaiting<QueryResponse>(wait, new ResultHandler<QueryResponse>() {
           @Override
           public void handle(Result<QueryResponse> r) {
             if (r.isError())
@@ -398,7 +354,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.query(new QueryParamsBuilder().setTypes(TYPE).setIncludeData(true).build(), new ResultWithWaiting<QueryResponse>(wait, new ResultHandler<QueryResponse>() {
+        client.query(new QueryParamsBuilder().setTypes(TYPE).setIncludeData(true).build(), new TestUtilities.ResultWithWaiting<QueryResponse>(wait, new ResultHandler<QueryResponse>() {
           @Override
           public void handle(Result<QueryResponse> r) {
             if (r.isError())
@@ -440,7 +396,7 @@ public class ClientTest {
                   public void handle(Result<Record> r) {
                     assertTrue("Should not be able to read record.", r.isError());
                     assertTrue("Should have got 404.", r.asError().error() instanceof E3DBNotFoundException);
-                    new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+                    new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
                       @Override
                       public void handle(final Result<Void> r1) {
                         if(r1.isError())
@@ -464,7 +420,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        writeRecord(getClient().client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(getClient().client, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -482,7 +438,7 @@ public class ClientTest {
         client.read(recordId.get(), new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+            new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(final Result<Record> r1) {
                 if(r1.isError())
@@ -508,7 +464,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -521,7 +477,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        writeRecord(client, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(client, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -533,7 +489,7 @@ public class ClientTest {
 
     while (!done.get()) {
       final CountDownLatch wait3 = new CountDownLatch(1);
-      client.query(paramsBuilder.build(), new ResultWithWaiting<QueryResponse>(wait3, new ResultHandler<QueryResponse>() {
+      client.query(paramsBuilder.build(), new TestUtilities.ResultWithWaiting<QueryResponse>(wait3, new ResultHandler<QueryResponse>() {
         @Override
         public void handle(Result<QueryResponse> r) {
           if(r.isError())
@@ -575,7 +531,7 @@ public class ClientTest {
             final Record record = r.asValue();
             Map<String, String> fields = new HashMap<>();
             fields.put(FIELD, updatedMessage);
-            client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
                 if(r.isError())
@@ -623,7 +579,7 @@ public class ClientTest {
               public String getVersion() {
                 return record.meta().version();
               }
-            }, new RecordData(fields), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+            }, new RecordData(fields), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
                 if(r.isError())
@@ -661,7 +617,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        writeRecord(clientRef.get(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        writeRecord(clientRef.get(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -681,7 +637,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), plain, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), plain, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -696,7 +652,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().read(recordRef.get().meta().recordId(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             try {
@@ -719,7 +675,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), null, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), null, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -734,7 +690,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().read(recordRef.get().meta().recordId(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -751,7 +707,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), new HashMap<String, String>(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().update(LocalUpdateMeta.fromRecordMeta(recordRef.get().meta()), new RecordData(recordRef.get().data()), new HashMap<String, String>(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if (r.isError())
@@ -766,7 +722,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        clientRef.get().read(recordRef.get().meta().recordId(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -800,7 +756,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        from.client.write(recordType, new RecordData(cleartext), null, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        from.client.write(recordType, new RecordData(cleartext), null, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -814,7 +770,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        from.client.share(recordType, to.client.clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        from.client.share(recordType, to.client.clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
             if(r.isError())
@@ -828,7 +784,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        to.client.read(recordIdRef.get(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        to.client.read(recordIdRef.get(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -846,7 +802,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        from.client.getIncomingSharing(new ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
+        from.client.getIncomingSharing(new TestUtilities.ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
           @Override
           public void handle(Result<List<IncomingSharingPolicy>> r) {
             if(r.isError())
@@ -861,7 +817,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        from.client.getOutgoingSharing(new ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
+        from.client.getOutgoingSharing(new TestUtilities.ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
           @Override
           public void handle(Result<List<OutgoingSharingPolicy>> r) {
             if(r.isError())
@@ -879,7 +835,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        to.client.getIncomingSharing(new ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
+        to.client.getIncomingSharing(new TestUtilities.ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
           @Override
           public void handle(Result<List<IncomingSharingPolicy>> r) {
             if(r.isError())
@@ -896,7 +852,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        to.client.getOutgoingSharing(new ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
+        to.client.getOutgoingSharing(new TestUtilities.ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
           @Override
           public void handle(Result<List<OutgoingSharingPolicy>> r) {
             if(r.isError())
@@ -912,7 +868,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        from.client.revoke(recordType, to.client.clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        from.client.revoke(recordType, to.client.clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
             if(r.isError())
@@ -925,7 +881,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        to.client.read(recordIdRef.get(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+        to.client.read(recordIdRef.get(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             assertTrue("Should not be able to read record " + recordIdRef.get(), r.isError());
@@ -966,7 +922,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          clientRef.get().write("poem", data, plain, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+          clientRef.get().write("poem", data, plain, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if(r.isError()) {
@@ -982,7 +938,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          clientRef.get().read(recordRef.get().meta().recordId(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+          clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               try {
@@ -1007,7 +963,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          clientRef.get().write("poem", data, plain, new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+          clientRef.get().write("poem", data, plain, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if(r.isError())
@@ -1022,7 +978,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          clientRef.get().read(recordRef.get().meta().recordId(), new ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+          clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               try {
@@ -1062,7 +1018,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
@@ -1112,14 +1068,14 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.share(type, client2.clientId(), new ResultWithWaiting<Void>(wait, null));
+        client1.share(type, client2.clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, null));
       }
     });
 
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client1.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
@@ -1150,7 +1106,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.getReaderKey(client1.clientId(), client1.clientId(), type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client2.getReaderKey(client1.clientId(), client1.clientId(), type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if(r.isError())
@@ -1199,7 +1155,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.write(recordType, new RecordData(data), null, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+        client.write(recordType, new RecordData(data), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError()) {
@@ -1284,7 +1240,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client.createWriterKey(recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> result) {
             EAKInfo eak = result.asValue();
@@ -1330,7 +1286,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client.createWriterKey(recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> result) {
             if(result.isError())
@@ -1483,7 +1439,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().createWriterKey(recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client1.get().createWriterKey(recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if (r.isError()) {
@@ -1502,7 +1458,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client1.get().share(recordType, client2.get().clientId(), new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        client1.get().share(recordType, client2.get().clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
             if (r.isError()) {
@@ -1521,7 +1477,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client2.get().getReaderKey(client1.get().clientId(), client1.get().clientId(), recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if (r.isError()) {
@@ -1631,7 +1587,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.createWriterKey(type, new ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+        client.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
             if (r.isError()) {
@@ -1699,7 +1655,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readFile(recordMeta.recordId(), actualFile, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+        client.readFile(recordMeta.recordId(), actualFile, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
             if(r.isError())
@@ -1731,7 +1687,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.read(recordMeta.recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+        client.read(recordMeta.recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
             if(r.isError())
@@ -1763,7 +1719,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          client.query(new QueryParamsBuilder().setTypes(recordType).setIncludeData(true).build(), new ResultWithWaiting<>(wait, new ResultHandler<QueryResponse>() {
+          client.query(new QueryParamsBuilder().setTypes(recordType).setIncludeData(true).build(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<QueryResponse>() {
             @Override
             public void handle(Result<QueryResponse> r) {
               if (r.isError())
@@ -1791,7 +1747,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          client.readFile(r.meta().recordId(), actualFile, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+          client.readFile(r.meta().recordId(), actualFile, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
             @Override
             public void handle(Result<RecordMeta> r) {
               if (r.isError())
@@ -1821,7 +1777,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readFile(UUID.randomUUID(), dest, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+        client.readFile(UUID.randomUUID(), dest, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
             result.set(r);
@@ -1856,7 +1812,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readFile(recordMeta.recordId(), dest, new ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
+        client.readFile(recordMeta.recordId(), dest, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
             result.set(r);
@@ -1895,7 +1851,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.writeFile(type, plain, null, new ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
+        client.writeFile(type, plain, null, new TestUtilities.ResultWithWaiting<RecordMeta>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
             if (r.isError()) {
@@ -1933,7 +1889,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1964,7 +1920,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -1982,7 +1938,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -2021,7 +1977,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          writeRecord(writer.client, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if (r.isError()) {
@@ -2048,7 +2004,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
@@ -2067,7 +2023,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2087,7 +2043,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2107,7 +2063,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if (r.isError()) {
@@ -2132,7 +2088,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2152,7 +2108,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
@@ -2191,7 +2147,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2211,7 +2167,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2232,7 +2188,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writeRecord(writer.client, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          writeRecord(writer.client, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if (r.isError()) {
@@ -2259,7 +2215,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if (r.isError()) {
@@ -2284,7 +2240,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               if(r.isError())
@@ -2304,7 +2260,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          reader.client.read(writtenRecord.meta().recordId(), new ResultWithWaiting<>(wait, new ResultHandler<Record>() {
+          reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
               if (r.isError() && r.asError().other() instanceof E3DBNotFoundException)
@@ -2336,7 +2292,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new ResultWithWaiting<>(wait, new ResultHandler<Void>() {
+          writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
               result.set(! r.isError());
@@ -2354,7 +2310,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          writer.client.getAuthorizers(new ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
+          writer.client.getAuthorizers(new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
             @Override
             public void handle(Result<List<AuthorizerPolicy>> r) {
               if (r.isError()) {
@@ -2386,7 +2342,7 @@ public class ClientTest {
       withTimeout(new AsyncAction() {
         @Override
         public void act(CountDownLatch wait) throws Exception {
-          authorizer.client.getAuthorizedBy(new ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
+          authorizer.client.getAuthorizedBy(new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<List<AuthorizerPolicy>>() {
             @Override
             public void handle(Result<List<AuthorizerPolicy>> r) {
               if (r.isError()) {
@@ -2426,8 +2382,8 @@ public class ClientTest {
         dataToEncrypt.put("TestNoteKey", "Test");
         final RecordData recordData = new RecordData(dataToEncrypt);
         String noteName = "testnote" + UUID.randomUUID();
-        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
-        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
           @Override
           public void handle(Result<Note> n) {
             if (n.isError()) {
@@ -2446,7 +2402,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2467,7 +2423,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        client.deleteNote(noteID, new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> n) {
             resultAtomicReference.set(n);
@@ -2482,7 +2438,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2511,8 +2467,8 @@ public class ClientTest {
         final Map<String, String> dataToEncrypt = new HashMap<>();
         dataToEncrypt.put("TestNoteKey", "Test");
         final RecordData recordData = new RecordData(dataToEncrypt);
-        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
-        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
           @Override
           public void handle(Result<Note> n) {
             if (n.isError()) {
@@ -2530,7 +2486,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByName(noteName, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+        client.readNoteByName(noteName, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2551,7 +2507,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        client.deleteNote(noteID, new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> n) {
             resultAtomicReference.set(n);
@@ -2566,7 +2522,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByName(noteName, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByName(noteName,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2596,8 +2552,8 @@ public class ClientTest {
         dataToEncrypt.put("TestNoteKey", "Test");
         final RecordData recordData = new RecordData(dataToEncrypt);
         String noteName = "testnote" + UUID.randomUUID();
-        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null);
-        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
+        NoteOptions noteOptions = new NoteOptions(client.clientId(), -1, noteName, null, true, null, null, null, null);
+        client.writeNote(recordData, client.getPublicEncryptionKey(), client.getPublicSigningKey(), noteOptions, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<com.tozny.e3db.Note>() {
           @Override
           public void handle(Result<Note> n) {
             if (n.isError()) {
@@ -2616,7 +2572,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID, new ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2636,7 +2592,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        client.deleteNote(noteID, new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> n) {
             resultAtomicReference.set(n);
@@ -2651,7 +2607,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.deleteNote(noteID, new ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
+        client.deleteNote(noteID, new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> n) {
             resultAtomicReference.set(n);

@@ -106,5 +106,20 @@ class PlainCrypto implements Crypto {
   public int getBlockSize() {
     throw new IllegalStateException();
   }
+
+  @Override
+  public E3DBKeyPair deriveEncryptionKeypair(char[] password, byte[] salt) throws E3DBCryptoException {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public E3DBKeyPair deriveSigningKeyPair(char[] password, byte[] salt) throws E3DBCryptoException {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public byte[] randomBytes(int bytes) {
+    throw new IllegalStateException();
+  }
 }
 

@@ -20,6 +20,7 @@
 
 package com.tozny.e3db;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,7 +49,7 @@ import static com.tozny.e3db.Checks.*;
  * instance, if you do not want to use the built-in JSON document.</p>
  */
 public class Config {
-  private static final ObjectMapper mapper =  new ObjectMapper();
+  private static final ObjectMapper mapper = new ObjectMapper();
 
   /**
    * Username (API key) for the client.
@@ -93,7 +94,6 @@ public class Config {
     checkNotEmpty(host, "host");
     checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
     checkNotNull(clientId, "clientId");
-    checkNotNull(name, "name");
 
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
@@ -104,7 +104,7 @@ public class Config {
     this.publicKey = encodeURL(Platform.crypto.getPublicKey(decodeURL(this.privateKey)));
     this.privateSigningKey = privateSigningKey;
 
-    if(this.privateSigningKey != null)
+    if (this.privateSigningKey != null)
       this.publicSigningKey = encodeURL(Platform.crypto.getPublicSigningKey(decodeURL(this.privateSigningKey)));
     else
       this.publicSigningKey = null;
@@ -114,7 +114,7 @@ public class Config {
   /**
    * Create a Config instance from the given credentials and private encryption key.
    *
-   * @param creds Username (API key), password (API secret), and client ID.
+   * @param creds                Username (API key), password (API secret), and client ID.
    * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
@@ -123,12 +123,12 @@ public class Config {
     checkNotEmpty(privateEncryptionKey, "privateEncryptionKey");
 
     return new Config(creds.apiKey(),
-      creds.apiSecret(),
-      creds.clientId(),
-      creds.name(),
-      "https://api.e3db.com",
-      privateEncryptionKey,
-      null
+            creds.apiSecret(),
+            creds.clientId(),
+            creds.name(),
+            "https://api.e3db.com",
+            privateEncryptionKey,
+            null
     );
   }
 
@@ -136,9 +136,9 @@ public class Config {
    * Create a Config instance from the given credentials, private encryption key and private
    * signing key.
    *
-   * @param creds Username (API key), password (API secret), and client ID.
+   * @param creds                Username (API key), password (API secret), and client ID.
    * @param privateEncryptionKey Curve25519 private key, as a Base64URL-encoded string.
-   * @param privateSigningKey Ed25519 private key, as a Base64URL-encoded string.
+   * @param privateSigningKey    Ed25519 private key, as a Base64URL-encoded string.
    * @return A {@link Config} instance.
    */
   public static Config fromCredentials(ClientCredentials creds, String privateEncryptionKey, String privateSigningKey) throws E3DBCryptoException {
@@ -147,12 +147,12 @@ public class Config {
     checkNotEmpty(privateSigningKey, "privateSigningKey");
 
     return new Config(creds.apiKey(),
-      creds.apiSecret(),
-      creds.clientId(),
-      creds.name(),
-      "https://api.e3db.com",
-      privateEncryptionKey,
-      privateSigningKey
+            creds.apiSecret(),
+            creds.clientId(),
+            creds.name(),
+            "https://api.e3db.com",
+            privateEncryptionKey,
+            privateSigningKey
     );
   }
 
@@ -163,8 +163,8 @@ public class Config {
    * using the {@link #json()} method.
    *
    * @param doc JSON document representing a configuration.
-   * @throws IOException ioException.
    * @return a {@link Config} instance.
+   * @throws IOException ioException.
    */
   public static Config fromJson(String doc) throws IOException, E3DBCryptoException {
     checkNotEmpty(doc, "doc");
@@ -184,23 +184,22 @@ public class Config {
     checkNotNull(api_key_id, "api_key_id");
     checkNotNull(api_secret, "api_secret");
     checkNotNull(client_id, "client_id");
-    checkNotNull(client_email, "client_email");
     checkNotNull(api_url, "api_url");
     checkNotNull(private_key, "private_key");
     checkNotNull(public_key, "public_key");
 
-    if(version != null && version.asInt() > 1) {
+    if (version != null && version.asInt() > 1) {
       checkNotNull(private_signing_key, "private_signing_key");
       checkNotNull(public_signing_key, "public_signing_key");
     }
 
     return new Config(api_key_id.asText(),
-      api_secret.asText(),
-      UUID.fromString(client_id.asText()),
-      client_email == null ? "" : client_email.asText(),
-      api_url.asText(),
-      private_key.asText(),
-      private_signing_key == null ? null : private_signing_key.asText()
+            api_secret.asText(),
+            UUID.fromString(client_id.asText()),
+            client_email == null ? "" : client_email.asText(),
+            api_url.asText(),
+            private_key.asText(),
+            private_signing_key == null ? null : private_signing_key.asText()
     );
   }
 
@@ -222,11 +221,11 @@ public class Config {
     info.put("public_key", publicKey);
     info.put("private_key", privateKey);
     info.put("version", 1);
-    if(publicSigningKey != null) {
+    if (publicSigningKey != null) {
       info.put("public_signing_key", publicSigningKey);
       info.put("version", 2);
     }
-    if(privateSigningKey != null) {
+    if (privateSigningKey != null) {
       info.put("private_signing_key", privateSigningKey);
       info.put("version", 2);
     }

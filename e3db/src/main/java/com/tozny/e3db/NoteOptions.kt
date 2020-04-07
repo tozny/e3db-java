@@ -1,7 +1,6 @@
 package com.tozny.e3db
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import java.time.Instant
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -13,7 +12,7 @@ class NoteOptions {
   @JvmField
   var noteName: String? = null
   @JvmField
-  var expiration: Instant? = null
+  var expiration: Date? = null
   @JvmField
   var expires = false
   @JvmField
@@ -27,7 +26,7 @@ class NoteOptions {
   var fileMeta: Map<String, String>? = null
 
 
-  constructor(clientID: UUID?, maxViews: Int, noteName: String?, expiration: Instant?, expires: Boolean, noteType: String?, plain: Map<String, String>?, fileMeta: Map<String, String>?, eacp: EACP?) {
+  constructor(clientID: UUID?, maxViews: Int, noteName: String?, expiration: Date?, expires: Boolean, noteType: String?, plain: Map<String, String>?, fileMeta: Map<String, String>?, eacp: EACP?) {
     this.clientID = clientID
     this.maxViews = maxViews
     this.noteName = noteName

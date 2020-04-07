@@ -2,7 +2,7 @@ package com.tozny.e3db;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.time.Instant;
+import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,13 +34,13 @@ public class Note {
   @JsonProperty("signature")
   String signature;
   @JsonProperty("created_at")
-  Instant createdAt;
+  Date createdAt;
   @JsonProperty("max_views")
   int maxViews;
   @JsonProperty("views")
   int views;
   @JsonProperty("expiration")
-  Instant expiration;
+  Date expiration;
   @JsonProperty("expires")
   boolean expires;
   @JsonProperty("eacp")
@@ -59,7 +59,7 @@ public class Note {
               Map<String, String> fileMeta,
               String signature,
               int maxViews,
-              Instant expiration,
+              Date expiration,
               boolean expires,
               EACP eacp) {
     this.noteName = noteName;
@@ -152,7 +152,7 @@ public class Note {
     return signature;
   }
 
-  public Instant getCreatedAt() {
+  public Date getCreatedAt() {
     return createdAt;
   }
 
@@ -164,7 +164,7 @@ public class Note {
     return views;
   }
 
-  public Instant getExpiration() {
+  public Date getExpiration() {
     return expiration;
   }
 

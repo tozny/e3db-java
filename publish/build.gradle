@@ -19,12 +19,12 @@
  */
 
 ext {
-  version = "5.1.0-SNAPSHOT"
+  version = "6.0.0"
   groupId = "com.tozny.e3db"
   baseName = "e3db-client"
 }
 
-task publishLocal(dependsOn: [":publish:android:publishMavenAarPublicationToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
+task publishLocal(dependsOn: [":publish:android:publishToMavenLocal", ":publish:plain:publishToMavenLocal"]) {
   doLast {
     println "Published local artifacts."
   }

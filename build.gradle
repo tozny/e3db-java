@@ -23,7 +23,10 @@
 apply plugin: 'kotlin'
 apply plugin: 'java'
 
+
 buildscript {
+   ext.kotlin_plugin_version = '1.3.72'
+   ext.kotlin_jdk8_version = '1.3.72'
     repositories {
         jcenter()
         google()
@@ -32,12 +35,12 @@ buildscript {
         maven { url "https://maven.tozny.com/repo" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.6.1'
+        classpath 'com.android.tools.build:gradle:3.6.2'
         classpath "de.mannodermaus.gradle.plugins:android-junit5:1.0.0"
         classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:1.0.0'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
         classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.1'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.3.61"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_plugin_version"
         classpath "commons-io:commons-io:2.6"
         classpath "org.assertj:assertj-core:2.9.1"
     }

@@ -44,9 +44,12 @@ task sourceJar(type: Jar) {
   from sourceSets.main.allJava
 }
 
+
 task javadocJar(type: Jar) {
   classifier = 'javadoc'
+
   from javadoc
+
 }
 
 signing {
@@ -75,7 +78,6 @@ dependencies {
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
   }
   compileOnly project(":e3db").configurations.compileOnly.dependencies
-  implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
 
 
@@ -133,12 +135,11 @@ uploadArchives {
   }
 }
 buildscript {
-  ext.kotlin_version = '1.3.61'
   repositories {
     mavenCentral()
   }
   dependencies {
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_plugin_version"
   }
 }
 repositories {

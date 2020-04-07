@@ -366,7 +366,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                                         uiExecutor.execute { resultHandler.handle(ValueResult(IdentityClient(storageClient, identityConfig, agentToken, certificatePinner))) }
                                       }
                                           ?: run {
-                                            (uiExecutor.execute { resultHandler.handle(ErrorResult(E3DBException("Identity Token Could not be parsed"))) })
+                                            (uiExecutor.execute { resultHandler.handle(ErrorResult(E3DBException("Identity Token could not be parsed"))) })
                                           }
                                     }
                                   }

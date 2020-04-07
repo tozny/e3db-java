@@ -6,7 +6,9 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.jackson.JacksonConverterFactory
 import retrofit2.create
-import java.time.Instant
+import java.text.ParseException
+import java.text.SimpleDateFormat
+import java.util.*
 
 
 open class PartialIdentityClient @JvmOverloads constructor(val client: Client, val identityConfig: IdentityConfig, certificatePinner: CertificatePinner? = null) {
@@ -93,13 +95,24 @@ class IdentityClient @JvmOverloads constructor(client: Client, identityConfig: I
 }
 
 
-data class AgentToken(val token: String, val tokenType: String, val expiry: Instant) {
+data class AgentToken(val token: String, val tokenType: String, val expiry: Date) {
   companion object {
+    val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS", Locale.US)
     fun fromJson(json: JsonNode): AgentToken? {
       json["access_token"]?.let { accessToken ->
         json["token_type"]?.let { tokenType ->
           json["expiry"]?.let { expiry ->
-            return AgentToken(accessToken.asText(), tokenType.asText(), Instant.parse(expiry.asText()))
+            try {
+              dateTimeFormat.parse(expiry.asText())?.let { date ->
+                return AgentToken(
+                    accessToken.asText(),
+                    tokenType.asText(),
+                    date
+                )
+              }
+            } catch (e: ParseException) {
+              return null
+            }
           }
         }
       }

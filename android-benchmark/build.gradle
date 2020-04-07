@@ -25,7 +25,7 @@ android {
     compileSdkVersion 29
     defaultConfig {
         applicationId "com.tozny.e3db.benchmark"
-        minSdkVersion 21
+        minSdkVersion 23
         targetSdkVersion 29
         versionCode 1
         versionName "1.0"
@@ -39,8 +39,9 @@ android {
     }
 }
 
+
 dependencies {
-    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.50"
+    api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_jdk8_version"
     androidTestImplementation 'junit:junit:4.13'
     androidTestImplementation 'com.android.support.test:rules:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'

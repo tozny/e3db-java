@@ -51,7 +51,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -61,7 +60,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -264,7 +262,7 @@ public class Client {
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   // UUIDv5 TFSP1;ED25519;BLAKE2B
   private static final String SIGNATURE_VERSION = "e7737e7c-1637-511e-8bab-93c4f3e26fd9";
-  private static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+  protected static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   protected static final Executor backgroundExecutor;
   protected static final Executor uiExecutor;
@@ -484,8 +482,7 @@ public class Client {
 
     ObjectMapper mapper = new ObjectMapper()
             .registerModule(new Jdk8Module())
-            .registerModule(new KotlinModule())
-            .registerModule(new JavaTimeModule());
+            .registerModule(new KotlinModule());
 
     Retrofit tsv1Build = new Retrofit.Builder()
             .callbackExecutor(uiExecutor)
@@ -956,11 +953,14 @@ public class Client {
         }
       }
       Collections.sort(params);
-      StringJoiner paramBuilder = new StringJoiner("&");
-      for (String param : params) {
-        paramBuilder.add(param);
+      StringBuilder paramString = new StringBuilder();
+      for (int i = 0; i < params.size(); i++) {
+        paramString.append(params.get(i));
+        if (i != params.size() - 1) {
+          paramString.append("&");
+        }
       }
-      return paramBuilder.toString();
+      return paramString.toString();
     }
   }
 
@@ -968,13 +968,9 @@ public class Client {
     String authenticationPrefix = "TSV1";
     String hashingAlgorithim = "ED25519";
     String signatureType = "BLAKE2B";
-    String authenticationMethod = new StringJoiner("-")
-            .add(authenticationPrefix)
-            .add(hashingAlgorithim)
-            .add(signatureType)
-            .toString();
+    String authenticationMethod = authenticationPrefix + "-" + hashingAlgorithim + "-" + signatureType;
     String publicKeyBase64 = Base64.encodeURL(publicSigningKey);
-    long timestamp = Instant.now().getEpochSecond();
+    long timestamp = System.currentTimeMillis() / 1000;
     UUID nonce = UUID.randomUUID();
     String userId;
     if (clientID != null) {
@@ -982,22 +978,14 @@ public class Client {
     } else {
       userId = "uid:";
     }
-    String headerString = new StringJoiner("; ")
-            .add(authenticationMethod)
-            .add(publicKeyBase64)
-            .add(String.valueOf(timestamp))
-            .add(nonce.toString())
-            .add(userId).toString();
-    String stringToSign = new StringJoiner("; ")
-            .add(canonicalURI)
-            .add(queryParams)
-            .add(method)
-            .add(headerString)
-            .toString();
+    String headerString = authenticationMethod + "; " + publicKeyBase64 + "; " + timestamp + "; " + nonce.toString() + "; " + userId;
+    String stringToSign = canonicalURI + "; " +
+            queryParams + "; " +
+            method + "; " +
+            headerString;
     byte[] hash = Platform.crypto.hashString(stringToSign);
     String signature = Base64.encodeURL(Platform.crypto.signature(hash, privateSigningKey));
-    String header = new StringJoiner("; ").add(headerString).add(signature).toString();
-    return header;
+    return headerString + "; " +signature;
   }
 
   private class SD<T extends Signable> implements SignedDocument<T> {
@@ -2026,7 +2014,7 @@ public class Client {
     checkNotNull(recipientEncryptionKey, "Recipient Encryption Key");
     checkNotNull(recipientSigningKey, "Recipient Signing Key");
 
-    byte[] writerSigningKey = this.privateSigningKey;
+    final byte[] writerSigningKey = this.privateSigningKey;
     backgroundExecutor.execute(new Runnable() {
       @Override
       public void run() {
@@ -2080,8 +2068,7 @@ public class Client {
 
     ObjectMapper mapper = new ObjectMapper()
             .registerModule(new Jdk8Module())
-            .registerModule(new KotlinModule())
-            .registerModule(new JavaTimeModule());
+            .registerModule(new KotlinModule());
 
     Retrofit tsv1Build = new Retrofit.Builder()
             .callbackExecutor(uiExecutor)
@@ -2116,17 +2103,17 @@ public class Client {
     readNote(noteID, null, notesClient, privateEncryptionKey, handleResult);
   }
 
-  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
-    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"),null,   null);
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+    StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"), null, null);
     readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
   }
 
-  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  Map<String, String> additionalHeaders,  final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey, Map<String, String> additionalHeaders, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
     StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"), additionalHeaders, null);
     readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
   }
 
-  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey,  Map<String, String> additionalHeaders, CertificatePinner certificatePinner, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
+  public static void readAnonymousNote(final UUID noteID, final String noteName, byte[] privateSigningKey, byte[] publicSigningKey, byte[] privateEncryptionKey, Map<String, String> additionalHeaders, CertificatePinner certificatePinner, final ResultHandler<Note> handleResult) throws IllegalArgumentException, E3DBCryptoException {
     StorageV2API anonymousNoteClient = getAnonymousNoteClient(privateSigningKey, publicSigningKey, URI.create("https://api.e3db.com"), additionalHeaders, certificatePinner);
     readNote(noteID, noteName, anonymousNoteClient, privateEncryptionKey, handleResult);
   }
@@ -2146,7 +2133,7 @@ public class Client {
    * @param handleResult Result of the operation. If successful, returns the requested note
    * @throws IllegalArgumentException if both lookup values are null
    */
-  private static void readNote(final UUID noteID, final String noteName, StorageV2API notesClient, byte[] privateEncryptionKey, final ResultHandler<Note> handleResult) throws IllegalArgumentException {
+  private static void readNote(final UUID noteID, final String noteName, final StorageV2API notesClient, final byte[] privateEncryptionKey, final ResultHandler<Note> handleResult) throws IllegalArgumentException {
     if (noteID == null && noteName == null) {
       throw new IllegalArgumentException("At least one of noteID and noteName must not be null");
     }

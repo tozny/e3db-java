@@ -28,7 +28,6 @@ dependencies {
     compileOnly project(':e3db-crypto-stub-plain')
     compileOnly project(':e3db-crypto-stub-android')
 
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     compile "com.squareup.retrofit2:retrofit:$retrofitVersion"
     compile "com.squareup.retrofit2:converter-jackson:$retrofitVersion"
 //    compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
@@ -45,7 +44,7 @@ dependencies {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-//setJava7(this.project)
+setJava7(this.project)
 
 evaluationDependsOn(':publish')
 
@@ -55,18 +54,19 @@ javadoc {
                     "${project(":e3db-crypto-interface").projectDir}/src/main/java",
                     "${project(":e3db-crypto-android").projectDir}/src/main/java",
                     "${project(":e3db-crypto-plain").projectDir}/src/main/java"])
+
+    excludes = ['**/*.kt']
     title = "E3DB API Client"
     destinationDir = file("${rootDir}/docs/docs/${project(":publish").ext.version}")
     options.noQualifiers "java.lang", "java.util"
     classpath = files([project(":e3db").sourceSets.main.compileClasspath.files])
 }
 buildscript {
-    ext.kotlin_version = '1.3.61'
     repositories {
         mavenCentral()
     }
     dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_jdk8_version"
     }
 }
 repositories {

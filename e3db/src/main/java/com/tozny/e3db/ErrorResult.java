@@ -71,16 +71,16 @@ public class ErrorResult<R> implements Result<R> {
   /**
    * Returns any E3DB-specific error that occurred.
    *
-   * <p>This method will return {@code null} if a general exception
+   * <p>This method will return the underlying exception if a general exception
    * occurred during the operation; otherwise, it will return a specific E3DB error.
    *
-   * @return The  error, if any.
+   * @return The error, if any.
    */
   public E3DBException error() {
     if(error instanceof E3DBException)
       return (E3DBException) error;
     else
-      return null;
+      return error;
   }
 
   /**

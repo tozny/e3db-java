@@ -353,7 +353,7 @@ public class Client {
   }
 
 
-  protected Config getConfig() throws E3DBCryptoException {
+  public Config getConfig() throws E3DBCryptoException {
     return new Config(this.apiKey, this.apiSecret, this.clientId, "", this.host.toString(), Base64.encodeURL(this.privateEncryptionKey), Base64.encodeURL(this.privateSigningKey));
   }
 

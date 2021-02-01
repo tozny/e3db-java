@@ -178,87 +178,89 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                     it.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().error())) }
                     else -> body.realmBrokerIdentityToznyId?.let { brokerID ->
                       try {
-                        // Write the broker email reset notes
-                        client.getClientInfo(brokerID)?.let { clientInfo ->
-                          listOf(firstName, lastName).filterNot(String?::isNullOrBlank).joinToString(" ").ifEmpty { null }
-                          val brokerKeyNoteName = Base64.encodeURL(crypto.hashString("brokerKey:$username@realm:$realmName"))
-                          val brokerKey = Base64.encodeURL(crypto.randomBytes(64))
-                          val brokerNoteCreds = deriveNoteCreds(realmName, username, brokerKey, CredentialType.EMAIL_OTP)
-                          val brokerNoteOptions = NoteOptions().apply {
-                            noteName = brokerKeyNoteName
-                            maxViews = -1
-                            expires = false
-                            eacp = EACP.Builder().emailEACP(EmailEACP(
-                                email,
-                                "claim_account",
-                                brokerTargetURL.toString(),
-                                listOf(firstName, lastName).filterNot(String?::isNullOrBlank).joinToString(" ").ifBlank { null }?.let { identityName -> mapOf("name" to identityName) }
-                                    ?: run { HashMap<String, String>() },
-                                emailEACPExpiryMinutes
-                            )).build()
-                          }
-                          client.writeNote(
-                              RecordData(mapOf("brokerKey" to brokerKey, "username" to username)),
-                              clientInfo.encryptionKey!!,
-                              clientInfo.signingKey!!,
-                              brokerNoteOptions
-                          ) { brokerKeyNoteResultOpt ->
-                            brokerKeyNoteResultOpt!!.let { brokerKeyNoteResult ->
-                              when {
-                                brokerKeyNoteResult.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
-                                else -> {
-                                  val brokerIdCredsNoteOptions = NoteOptions().apply {
-                                    noteName = brokerNoteCreds.noteName
-                                    maxViews = -1
-                                    expires = false
-                                    eacp = EACP.Builder().lastAccessEACP(LastAccessEACP(brokerKeyNoteResult.asValue().noteID)).build()
-                                  }
-                                  client.writeNote(
-                                      idClientData,
-                                      brokerNoteCreds.encryptionKeys.publicKey,
-                                      brokerNoteCreds.signingKeys.publicKey,
-                                      brokerIdCredsNoteOptions
-                                  ) { brokerIdCredsNoteOpt ->
-                                    brokerIdCredsNoteOpt!!.let { brokerIdCredsNoteResult ->
-                                      when {
-                                        brokerIdCredsNoteResult.isError -> resultHandler.handle(ErrorResult(it.asError().other()))
-                                        else -> {
-                                          // Write the broker otp reset notes
-                                          val brokerOTPNoteName = Base64.encodeURL(crypto.hashString("broker_otp:$username@realm:$realmName"))
-                                          val brokerOTPKey = Base64.encodeURL(crypto.randomBytes(64))
-                                          val brokerOTPNoteCreds = deriveNoteCreds(realmName, username, brokerOTPKey, CredentialType.TOZNY_OTP)
-                                          val brokerOTPNoteOptions = NoteOptions().apply {
-                                            noteName = brokerOTPNoteName
-                                            maxViews = -1
-                                            expires = false
-                                            eacp = EACP.Builder().toznyOTPEACP(ToznyOTPEACP(true)).build()
-                                          }
-                                          client.writeNote(
-                                              RecordData(mapOf("brokerKey" to brokerOTPKey, "username" to username)),
-                                              clientInfo.encryptionKey!!,
-                                              clientInfo.signingKey!!,
-                                              brokerOTPNoteOptions
-                                          ) { brokerOTPNoteOpt ->
-                                            brokerOTPNoteOpt!!.let { brokerOTPNoteResult ->
-                                              when {
-                                                brokerOTPNoteResult.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
-                                                else -> {
-                                                  val brokerIDCredsNoteOptions = NoteOptions().apply {
-                                                    noteName = brokerOTPNoteCreds.noteName
-                                                    maxViews = -1
-                                                    expires = false
-                                                    eacp = EACP.Builder().lastAccessEACP(LastAccessEACP(brokerOTPNoteResult.asValue().noteID)).build()
-                                                  }
-                                                  client.writeNote(
-                                                      idClientData,
-                                                      brokerOTPNoteCreds.encryptionKeys.publicKey,
-                                                      brokerOTPNoteCreds.signingKeys.publicKey,
-                                                      brokerIDCredsNoteOptions
-                                                  ) { brokerOTPCredsNoteOpt ->
-                                                    brokerOTPCredsNoteOpt!!.let { brokerOTPCredsNote ->
-                                                      when {
-                                                        brokerOTPCredsNote.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
-                                                        else -> uiExecutor.execute { resultHandler.handle(ValueResult(PartialIdentityClient(client, identityConfig))) }
+                        backgroundExecutor.execute {
+                          // Write the broker email reset notes
+                          client.getClientInfo(brokerID)?.let { clientInfo ->
+                            listOf(firstName, lastName).filterNot(String?::isNullOrBlank).joinToString(" ").ifEmpty { null }
+                            val brokerKeyNoteName = Base64.encodeURL(crypto.hashString("brokerKey:$username@realm:$realmName"))
+                            val brokerKey = Base64.encodeURL(crypto.randomBytes(64))
+                            val brokerNoteCreds = deriveNoteCreds(realmName, username, brokerKey, CredentialType.EMAIL_OTP)
+                            val brokerNoteOptions = NoteOptions().apply {
+                              noteName = brokerKeyNoteName
+                              maxViews = -1
+                              expires = false
+                              eacp = EACP.Builder().emailEACP(EmailEACP(
+                                      email,
+                                      "claim_account",
+                                      brokerTargetURL.toString(),
+                                      listOf(firstName, lastName).filterNot(String?::isNullOrBlank).joinToString(" ").ifBlank { null }?.let { identityName -> mapOf("name" to identityName) }
+                                              ?: run { HashMap<String, String>() },
+                                      emailEACPExpiryMinutes
+                              )).build()
+                            }
+                            client.writeNote(
+                                    RecordData(mapOf("brokerKey" to brokerKey, "username" to username)),
+                                    clientInfo.encryptionKey!!,
+                                    clientInfo.signingKey!!,
+                                    brokerNoteOptions
+                            ) { brokerKeyNoteResultOpt ->
+                              brokerKeyNoteResultOpt!!.let { brokerKeyNoteResult ->
+                                when {
+                                  brokerKeyNoteResult.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
+                                  else -> {
+                                    val brokerIdCredsNoteOptions = NoteOptions().apply {
+                                      noteName = brokerNoteCreds.noteName
+                                      maxViews = -1
+                                      expires = false
+                                      eacp = EACP.Builder().lastAccessEACP(LastAccessEACP(brokerKeyNoteResult.asValue().noteID)).build()
+                                    }
+                                    client.writeNote(
+                                            idClientData,
+                                            brokerNoteCreds.encryptionKeys.publicKey,
+                                            brokerNoteCreds.signingKeys.publicKey,
+                                            brokerIdCredsNoteOptions
+                                    ) { brokerIdCredsNoteOpt ->
+                                      brokerIdCredsNoteOpt!!.let { brokerIdCredsNoteResult ->
+                                        when {
+                                          brokerIdCredsNoteResult.isError -> resultHandler.handle(ErrorResult(it.asError().other()))
+                                          else -> {
+                                            // Write the broker otp reset notes
+                                            val brokerOTPNoteName = Base64.encodeURL(crypto.hashString("broker_otp:$username@realm:$realmName"))
+                                            val brokerOTPKey = Base64.encodeURL(crypto.randomBytes(64))
+                                            val brokerOTPNoteCreds = deriveNoteCreds(realmName, username, brokerOTPKey, CredentialType.TOZNY_OTP)
+                                            val brokerOTPNoteOptions = NoteOptions().apply {
+                                              noteName = brokerOTPNoteName
+                                              maxViews = -1
+                                              expires = false
+                                              eacp = EACP.Builder().toznyOTPEACP(ToznyOTPEACP(true)).build()
+                                            }
+                                            client.writeNote(
+                                                    RecordData(mapOf("brokerKey" to brokerOTPKey, "username" to username)),
+                                                    clientInfo.encryptionKey!!,
+                                                    clientInfo.signingKey!!,
+                                                    brokerOTPNoteOptions
+                                            ) { brokerOTPNoteOpt ->
+                                              brokerOTPNoteOpt!!.let { brokerOTPNoteResult ->
+                                                when {
+                                                  brokerOTPNoteResult.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
+                                                  else -> {
+                                                    val brokerIDCredsNoteOptions = NoteOptions().apply {
+                                                      noteName = brokerOTPNoteCreds.noteName
+                                                      maxViews = -1
+                                                      expires = false
+                                                      eacp = EACP.Builder().lastAccessEACP(LastAccessEACP(brokerOTPNoteResult.asValue().noteID)).build()
+                                                    }
+                                                    client.writeNote(
+                                                            idClientData,
+                                                            brokerOTPNoteCreds.encryptionKeys.publicKey,
+                                                            brokerOTPNoteCreds.signingKeys.publicKey,
+                                                            brokerIDCredsNoteOptions
+                                                    ) { brokerOTPCredsNoteOpt ->
+                                                      brokerOTPCredsNoteOpt!!.let { brokerOTPCredsNote ->
+                                                        when {
+                                                          brokerOTPCredsNote.isError -> uiExecutor.execute { resultHandler.handle(ErrorResult(it.asError().other())) }
+                                                          else -> uiExecutor.execute { resultHandler.handle(ValueResult(PartialIdentityClient(client, identityConfig))) }
+                                                        }
                                                       }
                                                     }
                                                   }
@@ -275,9 +277,9 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                             }
                           }
                         }
-                      } catch (e: E3DBException) {
-                        uiExecutor.execute { resultHandler.handle(ErrorResult(e)) }
-                      }
+                        } catch (e: E3DBException) {
+                          uiExecutor.execute { resultHandler.handle(ErrorResult(e)) }
+                        }
                     } ?: run {
                       // If there is no broker do not write broker notes
                       uiExecutor.execute { resultHandler.handle(ValueResult(PartialIdentityClient(client, identityConfig))) }

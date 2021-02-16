@@ -26,8 +26,8 @@ import android.content.Context;
 import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
-import android.support.v4.content.PermissionChecker;
-import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import androidx.core.content.PermissionChecker;
+import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 
 
 import com.tozny.e3db.E3DBCryptoException;

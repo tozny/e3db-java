@@ -20,7 +20,7 @@
 
 package com.tozny.e3db.benchmark
 
-import android.support.test.InstrumentationRegistry
+import androidx.test.platform.app.InstrumentationRegistry
 import android.util.Log
 import dk.ilios.spanner.SpannerConfig
 import dk.ilios.spanner.config.RuntimeInstrumentConfig

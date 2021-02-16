@@ -61,7 +61,7 @@ allprojects {
 
 ext {
     jacksonVersion = "2.10.2"
-    retrofitVersion = "2.7.1"
+    retrofitVersion = "2.9.0"
 }
 
 //task clean(type: Delete) {

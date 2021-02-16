@@ -31,6 +31,7 @@ dependencies {
     compile "com.squareup.retrofit2:retrofit:$retrofitVersion"
     compile "com.squareup.retrofit2:converter-jackson:$retrofitVersion"
 //    compile 'com.squareup.okhttp3:logging-interceptor:3.10.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.9.0'
     compile "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
     compile "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
     compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
@@ -43,8 +44,6 @@ dependencies {
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
-
-setJava7(this.project)
 
 evaluationDependsOn(':publish')
 

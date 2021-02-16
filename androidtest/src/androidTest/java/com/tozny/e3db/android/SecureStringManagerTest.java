@@ -22,7 +22,7 @@ package com.tozny.e3db.android;
 
 import android.content.Context;
 import android.os.Build;
-import android.support.test.InstrumentationRegistry;
+import androidx.test.platform.app.InstrumentationRegistry;
 import android.util.Log;
 import org.junit.Test;
 
@@ -30,8 +30,6 @@ import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -81,7 +79,7 @@ public class SecureStringManagerTest {
     // Ensures that if we modify the encrypted file, it will no longer decrypt due because the mac is
     // incorrect.
 
-    Context ctx = InstrumentationRegistry.getTargetContext();
+    Context ctx = InstrumentationRegistry.getInstrumentation().getTargetContext();
     String filename = UUID.randomUUID().toString();
     String text = "foo";
     KeyGenerator aes = KeyGenerator.getInstance("AES");

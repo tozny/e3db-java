@@ -21,10 +21,9 @@
 package com.tozny.e3db;
 
 import android.content.Context;
-import android.support.test.InstrumentationRegistry;
-import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import android.util.Log;
-import com.tozny.e3db.*;
 
 import com.tozny.e3db.android.*;
 import org.junit.Test;
@@ -105,7 +104,7 @@ public class AndroidConfigStoreTest {
   };
 
   private void testStringWithKPNone(final String config) throws InterruptedException {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     final ConfigStore ConfigStore = new AndroidConfigStore(context, name);
 
     Config.saveConfigSecurely(ConfigStore, config, new ConfigStore.SaveHandler() {
@@ -149,7 +148,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testSaveLoadPasswordProtected() {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     final String testPassword = UUID.randomUUID().toString();
     final String identifier = UUID.randomUUID().toString();
 
@@ -234,7 +233,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testAndroidConfigHelperParams() {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
 
     /* Null Context */
     try {
@@ -263,7 +262,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testSaveWithNullParams() throws InterruptedException {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     String config = "string";
 
     /* Null AndroidConfigStore */
@@ -287,7 +286,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testLoadWithNullParams() throws InterruptedException {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     final ConfigStore.LoadHandler badParamLoadHandler = new ConfigStore.LoadHandler() {
       @Override
       public void loadConfigDidSucceed(String config) {
@@ -344,7 +343,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testRemoveWithNullParams() throws InterruptedException {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     final ConfigStore.RemoveHandler badParamRemoveHandler = new ConfigStore.RemoveHandler() {
       @Override
       public void removeConfigDidSucceed() {
@@ -392,7 +391,7 @@ public class AndroidConfigStoreTest {
 
   @Test
   public void testBadIdentifierStrings() {
-    Context context = InstrumentationRegistry.getTargetContext();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     String string = "string";
 
     String badIdentifiers[] = {"",

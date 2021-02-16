@@ -22,8 +22,8 @@ package com.tozny.e3db.android;
 
 import android.app.Activity;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
-import android.support.v4.hardware.fingerprint.FingerprintManagerCompat;
+import androidx.annotation.RequiresApi;
+import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 
 import java.security.UnrecoverableKeyException;
 

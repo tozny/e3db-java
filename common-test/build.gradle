@@ -27,7 +27,7 @@ compileTestJava {
 }
 
 dependencies {
-  testImplementation("junit:junit:[4,)")
+  testImplementation("junit:junit:4.13.2")
   implementation project(path: ':e3db')
   implementation project(path: ':e3db-crypto-interface')
   compileOnly project(":e3db-crypto-stub-plain")

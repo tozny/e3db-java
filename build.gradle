@@ -25,8 +25,8 @@ apply plugin: 'java'
 
 
 buildscript {
-   ext.kotlin_plugin_version = '1.3.72'
-   ext.kotlin_jdk8_version = '1.3.72'
+   ext.kotlin_plugin_version = '1.4.30'
+   ext.kotlin_jdk8_version = '1.4.30'
     repositories {
         jcenter()
         google()
@@ -35,14 +35,14 @@ buildscript {
         maven { url "https://maven.tozny.com/repo" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.6.2'
+        classpath 'com.android.tools.build:gradle:4.1.2'
         classpath "de.mannodermaus.gradle.plugins:android-junit5:1.0.0"
-        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:1.0.0'
+        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:2.0.0'
         classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
         classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_plugin_version"
-        classpath "commons-io:commons-io:2.6"
-        classpath "org.assertj:assertj-core:2.9.1"
+        classpath "commons-io:commons-io:2.8.0"
+        classpath "org.assertj:assertj-core:3.19.0"
     }
 }
 
@@ -60,30 +60,10 @@ allprojects {
 }
 
 ext {
-    jacksonVersion = "2.10.2"
+    jacksonVersion = "2.12.1"
     retrofitVersion = "2.9.0"
 }
 
-//task clean(type: Delete) {
-//    delete rootProject.buildDir
-//}
-
-/*
- * Set the gradle property "java7Home" to the root of a Java 7 JDK to ensure compilation
- * using only JDK 7 classes.
- */
-void setJava7(Project project) {
-    if (hasProperty('java7Home') && project.sourceCompatibility.toString() == "1.7") {
-        def javaBootstrapPath = new File(java7Home, 'jre').toPath().resolve("lib").resolve("rt.jar").toString()
-        project.tasks.withType(AbstractCompile) {
-            options.with {
-                fork = true
-                forkOptions.javaHome = file(java7Home)
-                forkOptions.jvmArgs = ["-bootclasspath", javaBootstrapPath, "-Xlint:unchecked"]
-            }
-        }
-    }
-}
 
 def regToken() {
     if(project.properties["REGISTRATION_TOKEN"] != null)

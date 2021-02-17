@@ -69,11 +69,11 @@ publishing {
 }
   
 dependencies {
-  compile project(":e3db-crypto-plain").configurations.compile.dependencies.matching { dep ->
+  implementation project(":e3db-crypto-plain").configurations.compile.dependencies.matching { dep ->
     // exclude project dependencies - only include external, maven dependencies
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
   }
-  compile project(":e3db").configurations.compile.dependencies.matching { dep ->
+  implementation project(":e3db").configurations.compile.dependencies.matching { dep ->
     // exclude project dependencies - only include external, maven dependencies
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
   }

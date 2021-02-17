@@ -5,16 +5,17 @@ import android.os.Looper
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.tozny.e3db.Client.*
 import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.jackson.JacksonConverterFactory
 import retrofit2.create
 import java.net.URI
 import java.util.*
-import java.util.concurrent.*
 import kotlin.collections.HashMap
 
 
@@ -29,7 +30,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
     @JvmStatic
     private val uiExecutor = Client.uiExecutor
 
-    internal val mapper = ObjectMapper().registerModule(KotlinModule()).configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+    internal val mapper = ObjectMapper().registerKotlinModule().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
 
     internal fun deriveNoteCreds(realmName: String, userName: String, password: String, noteType: CredentialType): DerivedNoteCreds {
       val nameSeed = "${userName.toLowerCase(Locale.US)}@realm:$realmName".let { seed ->
@@ -401,17 +402,19 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
 
                           }
                           else -> {
-                            request.post(RequestBody.create(MediaType.get("application/json"), mapper.writeValueAsString(handleAction)))
+
+
+                            request.post(mapper.writeValueAsString(handleAction).toRequestBody("application/json".toMediaType()))
                           }
                         }
                         val loginActionResponse = loginActionClient.newCall(request.build()).execute()
                         when (loginActionResponse.isSuccessful) {
                           false -> {
                             madeFinalRequest = true
-                            throw E3DBException.find(loginActionResponse.code(), loginActionResponse.message())
+                            throw E3DBException.find(loginActionResponse.code, loginActionResponse.message)
                           }
                           true -> {
-                            val content = loginActionResponse.body()?.string()
+                            val content = loginActionResponse.body?.string()
                             content?.let {
                               body = mapper?.readValue(content) ?: run {
                                 madeFinalRequest = true

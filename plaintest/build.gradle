@@ -33,7 +33,7 @@ sourceSets.test.java {
 
 dependencies {
   testImplementation project(":common-test")
-  testCompile("junit:junit:[4,)")
+  testImplementation("junit:junit:4.13.2")
   testImplementation project(path: ':e3db')
   testImplementation project(path: ':e3db-crypto-interface')
   testCompile(project(path: ':e3db-crypto-plain')) {
@@ -42,8 +42,8 @@ dependencies {
   testImplementation "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
   testImplementation "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
   testImplementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-  testImplementation "commons-io:commons-io:2.6"
-  testImplementation "org.assertj:assertj-core:2.9.1"
+  testImplementation "commons-io:commons-io:2.8.0"
+  testImplementation "org.assertj:assertj-core:3.19.0"
 }
 
 tasks.withType(Test) {

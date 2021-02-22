@@ -24,6 +24,8 @@ import android.content.Context;
 import android.util.Log;
 
 
+import androidx.core.content.ContextCompat;
+
 import javax.crypto.*;
 import java.io.*;
 import java.util.ArrayList;

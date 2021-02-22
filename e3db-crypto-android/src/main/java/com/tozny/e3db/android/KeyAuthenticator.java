@@ -20,10 +20,12 @@
 
 package com.tozny.e3db.android;
 
-import android.app.Activity;
 import android.os.Build;
+
 import androidx.annotation.RequiresApi;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
+import androidx.fragment.app.FragmentActivity;
 
 import java.security.UnrecoverableKeyException;
 
@@ -37,8 +39,8 @@ import java.security.UnrecoverableKeyException;
  * etc.) with a {@code handler} argument. The implementation should gather the appropriate authentication, and then
  * call the {@code handle} method on the handler that was given.
  *
- * <p>Use the static method {@link #defaultAuthenticator(Activity, String)} to get an authenticator implementation
- * that can gather a password, collect a fingerprint, or ask the user to enter their lock screen PIN.
+ * <p>Use the static method {@link #defaultAuthenticator(FragmentActivity, String)} to get an authenticator implementation
+ * that can gather a password, collect a fingerprint, collect a biometric, or ask the user to enter their lock screen PIN.
  *
  * <p>The static method {@link #noAuthentication()} can be used to get an authenticator that should not be called (useful
  * when the configuration is not protected by any special authentication).
@@ -58,6 +60,11 @@ public abstract class KeyAuthenticator {
     @Override
     public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, AuthenticateHandler handler) {
       throw new IllegalStateException("authenticateWithFingerprint should not be called.");
+    }
+
+    @Override
+    public void authenticateWithBiometric(BiometricPrompt.CryptoObject cryptoObject, AuthenticateHandler handler) {
+      throw new IllegalStateException("authenticateWithBiometrics should not be called.");
     }
   };
 
@@ -108,21 +115,32 @@ public abstract class KeyAuthenticator {
    * Called when the user needs to present a fingerprint.
    * @param cryptoObject Contains a reference to the crypto operation that must be authenticated before it can be used.
    * @param handler For receiving the result of the authentication.
+   *
+   * @deprecated Use {@code com.tozny.e3db.authenticateWithBiometric} instead.
    */
+  @Deprecated
   @RequiresApi(api = Build.VERSION_CODES.M)
   public abstract void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, AuthenticateHandler handler);
 
   /**
-   * Returns an instance that can gather a password, collect a fingerprint, or initiate the system flow for asking the
+   * Called when the user needs to present a Biometric.
+   * @param cryptoObject Contains a reference to the crypto operation that must be authenticated before it can be used.
+   * @param handler For receiving the result of the authentication.
+   */
+  @RequiresApi(api = Build.VERSION_CODES.M)
+  public abstract void authenticateWithBiometric(BiometricPrompt.CryptoObject cryptoObject, AuthenticateHandler handler);
+
+  /**
+   * Returns an instance that can gather a password, collect a fingerprint, a biometric, or initiate the system flow for asking the
    * used to enter their lock screen PIN.
    *
-   * @param activity The activity from which the authenticatoin will be launched. Note that if your activity has the {@code noHistory} attribute set (via
+   * @param activity The fragment activity from which the authentication will be launched. Note that if your activity has the {@code noHistory} attribute set (via
    * AndroidManifest.xml), the lock screen authentication method will fail. ({@code onActivityResult} is never called and the device credential flow
    * fails to return to your activity.)
    * @param title Title to use on the dialog for gathering a fingerprint.
    * @return Ibid.
    */
-  public static KeyAuthenticator defaultAuthenticator(Activity activity, String title) {
+  public static KeyAuthenticator defaultAuthenticator(FragmentActivity activity, String title) {
     return new DefaultKeyAuthenticator(activity, title);
   }
 

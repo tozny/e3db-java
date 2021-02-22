@@ -24,19 +24,28 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.DialogFragment;
-import android.app.Fragment;
-import android.app.FragmentManager;
-import android.app.FragmentTransaction;
+
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
+
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+
+import androidx.biometric.BiometricPrompt;
+
 import android.os.Build;
 import android.os.Bundle;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import androidx.core.os.CancellationSignal;
+
 import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -47,6 +56,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.tozny.e3db.R;
 
 import java.security.GeneralSecurityException;
@@ -58,18 +68,16 @@ import static android.app.Activity.RESULT_OK;
  * Performs fingerprint authentication to unlock protected keys.
  */
 class DefaultKeyAuthenticator extends KeyAuthenticator {
-  private final Activity activity;
+  private final FragmentActivity activity;
   private final String title;
 
   /**
    * Create an instance that will display over the given activity.
    *
-   * @param activity
-   *         Activity that will host the dialog
-   * @param title
-   *         Title of the fingerprint dialog.
+   * @param activity Activity that will host the dialog
+   * @param title    Title of the fingerprint dialog.
    */
-  public DefaultKeyAuthenticator(Activity activity, String title) {
+  public DefaultKeyAuthenticator(FragmentActivity activity, String title) {
     if (activity == null)
       throw new IllegalArgumentException("activity");
     if (title == null)
@@ -85,7 +93,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
    */
   @TargetApi(23)
   public static class FingerprintAuthDialogFragment extends DialogFragment
-      implements FingerprintUiHelper.Callback {
+          implements FingerprintUiHelper.Callback {
 
     private Activity mActivity;
     private Callback mCallback;
@@ -144,8 +152,8 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
       });
 
       mFingerprintUiHelper = new FingerprintUiHelper(FingerprintManagerCompat.from(this.getActivity()),
-          (ImageView) v.findViewById(R.id.fingerprint_icon),
-          (TextView) v.findViewById(R.id.fingerprint_status), this);
+              (ImageView) v.findViewById(R.id.fingerprint_icon),
+              (TextView) v.findViewById(R.id.fingerprint_status), this);
 
       return v;
     }
@@ -284,7 +292,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
       mCancellationSignal = new CancellationSignal();
       mSelfCancelled = false;
       mFingerprintManager
-          .authenticate(cryptoObject, 0 /* flags */, mCancellationSignal, this, null);
+              .authenticate(cryptoObject, 0 /* flags */, mCancellationSignal, this, null);
       mIcon.setImageResource(R.drawable.ic_fp_40px);
     }
 
@@ -352,13 +360,82 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
     }
   }
 
+  @RequiresApi(Build.VERSION_CODES.M)
+  public static final class BiometricCredentialsFragment extends Fragment {
+
+    private AuthenticateHandler authHandler;
+    private BiometricPrompt.CryptoObject cryptoObject;
+    private String title;
+
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+      BiometricPrompt biometricPrompt = new BiometricPrompt(this, new BiometricPrompt.AuthenticationCallback() {
+        @Override
+        public void onAuthenticationError(int errorCode,
+                                          @NonNull CharSequence errString) {
+          super.onAuthenticationError(errorCode, errString);
+          authHandler.handleError(new GeneralSecurityException("An error occurred while authentication"));
+        }
+
+        @Override
+        public void onAuthenticationSucceeded(
+                @NonNull BiometricPrompt.AuthenticationResult result) {
+          super.onAuthenticationSucceeded(result);
+          authHandler.handleAuthenticated();
+        }
+
+        @Override
+        public void onAuthenticationFailed() {
+          super.onAuthenticationFailed();
+          authHandler.handleCancel();
+        }
+      });
+      String promptTitle = this.title != null ? this.title : "Biometric Prompt";
+      BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder().setTitle(promptTitle).setNegativeButtonText("Cancel").build();
+      biometricPrompt.authenticate(info, this.cryptoObject);
+    }
+
+    public void setCryptoObject(BiometricPrompt.CryptoObject cryptoObject) {
+      this.cryptoObject = cryptoObject;
+    }
+
+    public void setTitle(String title) {
+      this.title = title;
+    }
+
+    public void setHandler(AuthenticateHandler authHandler) {
+      this.authHandler = authHandler;
+    }
+
+    @Override
+    public void onAttach(Context context) {
+      super.onAttach(context);
+    }
+  }
+
   @RequiresApi(api = Build.VERSION_CODES.M)
   @Override
   public void authenticateWithLockScreen(AuthenticateHandler cont) {
     DeviceCredentialsFragment f = new DeviceCredentialsFragment(cont, title, (KeyguardManager) activity.getSystemService(Context.KEYGUARD_SERVICE));
-    FragmentManager fragmentManager = activity.getFragmentManager();
+    FragmentManager fragmentManager = activity.getSupportFragmentManager();
     FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
     fragmentTransaction.add(f, "device_credentials_fragment");
+    fragmentTransaction.commit();
+  }
+
+
+  @RequiresApi(api = Build.VERSION_CODES.M)
+  @Override
+  public void authenticateWithBiometric(BiometricPrompt.CryptoObject cryptoObject, AuthenticateHandler handler) {
+    BiometricCredentialsFragment f= new BiometricCredentialsFragment();
+    f.setHandler(handler);
+    f.setCryptoObject(cryptoObject);
+    f.setTitle(title);
+    FragmentManager fragmentManager = activity.getSupportFragmentManager();
+    FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+    fragmentTransaction.add(f, "biometric_credentials_fragment");
     fragmentTransaction.commit();
   }
 
@@ -438,9 +515,11 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
         }
       });
 
-      fragment.show(activity.getFragmentManager(), "fingerprintUI");
+      fragment.show(activity.getSupportFragmentManager(), "fingerprintUI");
     } catch (Throwable e) {
       handler.handleError(e);
     }
   }
+
+
 }

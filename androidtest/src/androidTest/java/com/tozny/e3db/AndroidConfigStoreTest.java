@@ -21,6 +21,8 @@
 package com.tozny.e3db;
 
 import android.content.Context;
+
+import androidx.biometric.BiometricPrompt;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 import android.util.Log;
@@ -169,6 +171,11 @@ public class AndroidConfigStoreTest {
 
       @Override
       public void authenticateWithFingerprint(FingerprintManagerCompat.CryptoObject cryptoObject, AuthenticateHandler handler) {
+        fail("Incorrect authentication.");
+      }
+
+      @Override
+      public void authenticateWithBiometric(BiometricPrompt.CryptoObject cryptoObject, AuthenticateHandler handler) {
         fail("Incorrect authentication.");
       }
     };

@@ -26,6 +26,9 @@ import android.content.Context;
 import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 import android.security.keystore.KeyPermanentlyInvalidatedException;
+
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.content.PermissionChecker;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
 
@@ -44,30 +47,77 @@ class KeyStoreManager {
   @SuppressLint({"MissingPermission", "NewApi"})
   private static void checkArgs(Context context, KeyAuthentication protection, KeyAuthenticator keyAuthenticator) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+      if (protection.authenticationType() == BIOMETRIC|| protection.authenticationType() == BIOMETRIC_STRONG)
+        throw new IllegalArgumentException(protection.authenticationType().toString() + " not supported below API 28.");
+    }
+
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
       if (protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN)
         throw new IllegalArgumentException(protection.authenticationType().toString() + " not supported below API 23.");
     }
 
-    if (protection.authenticationType() == PASSWORD || protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN) {
+    if (protection.authenticationType() == PASSWORD || protection.authenticationType() == FINGERPRINT || protection.authenticationType() == LOCK_SCREEN || protection.authenticationType() == BIOMETRIC || protection.authenticationType() == BIOMETRIC_STRONG) {
       if (keyAuthenticator == null) {
         throw new IllegalArgumentException("KeyAuthenticator can't be null for key protection type: " + protection.authenticationType().toString());
       }
     }
 
-    if (protection.authenticationType() == FINGERPRINT) {
-      if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED)
-        throw new IllegalArgumentException(protection.authenticationType().toString() + " permission not granted.");
+    if (protection.authenticationType() == BIOMETRIC){
+      if(Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+        isFingerPrintAvailable(context, protection);
+      } else {
+        isBiometricAvailable(context, protection.authenticationType(), BiometricManager.Authenticators.BIOMETRIC_WEAK);
+      }
+    }
 
-      // Some devices support fingerprint but the support library doesn't recognize it, so
-      // we use the actual FingerprintManager here. (https://stackoverflow.com/a/45181416/169359)
-      FingerprintManager mgr = context.getSystemService(FingerprintManager.class);
-      if (mgr == null || ! mgr.isHardwareDetected())
-        throw new IllegalArgumentException(protection.authenticationType().toString() + " hardware not available.");
+
+    if (protection.authenticationType() == BIOMETRIC_STRONG){
+      if(Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+        isFingerPrintAvailable(context, protection);
+      } else {
+        isBiometricAvailable(context, protection.authenticationType(), BiometricManager.Authenticators.BIOMETRIC_STRONG);
+      }
+    }
+
+    if (protection.authenticationType() == FINGERPRINT) {
+      isFingerPrintAvailable(context, protection);
     }
 
     if (protection.authenticationType() == LOCK_SCREEN) {
       if (protection.validUntilSecondsSinceUnlock() < 1)
         throw new IllegalArgumentException("secondsSinceUnlock must be greater than 0.");
+    }
+  }
+
+  private static void isFingerPrintAvailable(Context context, KeyAuthentication protection) {
+    if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_FINGERPRINT) != PermissionChecker.PERMISSION_GRANTED)
+      throw new IllegalArgumentException(protection.authenticationType().toString() + " permission not granted.");
+
+    // Some devices support fingerprint but the support library doesn't recognize it, so
+    // we use the actual FingerprintManager here. (https://stackoverflow.com/a/45181416/169359)
+    FingerprintManager mgr = context.getSystemService(FingerprintManager.class);
+    if (mgr == null || ! mgr.isHardwareDetected())
+      throw new IllegalArgumentException(protection.authenticationType().toString() + " hardware not available.");
+  }
+
+  @SuppressLint({"MissingPermission", "NewApi"})
+  private static void isBiometricAvailable(Context context, KeyAuthentication.KeyAuthenticationType protection, int biometricType) {
+    if (PermissionChecker.checkSelfPermission(context, Manifest.permission.USE_BIOMETRIC) != PermissionChecker.PERMISSION_GRANTED) {
+      throw new IllegalArgumentException(protection.toString() + " permission not granted.");
+    }
+    BiometricManager mgr = BiometricManager.from(context);
+    int canBiometricAuth = mgr.canAuthenticate(biometricType);
+    if (mgr == null || canBiometricAuth != BiometricManager.BIOMETRIC_SUCCESS) {
+      switch (canBiometricAuth) {
+        case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED:
+          throw new IllegalArgumentException(protection.toString() + " cannot be used because no biometrics are enrolled");
+        case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE:
+          throw new IllegalArgumentException(protection.toString() + " cannot be used because no biometric features available on this device.");
+        case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE:
+          throw new IllegalArgumentException(protection.toString() + " cannot be used because biometric features are currently unavailable.");
+        default:
+          throw new IllegalArgumentException(protection.toString() + " cannot be used");
+      }
     }
   }
 
@@ -96,6 +146,34 @@ class KeyStoreManager {
             authenticatedCipherHandler.onError(e);
           }
 
+          break;
+        case BIOMETRIC_STRONG:
+        case BIOMETRIC:
+          try {
+            cipher = cipherGetter.getCipher(context, identifier, AKSWrapper.getSecretKey(identifier, protection));
+            keyAuthenticator.authenticateWithBiometric(new BiometricPrompt.CryptoObject(cipher), new KeyAuthenticator.AuthenticateHandler() {
+              @Override
+              public void handleAuthenticated() {
+                try {
+                  authenticatedCipherHandler.onAuthenticated(cipher);
+                } catch (Throwable e) {
+                  authenticatedCipherHandler.onError(e);
+                }
+              }
+
+              @Override
+              public void handleCancel() {
+                authenticatedCipherHandler.onCancel();
+              }
+
+              @Override
+              public void handleError(Throwable e) {
+                authenticatedCipherHandler.onError(e);
+              }
+            });
+          } catch (InvalidKeyException | UnrecoverableKeyException | IOException | E3DBCryptoException e) {
+              authenticatedCipherHandler.onError(e);
+            }
           break;
         case FINGERPRINT:
           try {

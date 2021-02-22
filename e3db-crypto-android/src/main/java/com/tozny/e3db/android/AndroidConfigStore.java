@@ -114,6 +114,10 @@ public class AndroidConfigStore implements ConfigStore {
         return COM_TOZNY_E3DB_CRYPTO + identifier + "-NO";
       case FINGERPRINT:
         return COM_TOZNY_E3DB_CRYPTO + identifier + "-FP";
+      case BIOMETRIC:
+        return COM_TOZNY_E3DB_CRYPTO + identifier + "-BW";
+      case BIOMETRIC_STRONG:
+        return COM_TOZNY_E3DB_CRYPTO + identifier + "-BS";
       case LOCK_SCREEN:
         return COM_TOZNY_E3DB_CRYPTO + identifier + "-LS";
       case PASSWORD:

@@ -128,6 +128,8 @@ class CipherManager {
           cipher.init(Cipher.ENCRYPT_MODE, key, createIV());
         } else {
           switch (protection) {
+            case BIOMETRIC_STRONG:
+            case BIOMETRIC:
             case FINGERPRINT:
             case LOCK_SCREEN:
             case NONE:
@@ -167,6 +169,8 @@ class CipherManager {
       }
       else {
         switch(protection) {
+          case BIOMETRIC_STRONG:
+          case BIOMETRIC:
           case FINGERPRINT:
           case LOCK_SCREEN:
           case NONE:

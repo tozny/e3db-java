@@ -20,6 +20,7 @@
 
 package com.tozny.e3db.android;
 
+import android.hardware.biometrics.BiometricManager;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
@@ -56,6 +57,8 @@ class AKSWrapper {
         }
 
         switch(protection.authenticationType()) {
+          case BIOMETRIC:
+          case BIOMETRIC_STRONG:
           case FINGERPRINT:
             builder.setUserAuthenticationRequired(true);
             break;

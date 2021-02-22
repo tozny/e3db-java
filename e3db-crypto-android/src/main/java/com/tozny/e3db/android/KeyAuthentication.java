@@ -26,8 +26,10 @@ import android.content.Context;
 import android.hardware.fingerprint.FingerprintManager;
 import android.os.Build;
 
+import androidx.biometric.BiometricManager;
 import androidx.core.content.PermissionChecker;
 import androidx.core.hardware.fingerprint.FingerprintManagerCompat;
+
 import android.util.SparseArray;
 
 /**
@@ -36,7 +38,8 @@ import android.util.SparseArray;
  */
 public abstract class KeyAuthentication {
 
-  public KeyAuthentication() { }
+  public KeyAuthentication() {
+  }
 
   /**
    * Amount of time after the user unlocks their phone that a key protected
@@ -70,13 +73,19 @@ public abstract class KeyAuthentication {
     /**
      * Password authentication required.
      */
-    PASSWORD;
+    PASSWORD,
+
+    BIOMETRIC,
+
+    BIOMETRIC_STRONG,
+    ;
 
     private static class Ords {
       private static final SparseArray<KeyAuthenticationType> ordMap;
+
       static {
         ordMap = new SparseArray<>();
-        for(KeyAuthenticationType i : KeyAuthenticationType.values()) {
+        for (KeyAuthenticationType i : KeyAuthenticationType.values()) {
           ordMap.put(i.ordinal(), i);
         }
       }
@@ -84,7 +93,7 @@ public abstract class KeyAuthentication {
 
     static KeyAuthenticationType fromOrdinal(int ordinal) {
       KeyAuthenticationType keyAuthenticationType = Ords.ordMap.get(ordinal);
-      if(keyAuthenticationType == null)
+      if (keyAuthenticationType == null)
         throw new IllegalArgumentException("ordinal not found " + ordinal);
       return keyAuthenticationType;
     }
@@ -94,42 +103,77 @@ public abstract class KeyAuthentication {
    * Indicates the timeout for lock screen PIN authentication for the
    * key associated with this authentication method. Only valid when {@link #authenticationType()}
    * returns {@link KeyAuthenticationType#LOCK_SCREEN}.
-   *
+   * <p>
    * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
    * for details.
+   *
    * @return Ibid.
    */
   public abstract int validUntilSecondsSinceUnlock();
 
   /**
    * Indicates what type of authentication is supported by this instance.
+   *
    * @return Ibid.
    */
   public abstract KeyAuthenticationType authenticationType();
 
   /**
    * Indicates if the device and SDK support the given type of key authentication.
-   * @param ctx Application context.
+   *
+   * @param ctx            Application context.
    * @param authentication Authentication type.
    * @return {@code true} if the authencation type is supported; {@code false} otherwise.
    */
   @SuppressLint("MissingPermission")
   public static boolean protectionTypeSupported(Context ctx, KeyAuthenticationType authentication) {
-    switch(authentication){
+    switch (authentication) {
       case NONE:
       case PASSWORD:
         return true;
       case LOCK_SCREEN:
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
       case FINGERPRINT:
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
           // Some devices support fingerprint but the support library doesn't recognize it, so
           // we use the actual FingerprintManager here. (https://stackoverflow.com/a/45181416/169359)
           FingerprintManager mgr = ctx.getSystemService(FingerprintManager.class);
           if (mgr != null) {
             return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
-                       mgr.isHardwareDetected() &&
-                       mgr.hasEnrolledFingerprints();
+                    mgr.isHardwareDetected() &&
+                    mgr.hasEnrolledFingerprints();
+          }
+        }
+        return false;
+      case BIOMETRIC:
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          BiometricManager mgr = BiometricManager.from(ctx);
+          if (mgr != null) {
+            return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_BIOMETRIC) == PermissionChecker.PERMISSION_GRANTED &&
+                    (mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS);
+          }
+
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+          BiometricManager mgr = BiometricManager.from(ctx);
+          if (mgr != null) {
+            return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
+                    (mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS);
+          }
+        }
+        return false;
+      case BIOMETRIC_STRONG:
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          BiometricManager mgr = BiometricManager.from(ctx);
+          if (mgr != null) {
+            return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_BIOMETRIC) == PermissionChecker.PERMISSION_GRANTED &&
+                    (mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS);
+          }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+          BiometricManager mgr = BiometricManager.from(ctx);
+          if (mgr != null) {
+            return PermissionChecker.checkSelfPermission(ctx, Manifest.permission.USE_FINGERPRINT) == PermissionChecker.PERMISSION_GRANTED &&
+                    (mgr.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS);
+
           }
         }
         return false;
@@ -140,9 +184,10 @@ public abstract class KeyAuthentication {
 
   /**
    * Creates an instance for requiring fingerprint authentication.
-   *
+   * <p>
    * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
    * for details.
+   *
    * @return Ibid.
    */
   public static KeyAuthentication withFingerprint() {
@@ -164,8 +209,64 @@ public abstract class KeyAuthentication {
     };
   }
 
+
+  /**
+   * Creates an instance for requiring fingerprint authentication.
+   * <p>
+   * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
+   * for details.
+   *
+   * @return Ibid.
+   */
+  public static KeyAuthentication withBiometric() {
+    return new KeyAuthentication() {
+      @Override
+      public int validUntilSecondsSinceUnlock() {
+        throw new IllegalStateException();
+      }
+
+      @Override
+      public KeyAuthenticationType authenticationType() {
+        return KeyAuthenticationType.BIOMETRIC;
+      }
+
+      @Override
+      public String toString() {
+        return KeyAuthenticationType.BIOMETRIC.toString();
+      }
+    };
+  }
+
+  /**
+   * Creates an instance for requiring fingerprint authentication.
+   * <p>
+   * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
+   * for details.
+   *
+   * @return Ibid.
+   */
+  public static KeyAuthentication withBiometricStrong() {
+    return new KeyAuthentication() {
+      @Override
+      public int validUntilSecondsSinceUnlock() {
+        throw new IllegalStateException();
+      }
+
+      @Override
+      public KeyAuthenticationType authenticationType() {
+        return KeyAuthenticationType.BIOMETRIC_STRONG;
+      }
+
+      @Override
+      public String toString() {
+        return KeyAuthenticationType.BIOMETRIC_STRONG.toString();
+      }
+    };
+  }
+
   /**
    * Creates an instance requiring no authentication.
+   *
    * @return Ibid.
    */
   public static KeyAuthentication withNone() {
@@ -190,9 +291,10 @@ public abstract class KeyAuthentication {
   /**
    * Creates an instance requiring lock screen authentication (using the default
    * timeout of {@link #DEFAULT_LOCK_SCREEN_TIMEOUT}).
-   *
+   * <p>
    * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
    * for details.
+   *
    * @return Ibid.
    */
   public static KeyAuthentication withLockScreen() {
@@ -201,9 +303,10 @@ public abstract class KeyAuthentication {
 
   /**
    * Creates an instance requiring lock screen authentication (using the given timeout).
-   *
+   * <p>
    * See "Requiring User Authentication For Key Use" in the article "<a href="https://developer.android.com/training/articles/keystore.html">Android Keystore System</a>"
    * for details.
+   *
    * @param timeoutSeconds Length of time for which lock screen authencation is valid.
    * @return Ibid.
    */
@@ -229,6 +332,7 @@ public abstract class KeyAuthentication {
 
   /**
    * Creates an instance requiring password authentication.
+   *
    * @return Ibid.
    */
   public static KeyAuthentication withPassword() {

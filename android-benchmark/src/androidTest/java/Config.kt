@@ -34,7 +34,7 @@ object Config {
   @JvmOverloads
   @JvmStatic
   fun config(klass: Class<*>, time: Int = 1, timeUnit: TimeUnit = TimeUnit.SECONDS): SpannerConfig {
-    val filesDir = InstrumentationRegistry.getTargetContext().filesDir
+    val filesDir = InstrumentationRegistry.getInstrumentation().targetContext.filesDir
     val resultsDir = File(filesDir, "results")
 
     return SpannerConfig.Builder()

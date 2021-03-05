@@ -13,7 +13,7 @@
  * Software distributed under the License is distributed on an "AS IS"
  * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
  * License for the specific language governing rights and limitations under
- * the License. Portions of the software are Copyright (c) TOZNY LLC, 2018.
+ * the License. Portions of the software are Copyright (c) TOZNY LLC, 2021.
  * All rights reserved.
  *
  */
@@ -37,6 +37,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 
 import androidx.biometric.BiometricPrompt;
+import androidx.biometric.BiometricPrompt.PromptInfo;
 
 import android.os.Build;
 import android.os.Bundle;
@@ -70,12 +71,15 @@ import static android.app.Activity.RESULT_OK;
 class DefaultKeyAuthenticator extends KeyAuthenticator {
   private final FragmentActivity activity;
   private final String title;
+  private final String description;
+  private final String subtitle;
+  private final PromptInfo promptInfo;
 
   /**
    * Create an instance that will display over the given activity.
    *
    * @param activity Activity that will host the dialog
-   * @param title    Title of the fingerprint dialog.
+   * @param title    Title of the biometric dialog.
    */
   public DefaultKeyAuthenticator(FragmentActivity activity, String title) {
     if (activity == null)
@@ -85,6 +89,61 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
 
     this.activity = activity;
     this.title = title;
+    this.description = "";
+    this.subtitle = "";
+    this.promptInfo = new PromptInfo.Builder()
+            .setTitle(this.title)
+            .setNegativeButtonText("Cancel")
+            .build();
+  }
+
+  /**
+   * Create an instance that will display over the given activity.
+   *
+   * @param activity    Activity that will host the dialog
+   * @param title       Title of the biometric dialog.
+   * @param subtitle    Subtitle of the biometric dialog.
+   * @param description Description to show in the biometric dialog.
+   */
+  public DefaultKeyAuthenticator(FragmentActivity activity, String title, String subtitle, String description) {
+    if (activity == null)
+      throw new IllegalArgumentException("activity");
+    if (title == null)
+      throw new IllegalArgumentException("title");
+    if (subtitle == null)
+      throw new IllegalArgumentException("subtitle");
+    if (description == null)
+      throw new IllegalArgumentException("description");
+
+    this.activity = activity;
+    this.title = title;
+    this.description = description;
+    this.subtitle = subtitle;
+    this.promptInfo = new PromptInfo.Builder()
+            .setTitle(this.title)
+            .setSubtitle(this.subtitle)
+            .setDescription(this.description)
+            .setNegativeButtonText("Cancel")
+            .build();
+  }
+
+  /**
+   * Create an instance that will display over the given activity.
+   *
+   * @param activity Activity that will host the dialog
+   * @param promptInfo  Display properties of the biometric dialog.
+   */
+  public DefaultKeyAuthenticator(FragmentActivity activity, PromptInfo promptInfo) {
+    if (activity == null)
+      throw new IllegalArgumentException("activity");
+    if (promptInfo == null)
+      throw new IllegalArgumentException("promptInfo");
+
+    this.activity = activity;
+    this.title = promptInfo.getTitle().toString();
+    this.description = promptInfo.getDescription().toString();
+    this.subtitle = promptInfo.getSubtitle().toString();
+    this.promptInfo = promptInfo;
   }
 
   /**
@@ -393,13 +452,15 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
         }
       });
       String promptTitle = this.title != null ? this.title : "Biometric Prompt";
-      BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder().setTitle(promptTitle).setNegativeButtonText("Cancel").build();
+      BiometricPrompt.PromptInfo info = new PromptInfo.Builder()
+              .setTitle(promptTitle)
+              .setNegativeButtonText("Cancel")
+              .build();
       biometricPrompt.authenticate(info, this.cryptoObject);
     }
 
     public void setCryptoObject(BiometricPrompt.CryptoObject cryptoObject) {
-      this.cryptoObject = cryptoObject;
-    }
+      this.cryptoObject = cryptoObject;    }
 
     public void setTitle(String title) {
       this.title = title;

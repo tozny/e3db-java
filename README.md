@@ -47,7 +47,7 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [7.0.0](https://tozny.github.io/e3db-java/docs/7.0.0/) - The most recently released version of the client.
+* [7.1.0](https://tozny.github.io/e3db-java/docs/7.1.0/) - The most recently released version of the client.
 * All versions: https://tozny.github.io/e3db-java
 
 Code examples for the most common operations can be found below.
@@ -63,7 +63,7 @@ repositories {
   maven { url "https://dl.bintray.com/terl/lazysodium-maven" }
 }
 
-implementation ('com.tozny.e3db:e3db-client-android:7.0.0@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:7.1.0@aar') {
     transitive = true
 }
 ```
@@ -80,7 +80,7 @@ For use with Maven, declare the following dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>7.0.0</version>
+    <version>7.1.0</version>
   </dependency>
 </dependencies>
 ```
@@ -91,7 +91,7 @@ The SDK supports asynchronous execution by returning all results to
 callback handlers of type `ResultHandler<T>`, where `T` is the type of
 the value expected. `ResultHandler` defines one method, `void
 handle(Result<T> r)`, which takes one argument, returns no values, and
-throws no checked exceptions. 
+throws no checked exceptions.
 
 `Result<T>` is either the result of the operation or an error. The
 `isError()` method indicates which occurred. If an error did not occur,
@@ -327,7 +327,7 @@ Client client = new ClientBuilder()
 ## Write a record
 
 Records are represented as a `Map` with `String`-typed keys and
-`String`-typed values. 
+`String`-typed values.
 
 ```java
 Client client = ...; // Get a client instance
@@ -369,7 +369,7 @@ to reverse the process later when reading the data.
 
 E3DB allows you to query records based on a number of criteria,
 including record type. Use the `QueryParamsBuilder` object to build a
-query: 
+query:
 
 ```java
 QueryParams params = new QueryParamsBuilder()
@@ -406,7 +406,7 @@ filters include:
 - `setTypes`: Filter to records that match the given types
 - `setIncludeAllWriters`: Set this flag to include records that have been shared
   with you, defaults to `false`
-  
+
 > While the Java SDK supports _writing_ plaintext meta with records, the query interface does not support filtering on that meta information at this time.
 
 ## Pagination
@@ -420,7 +420,7 @@ snippet will loop through all "lyric" records in 10-row increments:
 Client client = ...; // Get a client instance
 
 // Create a parameter builder that we can re-use to
-// call the `setAfter()` method over and over, for 
+// call the `setAfter()` method over and over, for
 // pagination.
 final QueryParams params = new QueryParamsBuilder()
   .setTypes("lyric")
@@ -449,17 +449,17 @@ while(! done.get()) {
              System.out.println("Record ID: " + r.meta().recordId());
              System.out.println("Song: " + r.data().get("song"));
            }
-  
+
            // set next page in parameter builder
            params.setAfter(r.asValue().last());
          }
-  
+
          wait.countDown();
        }
      }
    }
   );
-  
+
   wait.await(30, TimeUnit.SECONDS);
 }
 ```

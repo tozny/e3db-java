@@ -184,10 +184,10 @@ To publish to maven central, the following gradle properties must be set:
 * signing.keyId= <- last 8 characters of your private signing key, this key must be shared with a third party gpg key server such as hkp://keyserver.ubuntu.com
 * signing.password= <- signing key password
 * signing.secretKeyRingFile= <-full path to your secring.gpg
-  
+
 * ossrhUsername= <- user token for sonatype ossr account that has permissions to deploy form com.tozny
 * ossrhPassword= <- password token for above account
-  
+
 * developerId= <developer id>
 * developerName= <Full Name>
 * developerEmail= <tozny email address>
@@ -215,14 +215,14 @@ Writing Android Apps
 
 Any Android app using the SDK requires the following dependency:
 
-* 'com.tozny.e3db:e3db-client-android:7.0.0-SNAPSHOT@aar'
+* 'com.tozny.e3db:e3db-client-android:7.1.0-SNAPSHOT@aar'
 
 Writing Java Programs
 ====
 
 Java programs requires the following dependency:
 
-* 'com.tozny.e3db:e3db-client-plain:7.0.0-SNAPSHOT'
+* 'com.tozny.e3db:e3db-client-plain:7.1.0-SNAPSHOT'
 
 Benchmarking
 ====
@@ -238,7 +238,7 @@ Plain Java benchmarks are implemented using the Java Microbenchmark Harness (JMH
 OpenJDK project. Maven must be used to build the JAR containing the benchmarks:
 
 ```bash
-$ mvn clean install 
+$ mvn clean install
 ```
 
 That command produces an executable jar, which can be used to run all the benchmarks:

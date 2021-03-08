@@ -181,9 +181,19 @@ When preparing to publish:
 
 To publish to maven central, the following gradle properties must be set:
 
-* signing.keyId= <- last 8 characters of your private signing key, this key must be shared with a third party gpg key server such as hkp://keyserver.ubuntu.com
+* signing.keyId= <- last 8 characters of the gpg KEY ID of your private signing key, this key must be shared with a third party gpg key server such as hkp://keyserver.ubuntu.com
 * signing.password= <- signing key password
 * signing.secretKeyRingFile= <-full path to your secring.gpg
+
+You can set up a gpg key and publish it to the ubuntu key servers via
+
+```bash
+gpg --gen-key
+gpg -K
+cd $HOME/.gnupg
+gpg --export-secret-keys -o secring.gpg # You'll be prompted for the password from step one
+gpg --send-keys --keyserver keyserver.ubuntu.com <KEY ID>
+```
 
 * ossrhUsername= <- user token for sonatype ossr account that has permissions to deploy form com.tozny
 * ossrhPassword= <- password token for above account

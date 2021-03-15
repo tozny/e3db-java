@@ -19,7 +19,7 @@
  */
 
 ext {
-  version = "7.1.0"
+  version = "7.1.1"
   groupId = "com.tozny.e3db"
   baseName = "e3db-client"
 }

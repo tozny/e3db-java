@@ -425,6 +425,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
     private AuthenticateHandler authHandler;
     private BiometricPrompt.CryptoObject cryptoObject;
     private String title;
+    private PromptInfo promptInfo;
 
 
     @Override
@@ -435,7 +436,11 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
         public void onAuthenticationError(int errorCode,
                                           @NonNull CharSequence errString) {
           super.onAuthenticationError(errorCode, errString);
-          authHandler.handleError(new GeneralSecurityException("An error occurred while authentication"));
+          if (errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+            authHandler.handleCancel();
+          } else {
+            authHandler.handleError(new GeneralSecurityException("An error occurred while authentication"));
+          }
         }
 
         @Override
@@ -451,12 +456,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
           authHandler.handleCancel();
         }
       });
-      String promptTitle = this.title != null ? this.title : "Biometric Prompt";
-      BiometricPrompt.PromptInfo info = new PromptInfo.Builder()
-              .setTitle(promptTitle)
-              .setNegativeButtonText("Cancel")
-              .build();
-      biometricPrompt.authenticate(info, this.cryptoObject);
+      biometricPrompt.authenticate(promptInfo, this.cryptoObject);
     }
 
     public void setCryptoObject(BiometricPrompt.CryptoObject cryptoObject) {
@@ -468,6 +468,10 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
 
     public void setHandler(AuthenticateHandler authHandler) {
       this.authHandler = authHandler;
+    }
+
+    public void setPromptInfo(PromptInfo promptInfo) {
+      this.promptInfo = promptInfo;
     }
 
     @Override
@@ -494,6 +498,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
     f.setHandler(handler);
     f.setCryptoObject(cryptoObject);
     f.setTitle(title);
+    f.setPromptInfo(promptInfo);
     FragmentManager fragmentManager = activity.getSupportFragmentManager();
     FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
     fragmentTransaction.add(f, "biometric_credentials_fragment");
@@ -581,6 +586,5 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
       handler.handleError(e);
     }
   }
-
 
 }

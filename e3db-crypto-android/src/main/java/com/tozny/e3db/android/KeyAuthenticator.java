@@ -40,14 +40,14 @@ import java.security.UnrecoverableKeyException;
  * etc.) with a {@code handler} argument. The implementation should gather the appropriate authentication, and then
  * call the {@code handle} method on the handler that was given.
  *
- * <p>Use the static method {@link #defaultAuthenticator(FragmentActivity, String)} to get an authenticator implementation
+ * <p>Use the static method defaultAuthenticator(FragmentActivity, String) to get an authenticator implementation
  * that can gather a password, collect a fingerprint, collect a biometric, or ask the user to enter their lock screen PIN.
  *
- * <p>Use the static method {@link #defaultAuthenticator(FragmentActivity, String, String, String)} to get an authenticator implementation
+ * <p>Use the static method defaultAuthenticator(FragmentActivity, String, String, String) to get an authenticator implementation
  * that can gather a password, collect a fingerprint, collect a biometric, or ask the user to enter their lock screen PIN with a custom
  * title, subtitle, and description values for the biometric prompt dialog.
  *
- * <p>Use the static method {@link #defaultAuthenticator(FragmentActivity, PromptInfo)} to get an authenticator implementation
+ * <p>Use the static method defaultAuthenticator(FragmentActivity, PromptInfo) to get an authenticator implementation
  * that can gather a password, collect a fingerprint, collect a biometric, or ask the user to enter their lock screen PIN with a custom
  * Biometric prompt dialog.
  *

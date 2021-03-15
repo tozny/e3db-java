@@ -225,14 +225,14 @@ Writing Android Apps
 
 Any Android app using the SDK requires the following dependency:
 
-* 'com.tozny.e3db:e3db-client-android:7.1.0-SNAPSHOT@aar'
+* 'com.tozny.e3db:e3db-client-android:7.1.1-SNAPSHOT@aar'
 
 Writing Java Programs
 ====
 
 Java programs requires the following dependency:
 
-* 'com.tozny.e3db:e3db-client-plain:7.1.0-SNAPSHOT'
+* 'com.tozny.e3db:e3db-client-plain:7.1.1-SNAPSHOT'
 
 Benchmarking
 ====

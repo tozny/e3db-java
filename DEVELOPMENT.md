@@ -195,6 +195,8 @@ gpg --export-secret-keys -o secring.gpg # You'll be prompted for the password fr
 gpg --send-keys --keyserver keyserver.ubuntu.com <KEY ID>
 ```
 
+The following list are required. In order to not check into source control they are often placed in
+`~/.gradle/gradle.properties` or equivalent so they are sourced automatically.
 * ossrhUsername= <- user token for sonatype ossr account that has permissions to deploy form com.tozny
 * ossrhPassword= <- password token for above account
 
@@ -293,4 +295,3 @@ A problem occurred evaluating project ':e3db-fips:publish:android'.
 
 To fix, just select `Sync` from the Gradle tool window. Doing a full build on the command line (e.g., `:publish:publishLocal`)
 will also fix the problem.
-

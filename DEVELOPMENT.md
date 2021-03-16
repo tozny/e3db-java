@@ -3,6 +3,7 @@ E3DB Java SDK
 
 This repo contains an E3DB SDK that can be used with both Android devices and plain Java programs.
 
+
 Android Studio
 ====
 
@@ -162,11 +163,61 @@ The published artifacts have different names, but should share versions. They ar
 Publishing a Release
 ====
 
+To generate javadocs for new versions of the SDK to publish your system / IDE must be using Java 1.8
+
+You can configure and switch between multiple versions of Java on a Mac for using [jenv](https://www.jenv.be) as shown below:
+
+
+```bash
+# Install the jenv tool
+brew install jenv
+#
+brew tap homebrew/cask-versions
+brew tap homebrew/cask
+# Update brew with latest versions of open source / community JDK
+brew tap adoptopenjdk/openjdk
+# Install versions of SDK as needed by your project
+brew cask install adoptopenjdk8
+brew cask install adoptopenjdk11
+brew cask install adoptopenjdk14
+
+# Add the following to your systems bash_profile or bash_rc file
+export PATH="$HOME/.jenv/bin:$PATH"
+eval "$(jenv init -)"
+export JAVA_8_HOME=$(/usr/libexec/java_home -v1.8)
+export JAVA_11_HOME=$(/usr/libexec/java_home -v11)
+export JAVA_14_HOME=$(/usr/libexec/java_home -v14)
+
+# Then switch between java versions as desired
+[octo@ValleyOfTheForge e3db-java]$ java -version
+openjdk version "1.8.0_282"
+OpenJDK Runtime Environment Corretto-8.282.08.1 (build 1.8.0_282-b08)
+OpenJDK 64-Bit Server VM Corretto-8.282.08.1 (build 25.282-b08, mixed mode)
+[octo@ValleyOfTheForge e3db-java]$ jenv versions
+  system
+* 1.8 (set by /Users/octo/.jenv/version)
+  1.8.0.282
+  11
+  11.0
+  11.0.10
+  14
+  14.0
+  14.0.2
+  corretto64-1.8.0.282
+  corretto64-11.0.10
+  oracle64-14.0.2
+[octo@ValleyOfTheForge e3db-java]$ jenv global 14
+[octo@ValleyOfTheForge e3db-java]$ java -version
+java version "14.0.2" 2020-07-14
+Java(TM) SE Runtime Environment (build 14.0.2+12-46)
+Java HotSpot(TM) 64-Bit Server VM (build 14.0.2+12-46, mixed mode, sharing)
+[octo@ValleyOfTheForge e3db-java]$
+```
+
 When preparing to publish:
 
 - Merge all changes that will be published into the master branch.
 - Change the version number in `./publish/build.gradle` to the version that will be published.
-- Make sure all Android lint checks pass (`./gradlew :publish:android:lint`)
 - Generate javadocs (`./gradlew :e3db:javadoc`)
 - Commit the newly generated javadocs folder.
 - Search across all files in the repo for the previous version number, and replace it with the new version number. At least the following
@@ -174,6 +225,7 @@ When preparing to publish:
   - README.md - links and version references.
   - docs\index.md - Change link to latest version of docs; move link to previous version of docs to the list of previous versions.
 - Commit changes to documentation
+- Merge all changes that will be published into the master branch.
 - Tag the commit using the version number just published (`git tag -s -a -m "Release <version>" <version>`)
 - Push changes and tags to remote
 - Publish JARs to the remote repository (`./gradlew :publish:publishMavenCentral`)

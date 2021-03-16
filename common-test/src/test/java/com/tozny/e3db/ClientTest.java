@@ -25,29 +25,46 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import okhttp3.CertificatePinner;
-import org.junit.*;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
-import static com.tozny.e3db.TestUtilities.withTimeout;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertTrue;
-import static org.junit.Assert.*;
-
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import okhttp3.CertificatePinner;
+
+import static com.tozny.e3db.TestUtilities.withTimeout;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 
 public class ClientTest {
   private static final ObjectMapper mapper;
   private static final Map<String, String> profiles = new HashMap<>();
-  private static final boolean INFINITE_WAIT = false;
+  private static final boolean INFINITE_WAIT = true;
   private static final int TIMEOUT = 5;
   private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -57,8 +74,8 @@ public class ClientTest {
   private static final String host;
   private static final String token;
   public static final String MESSAGE1 = "Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
-                                                           "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
-                                                           "ungirdled, was sustained gently behind him on the mild morning air.";
+          "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
+          "ungirdled, was sustained gently behind him on the mild morning air.";
 
   static {
     mapper = new ObjectMapper();
@@ -73,18 +90,17 @@ public class ClientTest {
     }
 
     String h = System.getProperty("e3db.host", System.getenv("DEFAULT_API_URL"));
-    if(h == null)
+    if (h == null)
       host = "https://api.e3db.com";
     else
       host = h;
 
     String t = System.getProperty("e3db.token", System.getenv("REGISTRATION_TOKEN"));
-    if(t == null)
-     throw new Error("Registration token must be set via environment variable or system property.");
+    if (t == null || t == "null")
+      throw new Error("Registration token must be set via environment variable or system property.");
     else
       token = t;
   }
-
 
 
   private static class CI {
@@ -104,23 +120,23 @@ public class ClientTest {
       @Override
       public void act(final CountDownLatch wait) throws Exception {
         Client.register(
-          token, clientName, host, new TestUtilities.ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
-          @Override
-          public void handle(Result<Config> r) {
-            if (!r.isError()) {
-              Config info = r.asValue();
+                token, clientName, host, new TestUtilities.ResultWithWaiting<Config>(wait, new ResultHandler<Config>() {
+                  @Override
+                  public void handle(Result<Config> r) {
+                    if (!r.isError()) {
+                      Config info = r.asValue();
 
-              profiles.put(profile, info.json());
+                      profiles.put(profile, info.json());
 
-            }
+                    }
 
-            if(handler == null) {
-              if (r.isError())
-                throw new Error(r.asError().other());
-            }
-            else
-              handler.handle(r);
-          }}));
+                    if (handler == null) {
+                      if (r.isError())
+                        throw new Error(r.asError().other());
+                    } else
+                      handler.handle(r);
+                  }
+                }));
       }
     });
   }
@@ -132,8 +148,8 @@ public class ClientTest {
   private CI getClient(String profile) throws Exception {
     final Config info = Config.fromJson(profiles.get(profile));
     final Client client = new ClientBuilder()
-      .fromConfig(info)
-      .build();
+            .fromConfig(info)
+            .build();
     return new CI(client, info);
   }
 
@@ -195,8 +211,7 @@ public class ClientTest {
     try {
       in.read(contents);
       return new String(contents, utf8);
-    }
-    finally {
+    } finally {
       in.close();
     }
   }
@@ -229,7 +244,8 @@ public class ClientTest {
                       fail("Invalid certificate pin");
                       throw new Error(r.asError().other());
                     }
-                  }}));
+                  }
+                }));
       }
     });
   }
@@ -253,7 +269,8 @@ public class ClientTest {
                     if (r.isError()) {
                       assertTrue(true);
                     }
-                  }}));
+                  }
+                }));
       }
     });
   }
@@ -270,13 +287,13 @@ public class ClientTest {
       @Override
       public void act(CountDownLatch wait) throws Exception {
         clientInfo.client.write(type, new RecordData(data), null,
-          new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
-            @Override
-            public void handle(Result<Record> r) {
-              if(r.isError())
-                throw new Error(r.asError().other());
-            }
-          }));
+                new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
+                  @Override
+                  public void handle(Result<Record> r) {
+                    if (r.isError())
+                      throw new Error(r.asError().other());
+                  }
+                }));
       }
     });
 
@@ -284,16 +301,16 @@ public class ClientTest {
       @Override
       public void act(CountDownLatch wait) throws Exception {
         clientInfo.client.getReaderKey(clientInfo.client.clientId(), clientInfo.client.clientId(), type,
-          new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
-            @Override
-            public void handle(Result<LocalEAKInfo> r) {
-              if(r.isError())
-                throw new Error(r.asError().other());
+                new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
+                  @Override
+                  public void handle(Result<LocalEAKInfo> r) {
+                    if (r.isError())
+                      throw new Error(r.asError().other());
 
-              EAKInfo eakInfo = r.asValue();
-              assertEquals("Authorizer should be this client.", eakInfo.getAuthorizerId(), clientInfo.client.clientId());
-            }
-          }));
+                    EAKInfo eakInfo = r.asValue();
+                    assertEquals("Authorizer should be this client.", eakInfo.getAuthorizerId(), clientInfo.client.clientId());
+                  }
+                }));
       }
     });
 
@@ -303,7 +320,7 @@ public class ClientTest {
         clientInfo.client.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             EAKInfo eakInfo = r.asValue();
@@ -378,7 +395,7 @@ public class ClientTest {
         writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             final Record record = r.asValue();
@@ -388,7 +405,7 @@ public class ClientTest {
             client.delete(record.meta().recordId(), record.meta().version(), new ResultHandler<Void>() {
               @Override
               public void handle(Result<Void> r) {
-                if(r.isError())
+                if (r.isError())
                   throw new Error(r.asError().other());
 
                 client.read(record.meta().recordId(), new ResultHandler<Record>() {
@@ -399,7 +416,7 @@ public class ClientTest {
                     new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
                       @Override
                       public void handle(final Result<Void> r1) {
-                        if(r1.isError())
+                        if (r1.isError())
                           throw new Error(r1.asError().other());
                       }
                     }).handle(new ValueResult<Void>(null));
@@ -423,7 +440,7 @@ public class ClientTest {
         writeRecord(getClient().client, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             recordId.set(r.asValue().meta().recordId());
@@ -441,7 +458,7 @@ public class ClientTest {
             new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(final Result<Record> r1) {
-                if(r1.isError())
+                if (r1.isError())
                   throw new Error(r1.asError().other());
 
                 assertEquals("line field did not match", MESSAGE, r1.asValue().data().get(FIELD));
@@ -492,21 +509,20 @@ public class ClientTest {
       client.query(paramsBuilder.build(), new TestUtilities.ResultWithWaiting<QueryResponse>(wait3, new ResultHandler<QueryResponse>() {
         @Override
         public void handle(Result<QueryResponse> r) {
-          if(r.isError())
+          if (r.isError())
             throw new Error(r.asError().other());
 
           List<Record> records = r.asValue().records();
-          if(records.size() == 0) {
+          if (records.size() == 0) {
             done.set(true);
-          }
-          else {
+          } else {
             pages.set(pages.get() + 1);
             paramsBuilder.setAfter(r.asValue().last());
           }
         }
       }));
 
-      if(! wait3.await(30, TimeUnit.SECONDS)) {
+      if (!wait3.await(30, TimeUnit.SECONDS)) {
         fail("Timed out during query execution. Pages: " + pages.get() + "; done: " + done.get() + "; last: " + last.get());
       }
     }
@@ -525,7 +541,7 @@ public class ClientTest {
         writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             final Record record = r.asValue();
@@ -534,7 +550,7 @@ public class ClientTest {
             client.update(LocalUpdateMeta.fromRecordMeta(record.meta()), new RecordData(fields), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
-                if(r.isError())
+                if (r.isError())
                   throw new RuntimeException(r.asError().other());
 
                 assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
@@ -556,7 +572,7 @@ public class ClientTest {
         writeRecord(client, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             final Record record = r.asValue();
@@ -582,7 +598,7 @@ public class ClientTest {
             }, new RecordData(fields), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
               @Override
               public void handle(Result<Record> r) {
-                if(r.isError())
+                if (r.isError())
                   throw new RuntimeException(r.asError().other());
 
                 assertEquals("Record not updated", r.asValue().data().get(FIELD), updatedMessage);
@@ -603,7 +619,7 @@ public class ClientTest {
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
       @Override
       public void handle(Result<Config> r) {
-        if(r.isError())
+        if (r.isError())
           throw new Error(r.asError().other());
 
         try {
@@ -620,7 +636,7 @@ public class ClientTest {
         writeRecord(clientRef.get(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             recordRef.set(r.asValue());
@@ -656,7 +672,7 @@ public class ClientTest {
           @Override
           public void handle(Result<Record> r) {
             try {
-              if(r.isError())
+              if (r.isError())
                 throw new Error(r.asError().other());
 
               assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
@@ -693,7 +709,7 @@ public class ClientTest {
         clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
@@ -725,7 +741,7 @@ public class ClientTest {
         clientRef.get().read(recordRef.get().meta().recordId(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("Plaintext missing.", r.asValue().meta().plain() != null);
@@ -759,7 +775,7 @@ public class ClientTest {
         from.client.write(recordType, new RecordData(cleartext), null, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
             recordIdRef.set(r.asValue().meta().recordId());
           }
@@ -773,7 +789,7 @@ public class ClientTest {
         from.client.share(recordType, to.client.clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
           }
         }));
@@ -787,7 +803,7 @@ public class ClientTest {
         to.client.read(recordIdRef.get(), new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             Record record = r.asValue();
@@ -805,7 +821,7 @@ public class ClientTest {
         from.client.getIncomingSharing(new TestUtilities.ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
           @Override
           public void handle(Result<List<IncomingSharingPolicy>> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("From client should not have any records shared.", r.asValue().size() == 0);
@@ -820,7 +836,7 @@ public class ClientTest {
         from.client.getOutgoingSharing(new TestUtilities.ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
           @Override
           public void handle(Result<List<OutgoingSharingPolicy>> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("From client should share only one record type.", r.asValue().size() == 1);
@@ -838,7 +854,7 @@ public class ClientTest {
         to.client.getIncomingSharing(new TestUtilities.ResultWithWaiting<List<IncomingSharingPolicy>>(wait, new ResultHandler<List<IncomingSharingPolicy>>() {
           @Override
           public void handle(Result<List<IncomingSharingPolicy>> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("To client should have one record type shared.", r.asValue().size() == 1);
@@ -855,7 +871,7 @@ public class ClientTest {
         to.client.getOutgoingSharing(new TestUtilities.ResultWithWaiting<List<OutgoingSharingPolicy>>(wait, new ResultHandler<List<OutgoingSharingPolicy>>() {
           @Override
           public void handle(Result<List<OutgoingSharingPolicy>> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             assertTrue("To client should not have any records shared.", r.asValue().size() == 0);
@@ -871,7 +887,7 @@ public class ClientTest {
         from.client.revoke(recordType, to.client.clientId(), new TestUtilities.ResultWithWaiting<Void>(wait, new ResultHandler<Void>() {
           @Override
           public void handle(Result<Void> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
           }
         }));
@@ -902,7 +918,7 @@ public class ClientTest {
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
       @Override
       public void handle(Result<Config> r) {
-        if(r.isError())
+        if (r.isError())
           throw new Error(r.asError().other());
 
         try {
@@ -925,7 +941,7 @@ public class ClientTest {
           clientRef.get().write("poem", data, plain, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
-              if(r.isError()) {
+              if (r.isError()) {
                 throw new Error(r.asError().other());
               }
 
@@ -942,7 +958,7 @@ public class ClientTest {
             @Override
             public void handle(Result<Record> r) {
               try {
-                if(r.isError())
+                if (r.isError())
                   throw new Error(r.asError().other());
 
                 assertEquals("Plain did not match", plainJson, mapper.readTree(mapper.writeValueAsString(r.asValue().meta().plain())));
@@ -966,7 +982,7 @@ public class ClientTest {
           clientRef.get().write("poem", data, plain, new TestUtilities.ResultWithWaiting<Record>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
-              if(r.isError())
+              if (r.isError())
                 throw new Error(r.asError().other());
 
               recordRef.set(r.asValue());
@@ -982,7 +998,7 @@ public class ClientTest {
             @Override
             public void handle(Result<Record> r) {
               try {
-                if(r.isError())
+                if (r.isError())
                   throw new Error(r.asError().other());
 
                 assertEquals("Plain did not match", plainJson, mapper.readTree(mapper.writeValueAsString(r.asValue().meta().plain())));
@@ -1021,7 +1037,7 @@ public class ClientTest {
         client.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             eakInfoRef.set(r.asValue());
@@ -1078,7 +1094,7 @@ public class ClientTest {
         client1.createWriterKey(type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             writerKeyRef.set(r.asValue());
@@ -1109,7 +1125,7 @@ public class ClientTest {
         client2.getReaderKey(client1.clientId(), client1.clientId(), type, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             readerKeyRef.set(r.asValue());
@@ -1150,7 +1166,6 @@ public class ClientTest {
     assertTrue("Unable to verify document", client.verify(sign, clientInfo1.clientConfig.publicSigningKey));
 
 
-
     // read a remote record, sign it, verify signature
     withTimeout(new AsyncAction() {
       @Override
@@ -1158,7 +1173,7 @@ public class ClientTest {
         client.write(recordType, new RecordData(data), null, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError()) {
+            if (r.isError()) {
               throw new RuntimeException(r.asError().other());
             }
 
@@ -1171,7 +1186,7 @@ public class ClientTest {
               assertTrue("Unable to verify document.", client.verify(client.sign(local),
                       clientInfo1.clientConfig.publicSigningKey)
               );
-            } catch(JsonProcessingException | E3DBCryptoException e) {
+            } catch (JsonProcessingException | E3DBCryptoException e) {
               throw new RuntimeException("Failed to serialize");
             }
 
@@ -1204,7 +1219,7 @@ public class ClientTest {
 
   @Test
   public void testExternalEncryptedRecord() throws Exception {
-    if(Platform.crypto.suite() == CipherSuite.Sodium) {
+    if (Platform.crypto.suite() == CipherSuite.Sodium) {
       final CI clientInfo1 = getClient();
       final Client client = clientInfo1.client;
       final JsonNode extEncryptedRecord = mapper.readTree("{\"doc\":{\"data\":{\"test_field\":\"QWfE7PpAjTgih1E9jyqSGex32ouzu1iF3la8fWNO5wPp48U2F5Q6kK41_8hgymWn.HW-dBzttfU6Xui-o01lOdVqchXJXqfqQ.eo8zE8peRC9qSt2ZOE8_54kOF0bWBEovuZ4.zO56Or0Pu2IFSzQZRpuXLeinTHQl7g9-\"},\"meta\":{\"plain\":{\"client_pub_sig_key\":\"fcyEKo6HSZo9iebWAQnEemVfqpTUzzR0VNBqgJJG-LY\",\"server_sig_of_client_sig_key\":\"ZtmkUb6MJ-1LqpIbJadYl_PPH5JjHXKrBspprhzaD8rKM4ejGD8cJsSFO1DlR-r7u-DKsLUk82EJF65RnTmMDQ\"},\"type\":\"ticket\",\"user_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\",\"writer_id\":\"d405a1ce-e528-4946-8682-4c2369a26604\"},\"rec_sig\":\"YsNbSXy0mVqsvgArmdESe6SkTAWFui8_NBn8ZRyxBfQHmJt7kwDU6szEqiRIaoZGrHsqgwS3uduLo_kzG6UeCA\"},\"sig\":\"iYc7G6ersNurZRr7_lWqoilr8Ve1d6HPZPPyC4YMXSvg7QvpUAHvjv4LsdMMDthk7vsVpoR0LYPC_SkIip7XCw\"}");
@@ -1289,7 +1304,7 @@ public class ClientTest {
         client.createWriterKey(recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<LocalEAKInfo>() {
           @Override
           public void handle(Result<LocalEAKInfo> result) {
-            if(result.isError())
+            if (result.isError())
               throw new Error(result.asError().other());
 
             eak.set(result.asValue());
@@ -1386,16 +1401,14 @@ public class ClientTest {
     try {
       LocalEncryptedRecord.decode("foo");
       fail("Should not decode.");
-    }
-    catch(IOException ex) {
+    } catch (IOException ex) {
 
     }
 
     try {
       LocalEncryptedRecord.decode(client.encryptExisting(unencrypted, eak.get()).encode().substring(1));
       fail("Should not decode.");
-    }
-    catch(IOException ex) {
+    } catch (IOException ex) {
 
     }
   }
@@ -1411,7 +1424,7 @@ public class ClientTest {
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
       @Override
       public void handle(Result<Config> r) {
-        if(r.isError())
+        if (r.isError())
           throw new Error(r.asError().other());
 
         try {
@@ -1425,7 +1438,7 @@ public class ClientTest {
     registerProfile(UUID.randomUUID().toString(), new ResultHandler<Config>() {
       @Override
       public void handle(Result<Config> r) {
-        if(r.isError())
+        if (r.isError())
           throw new Error(r.asError().other());
 
         try {
@@ -1658,7 +1671,7 @@ public class ClientTest {
         client.readFile(recordMeta.recordId(), actualFile, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<RecordMeta>() {
           @Override
           public void handle(Result<RecordMeta> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             actualRecordMeta.set(r.asValue());
@@ -1668,7 +1681,7 @@ public class ClientTest {
       }
     });
 
-    if(actualRecordMeta.get() == null)
+    if (actualRecordMeta.get() == null)
       fail("Failed to read file record.");
 
     assertNotNull("Expected file URL: " + actualRecordMeta.get(), actualRecordMeta.get().file());
@@ -1690,7 +1703,7 @@ public class ClientTest {
         client.read(recordMeta.recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
           @Override
           public void handle(Result<Record> r) {
-            if(r.isError())
+            if (r.isError())
               throw new Error(r.asError().other());
 
             actualRecord.set(r.asValue());
@@ -1699,7 +1712,7 @@ public class ClientTest {
       }
     });
 
-    if(actualRecord.get() == null)
+    if (actualRecord.get() == null)
       fail("Failed to retrieve record.");
 
     assertNotNull("Record should be a file record.", actualRecord.get().meta().file());
@@ -1759,7 +1772,7 @@ public class ClientTest {
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Failed to read record.");
 
       String contents = readContents(actualFile, UTF8);
@@ -1787,10 +1800,10 @@ public class ClientTest {
       }
     });
 
-    if(result.get() == null)
+    if (result.get() == null)
       fail("Failed to receive response.");
 
-    assertTrue("Expected error when reading non-existent file record." , result.get().isError());
+    assertTrue("Expected error when reading non-existent file record.", result.get().isError());
     assertFalse("Destination file (" + dest + ") should not exist", dest.exists());
   }
 
@@ -1798,12 +1811,11 @@ public class ClientTest {
   public void testReadToBadDestination() throws Throwable {
     final CI clientInfo1 = getClient();
     final Client client = clientInfo1.client;
-    final File dest = new File(File.separator +  UUID.randomUUID() + File.separator + UUID.randomUUID().toString() + ".txt").getAbsoluteFile();
+    final File dest = new File(File.separator + UUID.randomUUID() + File.separator + UUID.randomUUID().toString() + ".txt").getAbsoluteFile();
     try {
       if (dest.createNewFile())
         fail("Should not be able to create file at " + dest);
-    }
-    catch(IOException e) {
+    } catch (IOException e) {
       // expected
     }
 
@@ -1821,11 +1833,11 @@ public class ClientTest {
       }
     });
 
-    if(result.get() == null)
+    if (result.get() == null)
       throw new Error("Did not receive response.");
 
     assertTrue("Expected error", result.get().isError());
-    if(dest.exists())
+    if (dest.exists())
       fail("Destination file should not exist: " + dest);
   }
 
@@ -1837,13 +1849,12 @@ public class ClientTest {
     final File plain = File.createTempFile("clientTest", ".txt");
     plain.deleteOnExit();
     String message = "Stately, plump Buck Mulligan came from the stairhead, bearing a bowl of\n" +
-                         "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
-                         "ungirdled, was sustained gently behind him on the mild morning air.";
+            "lather on which a mirror and a razor lay crossed. A yellow dressinggown,\n" +
+            "ungirdled, was sustained gently behind him on the mild morning air.";
     FileOutputStream out = new FileOutputStream(plain);
     try {
       out.write(message.getBytes(UTF8));
-    }
-    finally {
+    } finally {
       out.close();
     }
 
@@ -1867,7 +1878,7 @@ public class ClientTest {
       }
     });
 
-    if(result.get() == null) {
+    if (result.get() == null) {
       fail("Unable to write file.");
     }
   }
@@ -1892,13 +1903,13 @@ public class ClientTest {
           writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to add authorizer.");
     }
   }
@@ -1923,13 +1934,13 @@ public class ClientTest {
           writer.client.removeAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to remove authorizer.");
     }
 
@@ -1941,13 +1952,13 @@ public class ClientTest {
           writer.client.removeAuthorizer(authorizer.clientConfig.clientId, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to remove authorizer.");
     }
   }
@@ -1995,7 +2006,7 @@ public class ClientTest {
 
       writtenRecord = result.get();
 
-      if(writtenRecord == null)
+      if (writtenRecord == null)
         fail("Did not write record.");
     }
 
@@ -2007,14 +2018,14 @@ public class ClientTest {
           reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
-              if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
+              if (r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
                 result.set((E3DBNotFoundException) r.asError().other());
             }
           }));
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Should not be able read record yet.");
     }
 
@@ -2026,15 +2037,15 @@ public class ClientTest {
           writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to add authorizer.");
     }
 
@@ -2046,15 +2057,15 @@ public class ClientTest {
           authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to share with reader.");
     }
 
@@ -2079,7 +2090,7 @@ public class ClientTest {
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Unable to read record.");
     }
 
@@ -2091,15 +2102,15 @@ public class ClientTest {
           authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to revoke reader.");
     }
 
@@ -2111,14 +2122,14 @@ public class ClientTest {
           reader.client.read(writtenRecord.meta().recordId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Record>() {
             @Override
             public void handle(Result<Record> r) {
-              if(r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
+              if (r.asError() != null && r.asError().other() instanceof E3DBNotFoundException)
                 result.set((E3DBNotFoundException) r.asError().other());
             }
           }));
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Should not be able to read record.");
     }
   }
@@ -2150,15 +2161,15 @@ public class ClientTest {
           writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to add authorizer.");
     }
 
@@ -2170,15 +2181,15 @@ public class ClientTest {
           authorizer.client.shareOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to share with reader.");
     }
 
@@ -2206,7 +2217,7 @@ public class ClientTest {
 
       writtenRecord = result.get();
 
-      if(writtenRecord == null)
+      if (writtenRecord == null)
         fail("Did not write record.");
     }
 
@@ -2231,7 +2242,7 @@ public class ClientTest {
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Unable to read record.");
     }
 
@@ -2243,15 +2254,15 @@ public class ClientTest {
           authorizer.client.revokeOnBehalfOf(WriterId.writerId(writer.client.clientId()), recordType, reader.client.clientId(), new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              if(r.isError())
+              if (r.isError())
                 r.asError().other().printStackTrace();
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to revoke reader.");
     }
 
@@ -2265,12 +2276,12 @@ public class ClientTest {
             public void handle(Result<Record> r) {
               if (r.isError() && r.asError().other() instanceof E3DBNotFoundException)
                 result.set((E3DBNotFoundException) r.asError().other());
-           }
+            }
           }));
         }
       });
 
-      if(result.get() == null)
+      if (result.get() == null)
         fail("Should not be able to read record.");
     }
   }
@@ -2295,13 +2306,13 @@ public class ClientTest {
           writer.client.addAuthorizer(authorizer.clientConfig.clientId, recordType, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Void>() {
             @Override
             public void handle(Result r) {
-              result.set(! r.isError());
+              result.set(!r.isError());
             }
           }));
         }
       });
 
-      if(! result.get())
+      if (!result.get())
         fail("Failed to add authorizer.");
     }
 
@@ -2326,14 +2337,14 @@ public class ClientTest {
         }
       });
 
-      if(result.get() == null || result.get().size() == 0)
+      if (result.get() == null || result.get().size() == 0)
         fail("Authorizer list is empty.");
 
       boolean found = false;
-      for(AuthorizerPolicy policy : result.get()) {
+      for (AuthorizerPolicy policy : result.get()) {
         found = found || policy.authorizerId().equals(authorizer.client.clientId()) && policy.recordType().equalsIgnoreCase(recordType);
       }
-      if(! found)
+      if (!found)
         fail("Authorizer not found in authorizer list.");
     }
 
@@ -2358,14 +2369,14 @@ public class ClientTest {
         }
       });
 
-      if(result.get() == null || result.get().size() == 0)
+      if (result.get() == null || result.get().size() == 0)
         fail("Authorized by list is empty.");
 
       boolean found = false;
-      for(AuthorizerPolicy policy : result.get()) {
+      for (AuthorizerPolicy policy : result.get()) {
         found = found || policy.authorizedBy().equals(writer.client.clientId()) && policy.recordType().equalsIgnoreCase(recordType);
       }
-      if(! found)
+      if (!found)
         fail("Writer not found in authorized by list.");
     }
   }
@@ -2395,14 +2406,14 @@ public class ClientTest {
         }));
       }
     });
-    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
     final UUID noteID = storedRecord.get().noteID;
 
     //Read by id
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2416,7 +2427,7 @@ public class ClientTest {
       }
 
     });
-    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
 
     // delete record
     AtomicReference<Result<Void>> resultAtomicReference = new AtomicReference<>();
@@ -2432,13 +2443,13 @@ public class ClientTest {
         }));
       }
     });
-    assert(!resultAtomicReference.get().isError());
+    assert (!resultAtomicReference.get().isError());
 
     // Read by id, should be missing
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2452,7 +2463,7 @@ public class ClientTest {
         }));
       }
     });
-    assert(storedRecord.get() == null);
+    assert (storedRecord.get() == null);
   }
 
   @Test
@@ -2480,7 +2491,7 @@ public class ClientTest {
         }));
       }
     });
-    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
     final UUID noteID = storedRecord.get().noteID;
     //Read by name
     withTimeout(new AsyncAction() {
@@ -2500,7 +2511,7 @@ public class ClientTest {
       }
 
     });
-    assert(storedRecord.get().data.get("TestNoteKey").equals("Test"));
+    assert (storedRecord.get().data.get("TestNoteKey").equals("Test"));
 
     AtomicReference<Result<Void>> resultAtomicReference = new AtomicReference<>();
     // delete record
@@ -2516,13 +2527,13 @@ public class ClientTest {
         }));
       }
     });
-    assert(!resultAtomicReference.get().isError());
+    assert (!resultAtomicReference.get().isError());
 
     //Read by name, should be missing
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByName(noteName,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByName(noteName, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2537,7 +2548,7 @@ public class ClientTest {
       }
 
     });
-    assert(storedRecord.get() == null);
+    assert (storedRecord.get() == null);
   }
 
   @Test
@@ -2572,7 +2583,7 @@ public class ClientTest {
     withTimeout(new AsyncAction() {
       @Override
       public void act(CountDownLatch wait) throws Exception {
-        client.readNoteByID(noteID,  new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
+        client.readNoteByID(noteID, new TestUtilities.ResultWithWaiting<>(wait, new ResultHandler<Note>() {
           @Override
           public void handle(Result<Note> n) {
             storedRecord.set(null);
@@ -2601,7 +2612,7 @@ public class ClientTest {
         }));
       }
     });
-    assert(!resultAtomicReference.get().isError());
+    assert (!resultAtomicReference.get().isError());
 
     // delete record again, expect error
     withTimeout(new AsyncAction() {
@@ -2616,6 +2627,369 @@ public class ClientTest {
         }));
       }
     });
-    assert(resultAtomicReference.get().isError());
+    assert (resultAtomicReference.get().isError());
   }
+
+
+  @Test(timeout = 5000)
+  public void searchV2ReturnsExpectedResultsForRecordID() throws Exception {
+    final AtomicReference<UUID> recordId = new AtomicReference<>();
+    Client client = getClient().client;
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId.set(r.asValue().meta().recordId());
+    })));
+
+    final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+    final AtomicReference<Boolean> success = new AtomicReference<>();
+    success.set(false);
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              new SearchRequestBuilder().
+                      setIncludeData(true).
+                      setMatch(Collections.singletonList(
+                              new SearchRequest.SearchParams(
+                                      SearchRequest.SearchParamCondition.AND,
+                                      SearchRequest.SearchParamStrategy.EXACT,
+                                      new SearchRequest.SearchTermsBuilder().
+                                              addRecordIds(recordId.get()).
+                                              build()))).build(), r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() > 0) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+
+    Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    SearchResponse searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.totalResults());
+    Record record = searchResponse.records().get(0);
+    assertEquals(record.meta().recordId(), recordId.get());
+  }
+
+
+  @Test(timeout = 5000)
+  public void searchV2ReturnsExpectedResultsExcludeRecordID() throws Exception {
+    final AtomicReference<UUID> recordId = new AtomicReference<>();
+    final AtomicReference<UUID> recordIdExclude = new AtomicReference<>();
+
+    Client client = getClient().client;
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId.set(r.asValue().meta().recordId());
+    })));
+
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordIdExclude.set(r.asValue().meta().recordId());
+    })));
+
+    final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+    final AtomicReference<Boolean> success = new AtomicReference<>();
+    success.set(false);
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              new SearchRequestBuilder().
+                      setIncludeData(true).
+                      setMatch(Collections.singletonList(
+                              new SearchRequest.SearchParams(
+                                      SearchRequest.SearchParamCondition.AND,
+                                      SearchRequest.SearchParamStrategy.EXACT,
+                                      new SearchRequest.SearchTermsBuilder().
+                                              addRecordIds(recordId.get()).
+                                              build()))).
+                      setExclude(Collections.singletonList(
+                              new SearchRequest.SearchParams(
+                                      SearchRequest.SearchParamCondition.AND,
+                                      SearchRequest.SearchParamStrategy.EXACT,
+                                      new SearchRequest.SearchTermsBuilder().
+                                              addRecordIds(recordIdExclude.get()).
+                                              build()))).
+                      build(), r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() > 0) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+
+    Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    SearchResponse searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.totalResults());
+    Record record = searchResponse.records().get(0);
+    assertEquals(record.meta().recordId(), recordId.get());
+  }
+
+  @Test(timeout = 5000)
+  public void searchV2ReturnsExpectedResultsLimitWithMultipleCalls() throws Exception {
+    final AtomicReference<UUID> recordId = new AtomicReference<>();
+    final AtomicReference<UUID> recordId2 = new AtomicReference<>();
+
+    Client client = getClient().client;
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId.set(r.asValue().meta().recordId());
+    })));
+
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId2.set(r.asValue().meta().recordId());
+    })));
+    Set<UUID> recordSet = Stream.of(recordId.get(), recordId2.get()).collect(Collectors.toSet());
+    final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+    final AtomicReference<Boolean> success = new AtomicReference<>();
+    success.set(false);
+    SearchRequest searchRequest = new SearchRequestBuilder().
+            setIncludeData(true).
+            setLimit(1).
+            setMatch(Collections.singletonList(
+                    new SearchRequest.SearchParams(
+                            SearchRequest.SearchParamCondition.OR,
+                            SearchRequest.SearchParamStrategy.EXACT,
+                            new SearchRequest.SearchTermsBuilder().
+                                    addRecordIds(recordId.get(), recordId2.get()).
+                                    build()))).
+            build();
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              searchRequest, r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() == 2) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+
+    Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    SearchResponse searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.records().size());
+    long last = searchResponse.last();
+    assertTrue(last != 0);
+    recordSet.remove(searchResponse.records().get(0).meta().recordId());
+
+    SearchRequest secondSearchRequest = searchRequest.buildOn().setNextToken(last).build();
+    success.set(false);
+    atomicSearchResponseResult.set(null);
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              secondSearchRequest, r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() == 2) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+    searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.records().size());
+    last = searchResponse.last();
+    assertEquals(0, last);
+    recordSet.remove(searchResponse.records().get(0).meta().recordId());
+    assertTrue(recordSet.isEmpty());
+  }
+
+  @Test(timeout = 5000)
+  public void searchV2ReturnsExpectedResultsWithMultipleMatchParams() throws Exception {
+    final AtomicReference<UUID> recordId = new AtomicReference<>();
+    final AtomicReference<UUID> recordId2 = new AtomicReference<>();
+
+    Client client = getClient().client;
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId.set(r.asValue().meta().recordId());
+    })));
+
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId2.set(r.asValue().meta().recordId());
+    })));
+    Set<UUID> recordSet = Stream.of(recordId.get(), recordId2.get()).collect(Collectors.toSet());
+    final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+    final AtomicReference<Boolean> success = new AtomicReference<>();
+    success.set(false);
+    SearchRequest searchRequest = new SearchRequestBuilder().
+            setIncludeData(true).
+            setMatch(Arrays.asList(
+                    new SearchRequest.SearchParams(
+                            SearchRequest.SearchParamCondition.AND,
+                            SearchRequest.SearchParamStrategy.EXACT,
+                            new SearchRequest.SearchTermsBuilder().
+                                    addRecordIds(recordId.get()).
+                                    build()),
+                    new SearchRequest.SearchParams(
+                            SearchRequest.SearchParamCondition.AND,
+                            SearchRequest.SearchParamStrategy.EXACT,
+                            new SearchRequest.SearchTermsBuilder().
+                                    addRecordIds(recordId2.get()).
+                                    build()))).
+            build();
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              searchRequest, r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() == 2) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+
+    Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    SearchResponse searchResponse = searchResponseResult.asValue();
+    assertEquals(2, searchResponse.records().size());
+    long last = searchResponse.last();
+    assertEquals(0, last);
+  }
+
+  @Test
+  public void searchV2ReturnsExpectedResultsWithRange() throws Exception {
+    final AtomicReference<UUID> recordId = new AtomicReference<>();
+    Client client = getClient().client;
+    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+      if (r.isError())
+        throw new Error(r.asError().other());
+
+      recordId.set(r.asValue().meta().recordId());
+    })));
+
+    final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+    final AtomicReference<Boolean> success = new AtomicReference<>();
+    success.set(false);
+    SearchRequest requestDefault = new SearchRequestBuilder().
+            setIncludeData(false).
+            setMatch(Collections.singletonList(
+                    new SearchRequest.SearchParams(
+                            SearchRequest.SearchParamCondition.AND,
+                            SearchRequest.SearchParamStrategy.EXACT,
+                            new SearchRequest.SearchTermsBuilder().
+                                    addRecordIds(recordId.get()).
+                                    build()))).build();
+    // Search with no range
+    do {
+      CountDownLatch latch = new CountDownLatch(1);
+      client.search(
+              requestDefault, r -> {
+                assert (!r.isError());
+                atomicSearchResponseResult.set(r);
+                if (r.asValue().totalResults() > 0) {
+                  success.set(true);
+                }
+                latch.countDown();
+              }
+      );
+      latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+    } while (!success.get());
+
+    Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    SearchResponse searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.totalResults());
+    Record record = searchResponse.records().get(0);
+    assertEquals(record.meta().recordId(), recordId.get());
+
+    // Search with range before exclusive
+    Date created = record.meta().created();
+    Date beforeCreated = new Date(created.toInstant().toEpochMilli() - 3600 * 1000);
+    SearchRequest beforeRequest = requestDefault.buildOn().setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED, null, beforeCreated)).build();
+    CountDownLatch latch = new CountDownLatch(1);
+    client.search(
+            beforeRequest, new TestUtilities.ResultWithWaiting<>(latch, r -> {
+              assert (!r.isError());
+              atomicSearchResponseResult.set(r);
+            })
+    );
+    latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+
+
+    searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    searchResponse = searchResponseResult.asValue();
+    assertEquals(0, searchResponse.totalResults());
+
+    // Search with range after exclusive
+    Date now = new Date(System.currentTimeMillis());
+    Date afterCreated = new Date(created.toInstant().toEpochMilli() + 3600 * 1000);
+    SearchRequest afterRequest= requestDefault.buildOn().setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED, now, afterCreated)).build();
+    latch = new CountDownLatch(1);
+    client.search(
+            afterRequest, new TestUtilities.ResultWithWaiting<>(latch, r -> {
+              assert (!r.isError());
+              atomicSearchResponseResult.set(r);
+            })
+    );
+    latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+
+
+    searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    searchResponse = searchResponseResult.asValue();
+    assertEquals(0, searchResponse.totalResults());
+
+    // Search with range that succeeds
+    SearchRequest workingRangeRequest= requestDefault.buildOn().setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED, beforeCreated, afterCreated)).build();
+    latch = new CountDownLatch(1);
+    client.search(
+            workingRangeRequest, new TestUtilities.ResultWithWaiting<>(latch, r -> {
+              assert (!r.isError());
+              atomicSearchResponseResult.set(r);
+              if (r.asValue().totalResults() == 1) {
+                success.set(true);
+              }
+            })
+    );
+    latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
+
+
+    searchResponseResult = atomicSearchResponseResult.get();
+    assert (!searchResponseResult.isError());
+    searchResponse = searchResponseResult.asValue();
+    assertEquals(1, searchResponse.totalResults());
+    record = searchResponse.records().get(0);
+    assertEquals(record.meta().recordId(), recordId.get());
+  }
+
 }

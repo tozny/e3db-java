@@ -29,7 +29,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.kotlin.KotlinModule;
 
 import java.io.File;
@@ -60,6 +59,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -262,7 +262,7 @@ public class Client {
   private static final MediaType APPLICATION_OCTET = MediaType.parse("application/octet-stream");
   // UUIDv5 TFSP1;ED25519;BLAKE2B
   private static final String SIGNATURE_VERSION = "e7737e7c-1637-511e-8bab-93c4f3e26fd9";
-  protected static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+  protected static final SimpleDateFormat iso8601 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'");
   private static final MediaType PLAIN_TEXT = MediaType.parse("text/plain");
   protected static final Executor backgroundExecutor;
   protected static final Executor uiExecutor;
@@ -280,6 +280,7 @@ public class Client {
   private final byte[] privateSigningKey;
   private final byte[] publicSigningKey;
   private final StorageAPI storageClient;
+  private final SearchAPI searchClient;
   private final ShareAPI shareClient;
   private final StorageV2API notesClient;
 
@@ -339,6 +340,7 @@ public class Client {
 
     mapper = new ObjectMapper();
     mapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+    iso8601.setTimeZone(TimeZone.getTimeZone("UTC"));
   }
 
   /**
@@ -497,10 +499,17 @@ public class Client {
             .baseUrl(host.resolve("/").toString())
             .build();
 
+    Retrofit converterBuild = new Retrofit.Builder()
+            .callbackExecutor(uiExecutor)
+            .client(clientBuilder.build())
+            .addConverterFactory(JacksonConverterFactory.create(mapper))
+            .baseUrl(host.resolve("/").toString())
+            .build();
+
     storageClient = build.create(StorageAPI.class);
     shareClient = build.create(ShareAPI.class);
     notesClient = tsv1Build.create(StorageV2API.class);
-
+    searchClient = converterBuild.create(SearchAPI.class);
   }
 
   Client(String apiKey, String apiSecret, UUID clientId, URI host, byte[] privateKey, byte[] privateSigningKey) throws E3DBCryptoException {
@@ -752,6 +761,7 @@ public class Client {
       UUID recordId = UUID.fromString(rawMeta.get("record_id").asText());
       UUID writerId = UUID.fromString(rawMeta.get("writer_id").asText());
       UUID userId = UUID.fromString(rawMeta.get("user_id").asText());
+      iso8601.setTimeZone(TimeZone.getTimeZone("UTC"));
       Date created = iso8601.parse(rawMeta.get("created").asText());
       Date lastModified = iso8601.parse(rawMeta.get("last_modified").asText());
       String version = rawMeta.get("version").asText();
@@ -838,6 +848,36 @@ public class Client {
     @Override
     public long last() {
       return lastIdx;
+    }
+  }
+
+
+  private static class SR implements SearchResponse {
+    private final ArrayList<Record> records;
+    private final long lastIdx;
+    private final long totalResults;
+    private final String searchId;
+
+    private SR(ArrayList<Record> records, long lastIdx, long totalResults, String searchId) {
+      this.records = records;
+      this.lastIdx = lastIdx;
+      this.totalResults = totalResults;
+      this. searchId = searchId;
+    }
+
+    @Override
+    public List<Record> records() {
+      return records;
+    }
+
+    @Override
+    public long last() {
+      return lastIdx;
+    }
+
+    @Override
+    public long totalResults() {
+      return this.totalResults;
     }
   }
 
@@ -1046,10 +1086,15 @@ public class Client {
     JsonNode currPage = results.get("results");
     long nextIdx = results.get("last_index").asLong();
 
+    ArrayList<Record> records = getRecordsFromJsonNode(currPage);
+
+    return new QR(records, nextIdx);
+  }
+
+  private ArrayList<Record> getRecordsFromJsonNode(JsonNode currPage) throws ParseException, E3DBVerificationException, E3DBDecryptionException, JsonProcessingException {
     ArrayList<Record> records = new ArrayList<>(currPage.size());
-    for (int currRow = 0; currRow < currPage.size(); currRow++) {
+    for (JsonNode queryRecord : currPage) {
       Record record;
-      JsonNode queryRecord = currPage.get(currRow);
       JsonNode access_key = queryRecord.get("access_key");
       if (access_key != null && access_key.isObject()) {
         final String authorizerPublicKey;
@@ -1078,8 +1123,25 @@ public class Client {
       }
       records.add(record);
     }
+    return records;
+  }
 
-    return new QR(records, nextIdx);
+
+  private SearchResponse doSearchV2Request(SearchRequest params) throws IOException, E3DBException, E3DBDecryptionException, ParseException {
+
+
+    retrofit2.Response<ResponseBody> execute = searchClient.search(params).execute();
+    if (execute.code() != 200)
+      throw E3DBException.find(execute.code(), execute.message());
+
+    JsonNode results = mapper.readTree(execute.body().string());
+    long totalResults = results.get("total_results").asLong();
+    String searchID = results.get("search_id").asText();
+    long lastIndex = results.get("last_index").asLong();
+    JsonNode currPage = results.get("results");
+    ArrayList<Record> records = getRecordsFromJsonNode(currPage);
+
+    return new SR(records, lastIndex,  totalResults, searchID);
   }
 
   private String[] makeArray(List writerIds) {
@@ -2450,7 +2512,9 @@ public class Client {
    * @param params       The criteria to filter records by. Use the {@link QueryParamsBuilder} class to make this object.
    * @param handleResult If successful, returns a page of results. The {@link QueryResponse#last()} method can be used
    *                     in conjunction with the {@link QueryParamsBuilder#setAfter(long)} method to implement pagination.
+    * @deprecated        Please use {@link Client#search(SearchRequest, ResultHandler)} instead.
    */
+  @Deprecated
   public void query(final QueryParams params, final ResultHandler<QueryResponse> handleResult) {
     checkNotNull(params, "params");
 
@@ -2465,6 +2529,30 @@ public class Client {
         } catch (final Throwable e) {
           uiError(handleResult, e);
         }
+      }
+    });
+  }
+
+
+  /**
+   * Get a list of records matching some criteria.
+   *
+   * <p>By default, results are limited to 50 records and do not include encrypted data
+   *
+   * @param params       The criteria to filter records by. Use the {@link SearchRequestBuilder} class to make this object.
+   * @param handleResult If successful, returns a page of results. The {@link QueryResponse#last()} method can be used
+   *                     in conjunction with the {@link SearchRequestBuilder#setNextToken(long)} method to implement pagination.
+   */
+  public void search(final SearchRequest params, final ResultHandler<SearchResponse> handleResult) {
+    checkNotNull(params, "params");
+    onBackground(() -> {
+      try {
+        SearchResponse searchResponse = doSearchV2Request(params);
+        uiValue(handleResult, searchResponse);
+      } catch (E3DBException e) {
+        e.printStackTrace();
+      } catch (Throwable e) {
+        e.printStackTrace();
       }
     });
   }

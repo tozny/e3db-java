@@ -47,7 +47,7 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [7.1.1](https://tozny.github.io/e3db-java/docs/7.1.1/) - The most recently released version of the client.
+* [7.1.2](https://tozny.github.io/e3db-java/docs/7.1.2/) - The most recently released version of the client.
 * All versions: https://tozny.github.io/e3db-java
 
 Code examples for the most common operations can be found below.
@@ -63,7 +63,7 @@ repositories {
   maven { url "https://dl.bintray.com/terl/lazysodium-maven" }
 }
 
-implementation ('com.tozny.e3db:e3db-client-android:7.1.1@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:7.1.2@aar') {
     transitive = true
 }
 ```
@@ -80,7 +80,7 @@ For use with Maven, declare the following dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>7.1.1</version>
+    <version>7.1.2</version>
   </dependency>
 </dependencies>
 ```

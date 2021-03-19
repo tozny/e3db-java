@@ -141,8 +141,8 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
 
     this.activity = activity;
     this.title = promptInfo.getTitle().toString();
-    this.description = promptInfo.getDescription().toString();
-    this.subtitle = promptInfo.getSubtitle().toString();
+    this.description = "";
+    this.subtitle = "";
     this.promptInfo = promptInfo;
   }
 

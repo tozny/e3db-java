@@ -373,6 +373,9 @@ public class SearchRequest {
 
   /**
    * Enum to define the order in which search results are returned.
+   *
+   * For dates {@link #ASCENDING} is oldest to newest
+   * For dates {@link #DESCENDING} is newest to oldest
    */
   public enum SearchSortOrder {
     ASCENDING,

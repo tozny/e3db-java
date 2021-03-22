@@ -47,7 +47,7 @@ meant to be secret and is safe to embed in your app.
 Full API documentation for various versions can be found at the
 following locations:
 
-* [7.1.3](https://tozny.github.io/e3db-java/docs/7.1.3/) - The most recently released version of the client.
+* [7.2.0](https://tozny.github.io/e3db-java/docs/7.2.0/) - The most recently released version of the client.
 * All versions: https://tozny.github.io/e3db-java
 
 Code examples for the most common operations can be found below.
@@ -63,7 +63,7 @@ repositories {
   maven { url "https://dl.bintray.com/terl/lazysodium-maven" }
 }
 
-implementation ('com.tozny.e3db:e3db-client-android:7.1.3@aar') {
+implementation ('com.tozny.e3db:e3db-client-android:7.2.0@aar') {
     transitive = true
 }
 ```
@@ -80,7 +80,7 @@ For use with Maven, declare the following dependencies:
   <dependency>
     <groupId>com.tozny.e3db</groupId>
     <artifactId>e3db-client-plain</artifactId>
-    <version>7.1.3</version>
+    <version>7.2.0</version>
   </dependency>
 </dependencies>
 ```
@@ -365,102 +365,83 @@ Any data format, such as JSON or raw bytes, can be stored as long as
 it is first converted to a `String` for a write operation. Just be sure
 to reverse the process later when reading the data.
 
-## Query records
+## Search records
 
-E3DB allows you to query records based on a number of criteria,
-including record type. Use the `QueryParamsBuilder` object to build a
-query:
+E3DB allows you to search for records based on a number of criteria,
+including record type. 
 
+A sample method to execute a paginated search using a [`SearchRequestBuilder`](e3db/src/main/java/com/tozny/e3db/SearchRequestBuilder.java). See the [`SearchRequest`](e3db/src/main/java/com/tozny/e3db/SearchRequest.java)
+class for detailed parameter information and uses.
 ```java
-QueryParams params = new QueryParamsBuilder()
-  .setTypes("lyric")
-  .setIncludeData(true)
-  .setCount(50)
-  .build();
+public class SearchExample {
+    public static void searchExample(Client client) throws InterruptedException {
 
-Client client = ...; // Get a client instance
+        // Create an initial search request.
+        SearchRequest searchRequest = new SearchRequestBuilder().
+                setIncludeData(true).
+                setIncludeAllWriters(false).
+                setLimit(50).
+                // Set a range of the search for records created from 5 days ago until now
+                setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED,
+                        Date.from(Instant.now().minus(5, ChronoUnit.DAYS)),
+                        null)).
+                // SearchOrderAscending sorts from oldest to newest
+                setOrder(SearchRequest.SearchOrder.SearchOrderAscending()).
+                setMatch(Arrays.asList(
+                        // Matches any records with the type `wanted type` OR `another type`
+                        // If SearchRequest.SearchParamCondition were `AND` there would
+                        // never be a match as records can only have one type
+                        new SearchRequest.SearchParams(
+                                SearchRequest.SearchParamCondition.OR,
+                                SearchRequest.SearchParamStrategy.EXACT,
+                                new SearchRequest.SearchTermsBuilder().
+                                        addRecordTypes("wanted type", "another type").
+                                        build()))).
+                setExclude(Arrays.asList(
+                        new SearchRequest.SearchParams(
+                                SearchRequest.SearchParamCondition.OR,
+                                SearchRequest.SearchParamStrategy.EXACT,
+                                new SearchRequest.SearchTermsBuilder().
+                                        addRecordTypes("excluded type").
+                                        build()))).
+                build();
 
-client.query(params, new ResultHandler<QueryResponse>() {
-   @Override
-   public void handle(Result<QueryResponse> r) {
-     if(! r.isError()) {
-       // print list of records
-       for(Record r : r.asValue().records()) {
-         System.out.println("Record ID: " + r.meta().recordId());
-         System.out.println("Song: " + r.data().get("song"));
-       }
-     }
-   }
- }
-);
-```
+        final AtomicReference<Result<SearchResponse>> atomicSearchResponseResult = new AtomicReference<>();
+        List<Record> records = new ArrayList<>();
+        // The nextToken record index is initially set to 0 and will be incremented in the search loop
+        long nextToken = 0;
+        // Execute an initial search and then determine if more are needed and execute those in a loop
+        do {
+            // In a non-Android environment CountDownLatch is a simple way to manage the asynchronous search flow
+            CountDownLatch latch = new CountDownLatch(1);
+            // Run the search
+            searchRequest = searchRequest.buildOn().setNextToken(nextToken).build();
+            client.search(
+                    searchRequest, r -> {
+                        atomicSearchResponseResult.set(r);
+                        latch.countDown();
+                    }
+            );
+            latch.await();
+            Result<SearchResponse> searchResponseResult = atomicSearchResponseResult.get();
+            if (searchResponseResult.isError()) {
+                // Handle a search error
+                throw new RuntimeException("An error occurred while searching", searchResponseResult.asError().other());
+            } else {
+                // Get the search response
+                SearchResponse searchResponse = searchResponseResult.asValue();
+                // update the nextToken value 
+                nextToken = searchResponse.last();
+                /**
+                 * Do any code logic that is needed such as aggregating found records
+                 */
+                records.addAll(searchResponse.records());
 
-`setCount` controls the number of records returned; `setIncludeData`
-includes the data for each record in results (otherwise, only `meta()`
-will be populated; `data()` will return an empty `Map`). Other possible
-filters include:
-
-- `setWriterIds`: Filter to records written by these IDs
-- `setUserIds`: Filter to records with these user IDs
-- `setRecordIds`: Filter to only the records identified by these IDs
-- `setTypes`: Filter to records that match the given types
-- `setIncludeAllWriters`: Set this flag to include records that have been shared
-  with you, defaults to `false`
-
-> While the Java SDK supports _writing_ plaintext meta with records, the query interface does not support filtering on that meta information at this time.
-
-## Pagination
-
-The `QueryResponse` object's method `last()` gives a value indicating the last
-record returned. Passing this value to the `setAfter()` method on the `QueryParamsBuilder`
-object will cause E3DB to return records that come "after" that value. For example, this
-snippet will loop through all "lyric" records in 10-row increments:
-
-```java
-Client client = ...; // Get a client instance
-
-// Create a parameter builder that we can re-use to
-// call the `setAfter()` method over and over, for
-// pagination.
-final QueryParams params = new QueryParamsBuilder()
-  .setTypes("lyric")
-  .setIncludeData(true)
-  .setCount(10);
-
-// Allows us to modify this flag from inside the `ResultHandler`
-// anonymous class below.
-final AtomicReference<Boolean> done = new AtomicReference<>(false);
-
-while(! done.get()) {
-  CountDownLatch wait = new CountDownLatch(1);
-
-  client.query(params.build(), new ResultHandler<QueryResponse>() {
-     @Override
-     public void handle(Result<QueryResponse> r) {
-       if(! r.isError()) {
-         List<Record> records = r.asValue().records();
-         if(records.size() == 0) {
-           // no more records, stop looping
-           done.set(true);
-         }
-         else {
-           // print list of records for this page
-           for(Record r : r.asValue().records()) {
-             System.out.println("Record ID: " + r.meta().recordId());
-             System.out.println("Song: " + r.data().get("song"));
-           }
-
-           // set next page in parameter builder
-           params.setAfter(r.asValue().last());
-         }
-
-         wait.countDown();
-       }
-     }
-   }
-  );
-
-  wait.await(30, TimeUnit.SECONDS);
+            }
+        // See if the search loop needs to happen again
+        } while (nextToken != 0);
+        System.out.println("There were " + records.size() + " records found with the search");
+    }
 }
 ```
 

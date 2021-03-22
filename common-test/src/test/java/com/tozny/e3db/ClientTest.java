@@ -2885,11 +2885,11 @@ public class ClientTest {
     assertEquals(0, last);
   }
 
-  @Test
+  @Test(timeout = 10000)
   public void searchV2ReturnsExpectedResultsWithRange() throws Exception {
     final AtomicReference<UUID> recordId = new AtomicReference<>();
     Client client = getClient().client;
-    withTimeout(wait -> writeRecord(client, new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
+    withTimeout(wait -> writeRecord(client, UUID.randomUUID().toString(), new TestUtilities.ResultWithWaiting<>(wait, (ResultHandler<Record>) r -> {
       if (r.isError())
         throw new Error(r.asError().other());
 

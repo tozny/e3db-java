@@ -171,28 +171,29 @@ You can configure and switch between multiple versions of Java on a Mac for usin
 ```bash
 # Install the jenv tool
 brew install jenv
-#
-brew tap homebrew/cask-versions
+# Load index of non-default packages provided by homebrew
 brew tap homebrew/cask
 # Update brew with latest versions of open source / community JDK
 brew tap adoptopenjdk/openjdk
 # Install versions of SDK as needed by your project
-brew cask install adoptopenjdk8
-brew cask install adoptopenjdk11
-brew cask install adoptopenjdk14
-
-# Add the following to your systems bash_profile or bash_rc file
+brew install --cask adoptopenjdk8
+brew install --cask adoptopenjdk11
+brew install --cask adoptopenjdk14
+# Add the following to your systems ~/.bash_profile or ~./bashrc file
 export PATH="$HOME/.jenv/bin:$PATH"
 eval "$(jenv init -)"
 export JAVA_8_HOME=$(/usr/libexec/java_home -v1.8)
 export JAVA_11_HOME=$(/usr/libexec/java_home -v11)
 export JAVA_14_HOME=$(/usr/libexec/java_home -v14)
-
+# Then source ~/.bashrc or sourc
+[octo@ValleyOfTheForge e3db-java]$ source ~/.bashrc
 # Then switch between java versions as desired
+[octo@ValleyOfTheForge e3db-java]$ jenv global 1.8
 [octo@ValleyOfTheForge e3db-java]$ java -version
 openjdk version "1.8.0_282"
 OpenJDK Runtime Environment Corretto-8.282.08.1 (build 1.8.0_282-b08)
 OpenJDK 64-Bit Server VM Corretto-8.282.08.1 (build 25.282-b08, mixed mode)
+# List available versions of java installed and able to switch between
 [octo@ValleyOfTheForge e3db-java]$ jenv versions
   system
 * 1.8 (set by /Users/octo/.jenv/version)

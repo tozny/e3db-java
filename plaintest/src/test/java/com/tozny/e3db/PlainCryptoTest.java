@@ -20,10 +20,10 @@
 
 package com.tozny.e3db;
 
-import com.goterl.lazycode.lazysodium.LazySodium;
-import com.goterl.lazycode.lazysodium.LazySodiumJava;
-import com.goterl.lazycode.lazysodium.SodiumJava;
-import com.goterl.lazycode.lazysodium.interfaces.Sign;
+import com.goterl.lazysodium.LazySodium;
+import com.goterl.lazysodium.LazySodiumJava;
+import com.goterl.lazysodium.SodiumJava;
+import com.goterl.lazysodium.interfaces.Sign;
 import com.tozny.e3db.crypto.*;
 
 import org.junit.*;

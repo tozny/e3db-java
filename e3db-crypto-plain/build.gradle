@@ -23,7 +23,7 @@ apply plugin: 'java'
 
 dependencies {
     compileOnly project(':e3db-crypto-interface')
-    compile 'com.goterl.lazycode:lazysodium-java:2.5.0'
+    compile 'com.goterl:lazysodium-java:5.0.1'
     compile 'net.java.dev.jna:jna:4.5.1'
 }
 

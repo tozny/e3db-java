@@ -2953,18 +2953,19 @@ public class ClientTest {
     // Search with range after exclusive
     Date now = new Date(System.currentTimeMillis());
     Date afterCreated = new Date(created.toInstant().toEpochMilli() + 3600 * 1000);
-    SearchRequest afterRequest= requestDefault.buildOn().setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED, now, afterCreated)).build();
+    SearchRequest afterRequest = requestDefault.buildOn().setRange(new SearchRequest.SearchRange(SearchRequest.SearchRangeType.CREATED, now, afterCreated)).build();
+    final AtomicReference<Result<SearchResponse>> newAtomicSearchResponseResult = new AtomicReference<>();
     latch = new CountDownLatch(1);
     client.search(
             afterRequest, new TestUtilities.ResultWithWaiting<>(latch, r -> {
               assert (!r.isError());
-              atomicSearchResponseResult.set(r);
+              newAtomicSearchResponseResult.set(r);
             })
     );
     latch.await(INFINITE_WAIT ? Integer.MAX_VALUE : TIMEOUT, TimeUnit.SECONDS);
 
 
-    searchResponseResult = atomicSearchResponseResult.get();
+    searchResponseResult = newAtomicSearchResponseResult.get();
     assert (!searchResponseResult.isError());
     searchResponse = searchResponseResult.asValue();
     assertEquals(0, searchResponse.totalResults());

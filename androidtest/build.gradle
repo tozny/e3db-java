@@ -76,7 +76,7 @@ dependencies {
   androidTestImplementation "commons-io:commons-io:2.8.0"
   androidTestImplementation "org.assertj:assertj-core:3.19.0"
 
-  androidTestImplementation 'com.goterl.lazycode:lazysodium-android:2.5.0@aar'
+  androidTestImplementation 'com.goterl:lazysodium-android:5.0.2@aar'
 
   androidTestImplementation project(path: ':e3db')
   androidTestImplementation project(path: ':e3db-crypto-interface')

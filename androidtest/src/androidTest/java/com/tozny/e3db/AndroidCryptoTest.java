@@ -25,11 +25,12 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Log;
 
-import com.goterl.lazycode.lazysodium.LazySodium;
-import com.goterl.lazycode.lazysodium.LazySodiumAndroid;
-import com.goterl.lazycode.lazysodium.SodiumAndroid;
-import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
-import com.goterl.lazycode.lazysodium.interfaces.Sign;
+import com.goterl.lazysodium.LazySodium;
+import com.goterl.lazysodium.LazySodiumAndroid;
+import com.goterl.lazysodium.SodiumAndroid;
+import com.goterl.lazysodium.interfaces.SecretStream;
+import com.goterl.lazysodium.interfaces.Sign;
+import com.goterl.lazysodium.utils.Key;
 import com.tozny.e3db.crypto.Crypto;
 
 import org.junit.Test;
@@ -55,7 +56,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 
-import static com.goterl.lazycode.lazysodium.LazySodium.toHex;
+import static com.goterl.lazysodium.LazySodium.toHex;
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
@@ -290,7 +291,7 @@ public class AndroidCryptoTest {
     cipherIn.read(header);
     Log.d("AndroidCryptoTest", toHex(header));
 
-    SecretStream.State state = lazySodium.cryptoSecretStreamInitPull(header, toHex(dataKey));
+    SecretStream.State state = lazySodium.cryptoSecretStreamInitPull(header, Key.fromBytes(dataKey));
     ByteBuffer allPlainBytes = ByteBuffer.allocate((int) plain.length());
     {
       byte[] encBlock = new byte[65_636 + SecretStream.ABYTES];
@@ -322,7 +323,7 @@ public class AndroidCryptoTest {
     String message2 = "World";
     byte[] header = new byte[SecretStream.HEADERBYTES];
 
-    String secretKey = lazySodium.cryptoSecretBoxKeygen();
+    Key secretKey = lazySodium.cryptoSecretBoxKeygen();
     SecretStream.State encState = lazySodium.cryptoSecretStreamInitPush(header, secretKey);
 
     String c1 = lazySodium.cryptoSecretStreamPush(encState, message1, SecretStream.TAG_MESSAGE);

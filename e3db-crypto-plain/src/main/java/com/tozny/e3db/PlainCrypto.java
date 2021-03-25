@@ -20,16 +20,17 @@
 
 package com.tozny.e3db;
 
-import com.goterl.lazycode.lazysodium.LazySodium;
-import com.goterl.lazycode.lazysodium.LazySodiumJava;
-import com.goterl.lazycode.lazysodium.SodiumJava;
-import com.goterl.lazycode.lazysodium.exceptions.SodiumException;
-import com.goterl.lazycode.lazysodium.interfaces.Box;
-import com.goterl.lazycode.lazysodium.interfaces.GenericHash;
-import com.goterl.lazycode.lazysodium.interfaces.SecretBox;
-import com.goterl.lazycode.lazysodium.interfaces.SecretStream;
-import com.goterl.lazycode.lazysodium.interfaces.Sign;
-import com.goterl.lazycode.lazysodium.utils.KeyPair;
+import com.goterl.lazysodium.LazySodium;
+import com.goterl.lazysodium.LazySodiumJava;
+import com.goterl.lazysodium.SodiumJava;
+import com.goterl.lazysodium.exceptions.SodiumException;
+import com.goterl.lazysodium.interfaces.Box;
+import com.goterl.lazysodium.interfaces.GenericHash;
+import com.goterl.lazysodium.interfaces.SecretBox;
+import com.goterl.lazysodium.interfaces.SecretStream;
+import com.goterl.lazysodium.interfaces.Sign;
+import com.goterl.lazysodium.utils.Key;
+import com.goterl.lazysodium.utils.KeyPair;
 import com.tozny.e3db.crypto.*;
 
 import java.io.File;
@@ -129,7 +130,7 @@ class PlainCrypto implements Crypto {
   @Override
   public byte[] newPrivateKey() throws E3DBCryptoException {
     try {
-      return lazySodium.cryptoBoxKeypair().getSecretKey();
+      return lazySodium.cryptoBoxKeypair().getSecretKey().getAsBytes();
     } catch (SodiumException e) {
       throw new E3DBCryptoException(e);
     }
@@ -138,11 +139,7 @@ class PlainCrypto implements Crypto {
   @Override
   public byte[] getPublicKey(byte[] privateKey) throws E3DBCryptoException {
     checkNotEmpty(privateKey, "privateKey");
-    try {
-      return lazySodium.cryptoScalarMultBase(privateKey).getPublicKey();
-    } catch (SodiumException e) {
-      throw new E3DBCryptoException(e);
-    }
+      return lazySodium.cryptoScalarMultBase(Key.fromBytes(privateKey)).getAsBytes();
   }
 
   @Override
@@ -156,7 +153,7 @@ class PlainCrypto implements Crypto {
   public byte[] signature(byte[] message, byte[] signingKey) throws E3DBCryptoException {
     byte[] signatureBytes = new byte[Sign.BYTES];
 
-    if (!lazySodium.cryptoSignDetached(signatureBytes, new long[]{0}, message, message.length, signingKey))
+    if (!lazySodium.cryptoSignDetached(signatureBytes, message, message.length, signingKey))
       throw new E3DBCryptoException("Unable to sign document.");
 
     return signatureBytes;
@@ -174,7 +171,7 @@ class PlainCrypto implements Crypto {
   @Override
   public byte[] newPrivateSigningKey() throws E3DBCryptoException {
     try {
-      return lazySodium.cryptoSignKeypair().getSecretKey();
+      return lazySodium.cryptoSignKeypair().getSecretKey().getAsBytes();
     } catch (SodiumException e) {
       throw new E3DBCryptoException(e);
     }
@@ -183,7 +180,7 @@ class PlainCrypto implements Crypto {
   @Override
   public byte[] getPublicSigningKey(byte[] privateKey) throws E3DBCryptoException {
     try {
-      return lazySodium.cryptoSignSecretKeyPair(privateKey).getPublicKey();
+      return lazySodium.cryptoSignSecretKeyPair(Key.fromBytes(privateKey)).getPublicKey().getAsBytes();
     } catch (SodiumException e) {
       throw new E3DBCryptoException(e);
     }
@@ -327,7 +324,7 @@ class PlainCrypto implements Crypto {
     byte[] bytes = derivePBKDF2WithHMACSHA512(password, salt);
     try {
       KeyPair keyPair = lazySodium.cryptoBoxSeedKeypair(bytes);
-      return new E3DBKeyPair(keyPair.getPublicKey(), keyPair.getSecretKey());
+      return new E3DBKeyPair(keyPair.getPublicKey().getAsBytes(), keyPair.getSecretKey().getAsBytes());
     } catch (SodiumException e) {
       throw new E3DBCryptoException(e);
     }
@@ -347,7 +344,7 @@ class PlainCrypto implements Crypto {
     byte[] bytes = derivePBKDF2WithHMACSHA512(password, salt);
     try {
       KeyPair keyPair = lazySodium.cryptoSignSeedKeypair(bytes);
-      return new E3DBKeyPair(keyPair.getPublicKey(), keyPair.getSecretKey());
+      return new E3DBKeyPair(keyPair.getPublicKey().getAsBytes(), keyPair.getSecretKey().getAsBytes());
     } catch (SodiumException e) {
       throw new E3DBCryptoException(e);
     }

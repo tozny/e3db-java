@@ -62,6 +62,7 @@ import com.tozny.e3db.R;
 
 import java.security.GeneralSecurityException;
 import java.security.UnrecoverableKeyException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static android.app.Activity.RESULT_OK;
 
@@ -130,8 +131,8 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
   /**
    * Create an instance that will display over the given activity.
    *
-   * @param activity Activity that will host the dialog
-   * @param promptInfo  Display properties of the biometric dialog.
+   * @param activity   Activity that will host the dialog
+   * @param promptInfo Display properties of the biometric dialog.
    */
   public DefaultKeyAuthenticator(FragmentActivity activity, PromptInfo promptInfo) {
     if (activity == null)
@@ -431,6 +432,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
     @Override
     public void onCreate(Bundle savedInstanceState) {
       super.onCreate(savedInstanceState);
+      final AtomicInteger attempts = new AtomicInteger();
       BiometricPrompt biometricPrompt = new BiometricPrompt(this, new BiometricPrompt.AuthenticationCallback() {
         @Override
         public void onAuthenticationError(int errorCode,
@@ -439,7 +441,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
           if (errorCode == BiometricPrompt.ERROR_USER_CANCELED || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
             authHandler.handleCancel();
           } else {
-            authHandler.handleError(new GeneralSecurityException("An error occurred while authentication"));
+            authHandler.handleError(new GeneralSecurityException("An error occurred while authenticating:" + errString));
           }
         }
 
@@ -450,17 +452,19 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
           authHandler.handleAuthenticated();
         }
 
+        // With the BiometricPrompt onAuthenticationFailed is a red herring. This is called for any bad scan.
+        // The biometric prompt actually fails after 5 bad scans when it calls onAuthenticationError with an errorCode of 7, multiple errorCode 7s will trigger an errorCode 9
         @Override
         public void onAuthenticationFailed() {
           super.onAuthenticationFailed();
-          authHandler.handleCancel();
         }
       });
       biometricPrompt.authenticate(promptInfo, this.cryptoObject);
     }
 
     public void setCryptoObject(BiometricPrompt.CryptoObject cryptoObject) {
-      this.cryptoObject = cryptoObject;    }
+      this.cryptoObject = cryptoObject;
+    }
 
     public void setTitle(String title) {
       this.title = title;
@@ -494,7 +498,7 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
   @RequiresApi(api = Build.VERSION_CODES.M)
   @Override
   public void authenticateWithBiometric(BiometricPrompt.CryptoObject cryptoObject, AuthenticateHandler handler) {
-    BiometricCredentialsFragment f= new BiometricCredentialsFragment();
+    BiometricCredentialsFragment f = new BiometricCredentialsFragment();
     f.setHandler(handler);
     f.setCryptoObject(cryptoObject);
     f.setTitle(title);
@@ -518,33 +522,33 @@ class DefaultKeyAuthenticator extends KeyAuthenticator {
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
 
         new AlertDialog.Builder(DefaultKeyAuthenticator.this.activity)
-            .setMessage(ctx.getString(R.string.key_provider_please_enter_pin))
-            .setPositiveButton(ctx.getString(R.string.key_provider_ok), new DialogInterface.OnClickListener() {
-              @Override
-              public void onClick(DialogInterface dialogInterface, int i) {
-                try {
-                  handler.handlePassword(input.getText().toString());
+                .setMessage(ctx.getString(R.string.key_provider_please_enter_pin))
+                .setPositiveButton(ctx.getString(R.string.key_provider_ok), new DialogInterface.OnClickListener() {
+                  @Override
+                  public void onClick(DialogInterface dialogInterface, int i) {
+                    try {
+                      handler.handlePassword(input.getText().toString());
 
-                } catch (UnrecoverableKeyException e) {
-                  wrongPasswordCount[0]++;
+                    } catch (UnrecoverableKeyException e) {
+                      wrongPasswordCount[0]++;
 
-                  if (wrongPasswordCount[0] >= 3) {
-                    handler.handleError(new RuntimeException("Too many password tries."));
-                  } else {
-                    Toast.makeText(DefaultKeyAuthenticator.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
-                    getPassword(handler);
+                      if (wrongPasswordCount[0] >= 3) {
+                        handler.handleError(new RuntimeException("Too many password tries."));
+                      } else {
+                        Toast.makeText(DefaultKeyAuthenticator.this.activity, e.getMessage(), Toast.LENGTH_SHORT).show();
+                        getPassword(handler);
+                      }
+                    }
                   }
-                }
-              }
-            })
-            .setNegativeButton(ctx.getString(R.string.key_provider_cancel), new DialogInterface.OnClickListener() {
-              @Override
-              public void onClick(DialogInterface dialogInterface, int i) {
-                handler.handleCancel();
-              }
-            })
-            .setView(input)
-            .show();
+                })
+                .setNegativeButton(ctx.getString(R.string.key_provider_cancel), new DialogInterface.OnClickListener() {
+                  @Override
+                  public void onClick(DialogInterface dialogInterface, int i) {
+                    handler.handleCancel();
+                  }
+                })
+                .setView(input)
+                .show();
 
         input.setOnFocusChangeListener(new View.OnFocusChangeListener() {
           @Override

@@ -5,8 +5,9 @@ title: API Documentation
 Full API documentation for our Java libraries can be found at the
 following locations:
 
-* [7.2.1](https://tozny.github.io/e4db-java/docs/7.2.1/) - The most recently released version of the client.
+* [7.2.2](https://tozny.github.io/e4db-java/docs/7.2.2/) - The most recently released version of the client.
 * Older versions:
+  * [7.2.1](https://tozny.github.io/e4db)
   * [7.2.0](https://tozny.github.io/e4db-java/docs/7.2.0/)
   * [7.1.3](https://tozny.github.io/e3db-java/docs/7.1.3/)
   * [7.1.2](https://tozny.github.io/e3db-java/docs/7.1.2/)

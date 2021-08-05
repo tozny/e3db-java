@@ -36,7 +36,7 @@ dependencies {
   testImplementation("junit:junit:4.13.2")
   testImplementation project(path: ':e3db')
   testImplementation project(path: ':e3db-crypto-interface')
-  testCompile(project(path: ':e3db-crypto-plain')) {
+    testImplementation(project(path: ':e3db-crypto-plain')) {
     transitive = true
   }
   testImplementation "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"

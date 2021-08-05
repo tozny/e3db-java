@@ -22,9 +22,9 @@ apply plugin: 'kotlin'
 apply plugin: 'java'
 
 dependencies {
-    compileOnly project(':e3db-crypto-interface')
-    compile 'com.goterl:lazysodium-java:5.0.1'
-    compile 'net.java.dev.jna:jna:4.5.1'
+    api project(':e3db-crypto-interface')
+    api 'com.goterl:lazysodium-java:5.0.1'
+    api 'net.java.dev.jna:jna:4.5.1'
 }
 
 sourceCompatibility = "1.8"

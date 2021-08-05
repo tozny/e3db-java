@@ -77,7 +77,8 @@ dependencies {
     // exclude project dependencies - only include external, maven dependencies
     ExternalModuleDependency.class.isAssignableFrom(dep.class)
   }
-  compileOnly project(":e3db").configurations.compileOnly.dependencies
+    implementation project(path: ':publish:android')
+    compileOnly project(":e3db").configurations.compileOnly.dependencies
 }
 
 

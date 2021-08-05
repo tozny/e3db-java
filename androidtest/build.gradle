@@ -101,4 +101,4 @@ tasks.withType(AndroidTestTask) {
 }
 
 apply plugin: 'kotlin-android'
-apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-parcelize'

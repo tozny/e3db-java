@@ -28,15 +28,15 @@ dependencies {
     compileOnly project(':e3db-crypto-stub-plain')
     compileOnly project(':e3db-crypto-stub-android')
 
-    compile "com.squareup.retrofit2:retrofit:$retrofitVersion"
-    compile "com.squareup.retrofit2:converter-jackson:$retrofitVersion"
-    compile 'com.squareup.okhttp3:okhttp:4.9.0'
+    api "com.squareup.retrofit2:retrofit:$retrofitVersion"
+    api "com.squareup.retrofit2:converter-jackson:$retrofitVersion"
+    api 'com.squareup.okhttp3:okhttp:4.9.0'
     implementation "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
-    compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion"
+    api "com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion"
     implementation "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
     implementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
-    compile "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
-    compile "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion"
+    api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion"
 
     implementation project(':e3db-crypto-interface')

@@ -25,30 +25,29 @@ apply plugin: 'java'
 
 
 buildscript {
-   ext.kotlin_plugin_version = '1.4.30'
+   ext.kotlin_plugin_version = '1.5.20'
    ext.kotlin_jdk8_version = '1.4.30'
     repositories {
-        jcenter()
         google()
+        gradlePluginPortal()
         mavenCentral()
-//        mavenLocal()
+        mavenLocal()
         maven { url "https://maven.tozny.com/repo" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.2'
+        classpath 'com.android.tools.build:gradle:4.2.2'
         classpath "de.mannodermaus.gradle.plugins:android-junit5:1.0.0"
-        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:2.0.0'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:5.2.0'
+        classpath 'com.getkeepsafe.dexcount:dexcount-gradle-plugin:3.0.0-RC02'
+        classpath 'gradle.plugin.com.github.jengelman.gradle.plugins:shadow:7.0.0'
         classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_plugin_version"
-        classpath "commons-io:commons-io:2.8.0"
+        classpath "commons-io:commons-io:2.10.0"
         classpath "org.assertj:assertj-core:3.19.0"
     }
 }
 
 allprojects {
     repositories {
-        jcenter()
         google()
         mavenCentral()
         mavenLocal()
@@ -87,4 +86,9 @@ def apiUrl() {
         else
             "https://api.e3db.com"
     }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }

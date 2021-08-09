@@ -49,7 +49,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
   }
 
   private val identityClient: IdentityServiceClient
-  private val defaultBrokerClient: BrokerClient
+  private lateinit var defaultBrokerClient: BrokerClient
   private val realmName: String
   private val appName: String
   private val brokerTargetURL: URI
@@ -95,7 +95,9 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
           publicRealmInfo.isSuccessful -> {
             publicRealmInfo.body().also {
               if (it != null) {
-                this.realmInfo = it // Extra effort to check for null despite a require that it not be null
+                this.realmInfo = it
+                retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/") // this.realmName --> this.domainName which is new instance variable for realms
+                defaultBrokerClient = retrofitBuilder.build().create()
               }
             }
           }
@@ -104,9 +106,6 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
         null // TODO: How to throw proper exception without a resultHandler in init?
       }
     }
-
-    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/") // this.realmName --> this.domainName which is new instance var for realms
-    defaultBrokerClient = retrofitBuilder.build().create()
   }
 
   private fun createTSV1Client(privateSigningKey: ByteArray, publicSigningKey: ByteArray = crypto.getPublicSigningKey(privateSigningKey), clientID: UUID? = null, additionalHeaders: Map<String, String> = mapOf()): OkHttpClient {

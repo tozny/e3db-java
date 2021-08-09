@@ -18,7 +18,6 @@ import java.net.URI
 import java.util.*
 import kotlin.collections.HashMap
 
-
 class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brokerTargetURL: URI?, apiURL: URI? = URI("https://api.e3db.com"), certificatePinner: CertificatePinner? = null) {
   companion object {
     @JvmStatic
@@ -56,6 +55,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
   private val brokerTargetURL: URI
   private val apiURL: URI
   private val certificatePinner: CertificatePinner?
+  private lateinit var realmInfo: PublicRealmInfo
 
   init {
     require(!realmName.isNullOrEmpty()) { illegalArgumentEmpty("realmName") }
@@ -82,9 +82,30 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
               JacksonConverterFactory.create(mapper)
           )
         }
+
     identityClient = retrofitBuilder.build().create()
 
-    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmName}/")
+    // TODO: All network calls are done on background threads (backgroundExecutor.execute), can this run in init?
+    // realmName get from call to getPublicRealm endpoint
+    // Most cases of this.realmName should be this.domainName (reference js-sdk for which needs to change), keycloak expects this
+    backgroundExecutor.execute {
+      try {
+        val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
+        when {
+          publicRealmInfo.isSuccessful -> {
+            publicRealmInfo.body().also {
+              if (it != null) {
+                this.realmInfo = it // Extra effort to check for null despite a require that it not be null
+              }
+            }
+          }
+        }
+      } catch (e: Exception) {
+        null // TODO: How to throw proper exception without a resultHandler in init?
+      }
+    }
+
+    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/") // this.realmName --> this.domainName which is new instance var for realms
     defaultBrokerClient = retrofitBuilder.build().create()
   }
 
@@ -312,9 +333,9 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
     backgroundExecutor.execute {
       try {
         val username = userName.toLowerCase(Locale.US)
-        val deriveNoteCreds = deriveNoteCreds(realmName, username, password, credentialType)
+        val deriveNoteCreds = deriveNoteCreds(realmInfo.name, username, password, credentialType)
         val anonymousIdentityClient = createTSV1IdentityClient(deriveNoteCreds.signingKeys.privateKey, deriveNoteCreds.signingKeys.publicKey)
-        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, realmName, appName)).execute()
+        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, realmInfo.name, appName)).execute()
         when {
           sessionStart.isSuccessful -> {
             val fieldMap = HashMap<String, String>()
@@ -323,7 +344,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                 put(it.key, it.value.asText())
               }
             }
-            val sessionRequest = identityClient.sessionRequest(realmName, fieldMap).execute()
+            val sessionRequest = identityClient.sessionRequest(realmInfo.name, fieldMap).execute()
             when {
               sessionRequest.isSuccessful -> {
                 var body: CompleteLoginAction
@@ -334,7 +355,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                     "fetch" -> {
                       madeFinalRequest = true
                       val finalRequest = anonymousIdentityClient.loginredirect(LoginRedirectRequest(
-                          realmName,
+                          realmInfo.name,
                           body.context["session_code"] ?: "",
                           body.context["execution"] ?: "",
                           body.context["tab_id"] ?: "",

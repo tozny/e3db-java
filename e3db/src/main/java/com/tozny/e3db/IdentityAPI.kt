@@ -105,6 +105,9 @@ interface IdentityServiceClient {
   // This method requires a TSV1 http client
   @POST("/v1/identity/tozid/redirect")
   fun loginredirect(@Body request: LoginRedirectRequest): Call<JsonNode>
+
+  @GET("v1/identity/info/realm/{realm}")
+  fun getPublicRealmInfo(@Path("realm") realmName: String): Call<PublicRealmInfo>
 }
 
 interface BrokerClient {
@@ -121,6 +124,10 @@ data class FetchTokenResponse(@JsonProperty("access_token") val accessToken: Str
                               @JsonProperty("refresh_expires_in") val refreshExpiresIn: Int,
                               @JsonProperty("refresh_token") val refreshToken: String?,
                               @JsonProperty("token_type") val tokenType: String?)
+
+data class PublicRealmInfo(@JsonProperty("name") val name: String,
+                           @JsonProperty("broker_id") val brokerId: UUID,
+                           @JsonProperty("domain") val domain: String)
 
 data class InitiateChallengeRequest(@JsonProperty("username") val username: String, @JsonProperty("action") val action: String = "challenge")
 

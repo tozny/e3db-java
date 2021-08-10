@@ -1,7 +1,5 @@
 package com.tozny.e3db
 
-import android.os.Handler
-import android.os.Looper
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
@@ -49,7 +47,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
   }
 
   private val identityClient: IdentityServiceClient
-  private lateinit var defaultBrokerClient: BrokerClient
+  private val defaultBrokerClient: BrokerClient
   private val realmName: String
   private val appName: String
   private val brokerTargetURL: URI
@@ -85,9 +83,8 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
 
     identityClient = retrofitBuilder.build().create()
 
-    // TODO: All network calls are done on background threads (backgroundExecutor.execute), can this run in init?
-    // realmName get from call to getPublicRealm endpoint
-    // Most cases of this.realmName should be this.domainName (reference js-sdk for which needs to change), keycloak expects this
+    // All network calls are done on background threads
+    // This is finicky, and does not guarantee that realmInfo will be populated before it is used?
     backgroundExecutor.execute {
       try {
         val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
@@ -96,16 +93,33 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
             publicRealmInfo.body().also {
               if (it != null) {
                 this.realmInfo = it
-                retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/") // this.realmName --> this.domainName which is new instance variable for realms
-                defaultBrokerClient = retrofitBuilder.build().create()
               }
             }
           }
         }
       } catch (e: Exception) {
-        null // TODO: How to throw proper exception without a resultHandler in init?
+        // Cannot use uiExecutor.execute here similarly to Realm class methods because
+        // of no result handler
+        throw E3dbRealmNotFoundException(realmName)
       }
     }
+
+    // The above background thread execution, but done on main thread.
+//    val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
+//    if (publicRealmInfo.code() == 404) {
+//      throw E3dbRealmNotFoundException(realmName)
+//    } else if (publicRealmInfo.code() != 200) {
+//      throw E3DBException.find(publicRealmInfo.code(), publicRealmInfo.message())
+//    }
+//    this.realmInfo = publicRealmInfo.body()!!
+
+    // TODO: this.realmName --> this.realmInfo.domain (lateinit causes error here)
+    // GetPublicRealmInfo API call is on background thread, so this.realmInfo is lateinit. This causes
+    // an uninitialized error if realmInfo is used here. The declaration of defaultBrokerClient cannot be on
+    // background thread due to similar issue when its used in method calls before initialized, so
+    // realmName is used.
+    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmName}/")
+    defaultBrokerClient = retrofitBuilder.build().create()
   }
 
   private fun createTSV1Client(privateSigningKey: ByteArray, publicSigningKey: ByteArray = crypto.getPublicSigningKey(privateSigningKey), clientID: UUID? = null, additionalHeaders: Map<String, String> = mapOf()): OkHttpClient {
@@ -164,8 +178,8 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
         val response = identityClient.registerIdentity(
                 RegisterIdentityRequest(
                     token,
-                    realmName,
-                    IdentityInfo(realmName, username, Curve25519PublicKey(publicEncryptionKey), Ed25519PublicKey(publicSigningKey), firstName, lastName, null, null, null, null)))
+                    realmInfo.domain,
+                    IdentityInfo(realmInfo.domain, username, Curve25519PublicKey(publicEncryptionKey), Ed25519PublicKey(publicSigningKey), firstName, lastName, null, null, null, null)))
             .execute()
         when {
           response.isSuccessful -> {
@@ -178,14 +192,14 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
               }.build()
               val deriveNoteCreds = deriveNoteCreds(realmName, username, password, CredentialType.PASSWORD)
               val storageConfig = storageClientConfig.json()
-              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username, null)
+              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username, realmInfo.domain)
               val identityConfigAsString = mapper.writeValueAsString(identityConfig)
               val data = mapOf("config" to identityConfigAsString, "storage" to storageConfig)
               val noteOptions = NoteOptions().apply {
                 noteName = deriveNoteCreds.noteName
                 maxViews = -1
                 expires = false
-                eacp = EACP.Builder().tozIDEACP(TozIDEACP(realmName)).build()
+                eacp = EACP.Builder().tozIDEACP(TozIDEACP(realmInfo.domain)).build()
               }
               val idClientData = RecordData(data)
               client.writeNote(
@@ -332,9 +346,9 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
     backgroundExecutor.execute {
       try {
         val username = userName.toLowerCase(Locale.US)
-        val deriveNoteCreds = deriveNoteCreds(realmInfo.name, username, password, credentialType)
+        val deriveNoteCreds = deriveNoteCreds(realmName, username, password, credentialType)
         val anonymousIdentityClient = createTSV1IdentityClient(deriveNoteCreds.signingKeys.privateKey, deriveNoteCreds.signingKeys.publicKey)
-        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, realmInfo.name, appName)).execute()
+        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, realmInfo.domain, appName)).execute()
         when {
           sessionStart.isSuccessful -> {
             val fieldMap = HashMap<String, String>()
@@ -343,7 +357,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                 put(it.key, it.value.asText())
               }
             }
-            val sessionRequest = identityClient.sessionRequest(realmInfo.name, fieldMap).execute()
+            val sessionRequest = identityClient.sessionRequest(realmName, fieldMap).execute()
             when {
               sessionRequest.isSuccessful -> {
                 var body: CompleteLoginAction
@@ -354,7 +368,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                     "fetch" -> {
                       madeFinalRequest = true
                       val finalRequest = anonymousIdentityClient.loginredirect(LoginRedirectRequest(
-                          realmInfo.name,
+                          realmInfo.domain,
                           body.context["session_code"] ?: "",
                           body.context["execution"] ?: "",
                           body.context["tab_id"] ?: "",
@@ -583,13 +597,8 @@ data class IdentityConfig(
     @JsonProperty("broker_target_url") val brokerTargetUrl: String,
     @JsonProperty("realm_name") val realmName: String,
     @JsonProperty("user_id") val userId: Int?,
-    @JsonProperty("realm_domain") val realmDomain: String?,
-
-    // readAnonymousNote response did not contain a username field, so we make
-    // it optional here. This caused replacePassword and validatePassword methods
-    // in the Identity class to use a non-null assertion when constructing
-    // IdentityConfig objects. 
-    @JsonProperty("username") val username: String?
+    @JsonProperty("username") val username: String?,
+    @JsonProperty("realm_domain") val realmDomain: String?
 ) {
   companion object {
     fun fromJson(json: String): IdentityConfig {

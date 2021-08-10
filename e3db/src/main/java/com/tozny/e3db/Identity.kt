@@ -28,7 +28,8 @@ open class PartialIdentityClient @JvmOverloads constructor(val client: Client, v
   }
 
   private fun validatePassword(currentPassword: String): Boolean {
-    val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username, currentPassword, CredentialType.PASSWORD)
+    // identityConfig.username non-null asserted due to IdentityConfig providing username as an optional field
+    val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username!!, currentPassword, CredentialType.PASSWORD)
     val anonymousNoteClient = Client.getAnonymousNoteClient(deriveNoteCreds.signingKeys.privateKey, deriveNoteCreds.signingKeys.publicKey, identityConfig.apiURL, mapOf(), null)
     val challengeRequest = ChallengeRequest(TozIDEACPChallengeRequest(1))
     val execute = anonymousNoteClient.challengeNote(deriveNoteCreds.noteName, challengeRequest).execute()
@@ -36,7 +37,7 @@ open class PartialIdentityClient @JvmOverloads constructor(val client: Client, v
   }
 
   private fun replacePassword(newPassword: String, resultHandler: ResultHandler<Void>) {
-    val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username, newPassword, CredentialType.PASSWORD)
+    val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username!!, newPassword, CredentialType.PASSWORD)
     val identityConfigAsString = Realm.mapper.writeValueAsString(identityConfig)
     val storageConfig = client.config.json()
     val data = mapOf("config" to identityConfigAsString, "storage" to storageConfig)

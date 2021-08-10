@@ -178,7 +178,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
               }.build()
               val deriveNoteCreds = deriveNoteCreds(realmName, username, password, CredentialType.PASSWORD)
               val storageConfig = storageClientConfig.json()
-              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username)
+              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username, null)
               val identityConfigAsString = mapper.writeValueAsString(identityConfig)
               val data = mapOf("config" to identityConfigAsString, "storage" to storageConfig)
               val noteOptions = NoteOptions().apply {
@@ -583,7 +583,13 @@ data class IdentityConfig(
     @JsonProperty("broker_target_url") val brokerTargetUrl: String,
     @JsonProperty("realm_name") val realmName: String,
     @JsonProperty("user_id") val userId: Int?,
-    @JsonProperty("username") val username: String
+    @JsonProperty("realm_domain") val realmDomain: String?,
+
+    // readAnonymousNote response did not contain a username field, so we make
+    // it optional here. This caused replacePassword and validatePassword methods
+    // in the Identity class to use a non-null assertion when constructing
+    // IdentityConfig objects. 
+    @JsonProperty("username") val username: String?
 ) {
   companion object {
     fun fromJson(json: String): IdentityConfig {

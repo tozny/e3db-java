@@ -1,17 +1,14 @@
 package com.tozny.e3db;
 
 import org.jetbrains.annotations.NotNull;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import com.tozny.e3db.Realm.Companion;
 
 import static com.tozny.e3db.TestUtilities.withTimeout;
 
@@ -61,5 +58,6 @@ public class RealmTest {
         IdentityClient partialIdentityClient = pic.get();
         Client client = partialIdentityClient.getClient();
         System.out.println(client.clientId());
+
     }
 }

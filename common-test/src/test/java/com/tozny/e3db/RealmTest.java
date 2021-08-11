@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.tozny.e3db.TestUtilities.withTimeout;
+import static org.junit.Assert.assertFalse;
 
 public class RealmTest {
     String host = "https://api.e3db.com";
@@ -48,8 +49,6 @@ public class RealmTest {
         if (!atomicBoolean.get()) {
             throw new Error(throwableRef.get());
         }
-        System.out.println(pic.get().getClient().clientId());
-        System.out.println(pic.get().getIdentityConfig().toString());
     }
 
     private static class LoginHandler implements LoginActionHandler {
@@ -89,7 +88,6 @@ public class RealmTest {
         }
         IdentityClient partialIdentityClient = pic.get();
         Client client = partialIdentityClient.getClient();
-        System.out.println(client.clientId());
     }
 
     // Timeout can occur here. Re-ran the test passes.
@@ -100,15 +98,10 @@ public class RealmTest {
             @Override
             public void act(CountDownLatch wait) throws Exception {
                 realm.initiateBrokerLogin(email, r -> {
-                    if (r.isError()) {
-                        System.out.println("failed to initiate");
-                    }
+                    assertFalse(r.isError());
                     wait.countDown();
                 });
             }
         });
-        System.out.println("done");
     }
-
-    // TODO: completeBrokerLogin() test
 }

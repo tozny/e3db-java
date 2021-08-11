@@ -15,6 +15,8 @@ import retrofit2.create
 import java.net.URI
 import java.util.*
 import kotlin.collections.HashMap
+import kotlinx.coroutines.*
+import kotlin.system.*
 
 class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brokerTargetURL: URI?, apiURL: URI? = URI("https://api.e3db.com"), certificatePinner: CertificatePinner? = null) {
   companion object {
@@ -83,33 +85,26 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
 
     identityClient = retrofitBuilder.build().create()
 
-    backgroundExecutor.execute {
+    requestPublicRealmInfo()
+
+    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/")
+    defaultBrokerClient = retrofitBuilder.build().create()
+  }
+
+  private fun requestPublicRealmInfo() = runBlocking {
+    val job = launch {
       try {
         val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
         when {
           publicRealmInfo.isSuccessful -> {
-            publicRealmInfo.body().also {
-              if (it != null) {
-                this.realmInfo = it
-              }
-            }
-            publicRealmInfo.body()?.let {
-              this.realmInfo = it
-            }.run { throw E3dbRealmNotFoundException(realmName) }
+            realmInfo = publicRealmInfo.body()?: throw E3dbRealmNotFoundException(realmName)
           }
         }
       } catch (e: Exception) {
         throw E3dbRealmNotFoundException(realmName)
       }
     }
-
-    // TODO: this.realmName --> this.realmInfo.domain (lateinit causes error here)
-    // GetPublicRealmInfo API call is on background thread, so this.realmInfo is lateinit. This causes
-    // an uninitialized error if realmInfo is used here. The declaration of defaultBrokerClient cannot be on
-    // background thread due to similar issue when its used in method calls before initialized, so
-    // realmName is used.
-    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmName}/")
-    defaultBrokerClient = retrofitBuilder.build().create()
+    job.join()
   }
 
   private fun createTSV1Client(privateSigningKey: ByteArray, publicSigningKey: ByteArray = crypto.getPublicSigningKey(privateSigningKey), clientID: UUID? = null, additionalHeaders: Map<String, String> = mapOf()): OkHttpClient {

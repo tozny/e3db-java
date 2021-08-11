@@ -83,8 +83,6 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
 
     identityClient = retrofitBuilder.build().create()
 
-    // All network calls are done on background threads
-    // This is finicky, and does not guarantee that realmInfo will be populated before it is used?
     backgroundExecutor.execute {
       try {
         val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
@@ -95,23 +93,15 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                 this.realmInfo = it
               }
             }
+            publicRealmInfo.body()?.let {
+              this.realmInfo = it
+            }.run { throw E3dbRealmNotFoundException(realmName) }
           }
         }
       } catch (e: Exception) {
-        // Cannot use uiExecutor.execute here similarly to Realm class methods because
-        // of no result handler
         throw E3dbRealmNotFoundException(realmName)
       }
     }
-
-    // The above background thread execution, but done on main thread.
-//    val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
-//    if (publicRealmInfo.code() == 404) {
-//      throw E3dbRealmNotFoundException(realmName)
-//    } else if (publicRealmInfo.code() != 200) {
-//      throw E3DBException.find(publicRealmInfo.code(), publicRealmInfo.message())
-//    }
-//    this.realmInfo = publicRealmInfo.body()!!
 
     // TODO: this.realmName --> this.realmInfo.domain (lateinit causes error here)
     // GetPublicRealmInfo API call is on background thread, so this.realmInfo is lateinit. This causes
@@ -399,6 +389,9 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                                     message.data["config"]?.let { identityConfigJson ->
                                       val storageClient = ClientBuilder().fromConfig(Config.fromJson(storageConfig)).build()
                                       val identityConfig = IdentityConfig.fromJson(identityConfigJson)
+                                      when {
+                                        identityConfig.username.isNullOrEmpty() -> identityConfig.username = username
+                                      }
                                       AgentToken.fromJson(finalRequestBody)?.let { agentToken ->
                                         uiExecutor.execute { resultHandler.handle(ValueResult(IdentityClient(storageClient, identityConfig, agentToken, certificatePinner))) }
                                       }
@@ -592,13 +585,13 @@ enum class CredentialType {
 }
 
 data class IdentityConfig(
-    @JsonProperty("api_url") val apiURL: URI,
-    @JsonProperty("app_name") val appName: String,
-    @JsonProperty("broker_target_url") val brokerTargetUrl: String,
-    @JsonProperty("realm_name") val realmName: String,
-    @JsonProperty("user_id") val userId: Int?,
-    @JsonProperty("username") val username: String?,
-    @JsonProperty("realm_domain") val realmDomain: String?
+        @JsonProperty("api_url") val apiURL: URI,
+        @JsonProperty("app_name") val appName: String,
+        @JsonProperty("broker_target_url") val brokerTargetUrl: String,
+        @JsonProperty("realm_name") val realmName: String,
+        @JsonProperty("user_id") val userId: Int?,
+        @JsonProperty("username") var username: String?,
+        @JsonProperty("realm_domain") val realmDomain: String?
 ) {
   companion object {
     fun fromJson(json: String): IdentityConfig {

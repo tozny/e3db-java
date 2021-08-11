@@ -28,8 +28,12 @@ open class PartialIdentityClient @JvmOverloads constructor(val client: Client, v
   }
 
   private fun validatePassword(currentPassword: String): Boolean {
-    // identityConfig.username non-null asserted due to IdentityConfig providing username as an optional field
-    val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username!!, currentPassword, CredentialType.PASSWORD)
+    // IdentityConfig.username field is optional, so return false if it is null.
+    // The only execution path to replacePassword is through a successful validatePassword,
+    // so username is guaranteed to be set if it reaches replacePassword.
+    val deriveNoteCreds = identityConfig.username?.let {
+      Realm.deriveNoteCreds(identityConfig.realmName, it, currentPassword, CredentialType.PASSWORD)
+    } ?: return false
     val anonymousNoteClient = Client.getAnonymousNoteClient(deriveNoteCreds.signingKeys.privateKey, deriveNoteCreds.signingKeys.publicKey, identityConfig.apiURL, mapOf(), null)
     val challengeRequest = ChallengeRequest(TozIDEACPChallengeRequest(1))
     val execute = anonymousNoteClient.challengeNote(deriveNoteCreds.noteName, challengeRequest).execute()
@@ -37,6 +41,8 @@ open class PartialIdentityClient @JvmOverloads constructor(val client: Client, v
   }
 
   private fun replacePassword(newPassword: String, resultHandler: ResultHandler<Void>) {
+    // identityConfig.username is guaranteed to be non-null because only path to replacePassword is
+    // through validatePassword, which performs a null safety check on the field.
     val deriveNoteCreds = Realm.deriveNoteCreds(identityConfig.realmName, identityConfig.username!!, newPassword, CredentialType.PASSWORD)
     val identityConfigAsString = Realm.mapper.writeValueAsString(identityConfig)
     val storageConfig = client.config.json()

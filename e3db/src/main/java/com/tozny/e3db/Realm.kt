@@ -15,8 +15,6 @@ import retrofit2.create
 import java.net.URI
 import java.util.*
 import kotlin.collections.HashMap
-import kotlinx.coroutines.*
-import kotlin.system.*
 
 class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brokerTargetURL: URI?, apiURL: URI? = URI("https://api.e3db.com"), certificatePinner: CertificatePinner? = null) {
   companion object {

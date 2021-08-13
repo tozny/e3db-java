@@ -85,14 +85,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
 
     identityClient = retrofitBuilder.build().create()
 
-    requestPublicRealmInfo()
-
-    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${this.realmInfo.domain}/")
-    defaultBrokerClient = retrofitBuilder.build().create()
-  }
-
-  private fun requestPublicRealmInfo() = runBlocking {
-    val job = launch {
+    backgroundExecutor.execute {
       try {
         val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
         when {
@@ -101,10 +94,22 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
           }
         }
       } catch (e: Exception) {
-        throw E3dbRealmNotFoundException(realmName)
+        throw e
       }
     }
-    job.join()
+
+    // defaultBrokerClient is not needed until used, so it can be used lazily in the future.
+    // This is because of the public realm info api request being asynchronous.
+    retrofitBuilder.baseUrl("${apiURL}/v1/identity/broker/realm/${requestPublicRealmInfo().domain}/")
+    defaultBrokerClient = retrofitBuilder.build().create()
+  }
+
+  // Forces calling thread to wait until realmInfo is initialized.
+  // This solves an uninitialized error when trying to access realmInfo before
+  // the API call is complete. This should be updated to use an async/await pattern.
+  private fun requestPublicRealmInfo(): PublicRealmInfo {
+    while (!::realmInfo.isInitialized) {}
+    return realmInfo
   }
 
   private fun createTSV1Client(privateSigningKey: ByteArray, publicSigningKey: ByteArray = crypto.getPublicSigningKey(privateSigningKey), clientID: UUID? = null, additionalHeaders: Map<String, String> = mapOf()): OkHttpClient {
@@ -163,8 +168,8 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
         val response = identityClient.registerIdentity(
                 RegisterIdentityRequest(
                     token,
-                    realmInfo.domain,
-                    IdentityInfo(realmInfo.domain, username, Curve25519PublicKey(publicEncryptionKey), Ed25519PublicKey(publicSigningKey), firstName, lastName, null, null, null, null)))
+                    requestPublicRealmInfo().domain,
+                    IdentityInfo(requestPublicRealmInfo().domain, username, Curve25519PublicKey(publicEncryptionKey), Ed25519PublicKey(publicSigningKey), firstName, lastName, null, null, null, null)))
             .execute()
         when {
           response.isSuccessful -> {
@@ -177,14 +182,14 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
               }.build()
               val deriveNoteCreds = deriveNoteCreds(realmName, username, password, CredentialType.PASSWORD)
               val storageConfig = storageClientConfig.json()
-              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username, realmInfo.domain)
+              val identityConfig = IdentityConfig(apiURL, appName, brokerTargetURL.toString(), realmName, body.identityInfo.userId, username, requestPublicRealmInfo().domain)
               val identityConfigAsString = mapper.writeValueAsString(identityConfig)
               val data = mapOf("config" to identityConfigAsString, "storage" to storageConfig)
               val noteOptions = NoteOptions().apply {
                 noteName = deriveNoteCreds.noteName
                 maxViews = -1
                 expires = false
-                eacp = EACP.Builder().tozIDEACP(TozIDEACP(realmInfo.domain)).build()
+                eacp = EACP.Builder().tozIDEACP(TozIDEACP(requestPublicRealmInfo().domain)).build()
               }
               val idClientData = RecordData(data)
               client.writeNote(
@@ -333,7 +338,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
         val username = userName.toLowerCase(Locale.US)
         val deriveNoteCreds = deriveNoteCreds(realmName, username, password, credentialType)
         val anonymousIdentityClient = createTSV1IdentityClient(deriveNoteCreds.signingKeys.privateKey, deriveNoteCreds.signingKeys.publicKey)
-        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, realmInfo.domain, appName)).execute()
+        val sessionStart = anonymousIdentityClient.loginIdentity(LoginRequest(username, requestPublicRealmInfo().domain, appName)).execute()
         when {
           sessionStart.isSuccessful -> {
             val fieldMap = HashMap<String, String>()
@@ -342,7 +347,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                 put(it.key, it.value.asText())
               }
             }
-            val sessionRequest = identityClient.sessionRequest(realmName, fieldMap).execute()
+            val sessionRequest = identityClient.sessionRequest(requestPublicRealmInfo().domain, fieldMap).execute()
             when {
               sessionRequest.isSuccessful -> {
                 var body: CompleteLoginAction
@@ -353,7 +358,7 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
                     "fetch" -> {
                       madeFinalRequest = true
                       val finalRequest = anonymousIdentityClient.loginredirect(LoginRedirectRequest(
-                          realmInfo.domain,
+                        requestPublicRealmInfo().domain,
                           body.context["session_code"] ?: "",
                           body.context["execution"] ?: "",
                           body.context["tab_id"] ?: "",

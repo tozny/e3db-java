@@ -88,11 +88,11 @@ class Realm @JvmOverloads constructor(realmName: String?, appName: String?, brok
         val publicRealmInfo = identityClient.getPublicRealmInfo(realmName).execute()
         when {
           publicRealmInfo.isSuccessful -> {
-            realmInfo = publicRealmInfo.body()?: throw E3dbRealmNotFoundException(realmName)
+            realmInfo = publicRealmInfo.body()?: throw E3DBException.find(publicRealmInfo.code(), publicRealmInfo.message())
           }
         }
       } catch (e: Exception) {
-        throw e
+        throw E3DBException("message", e)
       }
     }
 

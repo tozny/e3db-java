@@ -1,6 +1,7 @@
 package com.tozny.e3db;
 
 import org.jetbrains.annotations.NotNull;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URI;
@@ -14,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.tozny.e3db.TestUtilities.withTimeout;
 import static org.junit.Assert.assertFalse;
 
+@Ignore
 public class RealmTest {
     String host = "https://api.e3db.com";
     String brokerUrl = "";
